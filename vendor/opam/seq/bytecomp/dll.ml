@@ -141,12 +141,36 @@ let synchronize_primitive num symb =
 (* Read the [ld.conf] file and return the corresponding list of directories *)
 
 let ld_conf_contents () =
+  let is_separator =
+    if Sys.win32 then
+      function '/' | '\\' -> true | _ -> false
+    else
+      Char.equal '/'
+  in
   let path = ref [] in
   begin try
     let ic = open_in (Filename.concat Config.standard_library "ld.conf") in
     begin try
       while true do
-        path := input_line ic :: !path
+        let line = input_line ic in
+        let line =
+          if line = "" then
+            ""
+          else
+            let len = String.length line in
+            if line.[0] = '.' then
+              if len = 1 then
+                Config.standard_library
+              else if is_separator line.[1] then
+                Config.standard_library ^ String.sub line 1 (len - 1)
+              else if line.[1] = '.' && (len = 2 || is_separator line.[2]) then
+                Filename.concat Config.standard_library line
+              else
+                line
+            else
+              line
+        in
+        path := line :: !path
       done
     with End_of_file -> ()
     end;

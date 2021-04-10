@@ -92,10 +92,40 @@ CAMLexport const char_os * caml_get_stdlib_location(void)
   return stdlib;
 }
 
+/* Return a copy of [path], interpreting explicit-relative paths relative to
+   [root]. [root] must not end with a directory separator and is expected to be
+   absolute. The result of this function can never be ".", ".." or a path
+   beginning "./" or "../". Note that the function does not necessarily
+   canonicalise the path. */
+static char_os *make_relative_path_absolute(char_os *path, char_os *root)
+{
+  if (path[0] == '.') {
+    if (path[1] == '\0') {
+      /* path is exactly "." => return root */
+      return caml_stat_strdup_os(root);
+    } else if (Is_separator(path[1])) {
+      /* path is exactly "./" or begins "./". In both cases, replace the "."
+         with root */
+      return caml_stat_strconcat_os(2, root, (path + 1));
+    } else if (path[1] == '.' && (path[2] == '\0' || Is_separator(path[2]))) {
+      /* path is either exactly ".." or begins "../" => prefix it with root
+         (which has no trailing separator) */
+      return caml_stat_strconcat_os(3, root, CAML_DIR_SEP, path);
+    } else {
+      /* path is not explicit-relative, but simply begins with a dot
+           => return a copy */
+      return caml_stat_strdup_os(path);
+    }
+  } else {
+    /* path is not explicit-relative => return a copy */
+    return caml_stat_strdup_os(path);
+  }
+}
+
 CAMLexport char_os * caml_parse_ld_conf(void)
 {
   const char_os * stdlib;
-  char_os * ldconfname, * wconfig, * p, * q;
+  char_os * libroot, * ldconfname, * wconfig, * p, * q;
   char * config;
 #ifdef _WIN32
   struct _stati64 st;
@@ -103,15 +133,17 @@ CAMLexport char_os * caml_parse_ld_conf(void)
   struct stat st;
 #endif
   int ldconf, nread;
+  size_t length;
 
   stdlib = caml_get_stdlib_location();
-  size_t length = strlen_os(stdlib);
-  if (length == 0 || !Is_dir_separator(stdlib[length - 1]))
-    ldconfname = caml_stat_strconcat_os(3, stdlib, CAML_DIR_SEP, LD_CONF_NAME);
-  else
-    ldconfname = caml_stat_strconcat_os(2, stdlib, LD_CONF_NAME);
+  libroot = caml_stat_strdup_os(stdlib);
+  length = strlen_os(libroot);
+  if (length > 1 && Is_separator(libroot[length - 1]))
+    libroot[length - 1] = '\0';
+  ldconfname = caml_stat_strconcat_os(3, libroot, CAML_DIR_SEP, LD_CONF_NAME);
   if (stat_os(ldconfname, &st) == -1) {
     caml_stat_free(ldconfname);
+    caml_stat_free(libroot);
     return NULL;
   }
   ldconf = open_os(ldconfname, O_RDONLY, 0);
@@ -127,18 +159,41 @@ CAMLexport char_os * caml_parse_ld_conf(void)
   config[nread] = 0;
   wconfig = caml_stat_strdup_to_os(config);
   caml_stat_free(config);
-  q = wconfig;
-  for (p = wconfig; *p != 0; p++) {
-    if (*p == '\n') {
-      *p = 0;
-      caml_ext_table_add(&caml_shared_libs_path, q);
-      q = p + 1;
-    }
+
+  /* Use a temporary ext_table to hold the individually-allocated entries */
+  struct ext_table entries;
+  caml_ext_table_init(&entries, 8);
+  length = 0;
+  p = wconfig;
+  while (*p != '\0') {
+    for (q = p; *q != '\0' && *q != '\n'; q++) /*nothing*/;
+    char_os last = *q;
+    *q = '\0';
+    char_os *entry = make_relative_path_absolute(p, libroot);
+    length += strlen_os(entry) + 1;
+    caml_ext_table_add(&entries, entry);
+    p = q;
+    if (last == '\n')
+      p++;
   }
-  if (q < p) caml_ext_table_add(&caml_shared_libs_path, q);
-  close(ldconf);
   caml_stat_free(ldconfname);
-  return wconfig;
+  close(ldconf);
+
+  /* Now concatenate them all and load the search path */
+  char_os *result = caml_stat_alloc(length * sizeof(char_os));
+  p = result;
+  for (int i = 0; i < entries.size; i++) {
+    char_os *entry = entries.contents[i];
+    length = strlen_os(entry) + 1;
+    memcpy(p, entry, length * sizeof(char_os));
+    caml_ext_table_add(&caml_shared_libs_path, p);
+    p += length;
+  }
+  caml_ext_table_free(&entries, 1);
+  caml_stat_free(wconfig);
+  caml_stat_free(libroot);
+
+  return result;
 }
 
 /* Open the given shared library and add it to shared_libs.
