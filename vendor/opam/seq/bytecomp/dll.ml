@@ -140,6 +140,19 @@ let synchronize_primitive num symb =
 
 (* Read the [ld.conf] file and return the corresponding list of directories *)
 
+let rtrim_cr s =
+  if s = "" then s
+  else
+    let len = String.length s in
+    let i = ref len in
+    while !i > 0 && s.[!i - 1] = '\r' do
+      decr i
+    done;
+    if !i <> len then
+      String.sub s 0 !i
+    else
+      s
+
 let ld_conf_contents dir =
   let is_separator =
     if Sys.win32 then
@@ -147,37 +160,34 @@ let ld_conf_contents dir =
     else
       Char.equal '/'
   in
-  let path = ref [] in
-  begin try
-    let ic = open_in (Filename.concat dir "ld.conf") in
-    begin try
-      while true do
-        let line = input_line ic in
-        let line =
-          if line = "" then
-            ""
-          else
-            let len = String.length line in
-            if line.[0] = '.' then
-              if len = 1 then
-                dir
-              else if is_separator line.[1] then
-                dir ^ String.sub line 1 (len - 1)
-              else if line.[1] = '.' && (len = 2 || is_separator line.[2]) then
-                Filename.concat dir line
-              else
-                line
-            else
-              line
-        in
-        path := line :: !path
-      done
-    with End_of_file -> ()
-    end;
-    close_in ic
-  with Sys_error _ -> ()
-  end;
-  List.rev !path
+  let translate line =
+    if line = "" then
+      ""
+    else
+      let len = String.length line in
+      if line.[0] = '.' then
+        if len = 1 then
+          dir
+        else if is_separator line.[1] then
+          dir ^ String.sub line 1 (len - 1)
+        else if line.[1] = '.' && (len = 2 || is_separator line.[2]) then
+          Filename.concat dir line
+        else
+          line
+      else
+        line
+  in
+  try
+    In_channel.with_open_bin (Filename.concat dir "ld.conf") @@ fun ic ->
+      let lines = String.split_on_char '\n' (In_channel.input_all ic) in
+      match List.rev lines with
+      | [] -> assert false (* String.split_on_char doesn't return [] *)
+      | [""] -> []
+      | last :: rev_rest ->
+          let f s = translate (rtrim_cr s) in
+          let last = translate last in
+          List.rev_map f rev_rest @ if last = "" then [] else [last]
+  with Sys_error _ -> []
 
 let ld_conf_contents () =
   let dirs = [
