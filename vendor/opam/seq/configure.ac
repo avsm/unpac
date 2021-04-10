@@ -390,6 +390,17 @@ AS_IF([test -n "$csc"],
       AS_CASE([$host_cpu], [i*86], [CSCFLAGS="$CSCFLAGS /platform:x86"])],
     [AC_MSG_WARN([Mono is not yet supported - C sharp tests disabled])])])
 
+# Environment-specific set-up
+
+dnl The separator should be being treated differently for host/target for
+dnl cross-compilers, but the installation layout for cross-compilers is already
+dnl incorrect (for example, ld.conf is processed by _both_ the host and target
+dnl runtimes), so this is left as target-specific for now.
+AS_CASE([$target],
+  [*-w64-mingw32*|*-pc-windows],
+    [default_separator='\'],
+  [default_separator='/'])
+
 # Environment variables that are taken into account
 
 AC_ARG_VAR([AS], [which assembler to use])
@@ -588,9 +599,8 @@ AC_ARG_WITH([additional-stublibsdir],
     [no],
       [ocaml_additional_stublibs_dir=''],
     [yes],
-      [ocaml_additional_stublibs_dir='"${prefix}/lib/stublibs"'],
-    [ocaml_additional_stublibs_dir=\
-"'$(echo "$withval" | sed -e "s/'/'\"'\"'/g")'"])],
+      [ocaml_additional_stublibs_dir="..${default_separator}stublibs"],
+    [ocaml_additional_stublibs_dir="$withval"])],
   [ocaml_additional_stublibs_dir=''])
 
 AC_ARG_ENABLE([reserved-header-bits],
@@ -2948,7 +2958,6 @@ AC_CONFIG_COMMANDS_PRE([
   eval "exec_prefix=\"$exec_prefix\""
   eval "ocaml_bindir=\"$bindir\""
   eval "ocaml_libdir=\"$libdir\""
-  eval "ocaml_additional_stublibs_dir=$ocaml_additional_stublibs_dir"
   AS_IF([test x"$TARGET_BINDIR" = 'x'],[TARGET_BINDIR="$ocaml_bindir"])
   AS_IF([test x"$target_launch_method" = 'x'],
     [target_launch_method="$launch_method"])
@@ -2960,11 +2969,12 @@ AC_CONFIG_COMMANDS([runtime/ld.conf],
   [rm -f runtime/ld.conf
   test x"$ocaml_additional_stublibs_dir" = 'x' || \
     echo "$ocaml_additional_stublibs_dir" > runtime/ld.conf
-  echo "$ocaml_libdir/stublibs" >> runtime/ld.conf
-  echo "$ocaml_libdir" >> runtime/ld.conf],
+  echo ".${default_separator}stublibs" >> runtime/ld.conf
+  echo "." >> runtime/ld.conf],
   [ocaml_additional_stublibs_dir=\
 '$(echo "$ocaml_additional_stublibs_dir" | sed -e "s/'/'\"'\"'/g")'
-  ocaml_libdir='$(echo "$ocaml_libdir" | sed -e "s/'/'\"'\"'/g")'])
+  ocaml_libdir='$(echo "$ocaml_libdir" | sed -e "s/'/'\"'\"'/g")'
+  default_separator='$default_separator'])
 
 # Just before config.status is generated, determine the final values for MKEXE,
 # MKDLL, MKMAINDLL and MKEXE_VIA_CC. The final variables controlling these are:

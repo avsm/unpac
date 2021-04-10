@@ -3941,6 +3941,15 @@ printf "%s\n" "$as_me: WARNING: Mono is not yet supported - C sharp tests disabl
 esac
 fi
 
+# Environment-specific set-up
+
+case $target in #(
+  *-w64-mingw32*|*-pc-windows) :
+    default_separator='\' ;; #(
+  *) :
+    default_separator='/' ;;
+esac
+
 # Environment variables that are taken into account
 
 
@@ -4232,10 +4241,9 @@ then :
   no) :
     ocaml_additional_stublibs_dir='' ;; #(
   yes) :
-    ocaml_additional_stublibs_dir='"${prefix}/lib/stublibs"' ;; #(
+    ocaml_additional_stublibs_dir="..${default_separator}stublibs" ;; #(
   *) :
-    ocaml_additional_stublibs_dir=\
-"'$(echo "$withval" | sed -e "s/'/'\"'\"'/g")'" ;;
+    ocaml_additional_stublibs_dir="$withval" ;;
 esac
 else $as_nop
   ocaml_additional_stublibs_dir=''
@@ -24367,7 +24375,6 @@ fi
   eval "exec_prefix=\"$exec_prefix\""
   eval "ocaml_bindir=\"$bindir\""
   eval "ocaml_libdir=\"$libdir\""
-  eval "ocaml_additional_stublibs_dir=$ocaml_additional_stublibs_dir"
   if test x"$TARGET_BINDIR" = 'x'
 then :
   TARGET_BINDIR="$ocaml_bindir"
@@ -25342,6 +25349,7 @@ fi
 ocaml_additional_stublibs_dir=\
 '$(echo "$ocaml_additional_stublibs_dir" | sed -e "s/'/'\"'\"'/g")'
   ocaml_libdir='$(echo "$ocaml_libdir" | sed -e "s/'/'\"'\"'/g")'
+  default_separator='$default_separator'
 
 _ACEOF
 
@@ -26525,8 +26533,8 @@ ltmain=$ac_aux_dir/ltmain.sh
     "runtime/ld.conf":C) rm -f runtime/ld.conf
   test x"$ocaml_additional_stublibs_dir" = 'x' || \
     echo "$ocaml_additional_stublibs_dir" > runtime/ld.conf
-  echo "$ocaml_libdir/stublibs" >> runtime/ld.conf
-  echo "$ocaml_libdir" >> runtime/ld.conf ;;
+  echo ".${default_separator}stublibs" >> runtime/ld.conf
+  echo "." >> runtime/ld.conf ;;
 
   esac
 done # for ac_tag
