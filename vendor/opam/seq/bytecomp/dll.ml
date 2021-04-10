@@ -140,7 +140,7 @@ let synchronize_primitive num symb =
 
 (* Read the [ld.conf] file and return the corresponding list of directories *)
 
-let ld_conf_contents () =
+let ld_conf_contents dir =
   let is_separator =
     if Sys.win32 then
       function '/' | '\\' -> true | _ -> false
@@ -149,7 +149,7 @@ let ld_conf_contents () =
   in
   let path = ref [] in
   begin try
-    let ic = open_in (Filename.concat Config.standard_library "ld.conf") in
+    let ic = open_in (Filename.concat dir "ld.conf") in
     begin try
       while true do
         let line = input_line ic in
@@ -160,11 +160,11 @@ let ld_conf_contents () =
             let len = String.length line in
             if line.[0] = '.' then
               if len = 1 then
-                Config.standard_library
+                dir
               else if is_separator line.[1] then
-                Config.standard_library ^ String.sub line 1 (len - 1)
+                dir ^ String.sub line 1 (len - 1)
               else if line.[1] = '.' && (len = 2 || is_separator line.[2]) then
-                Filename.concat Config.standard_library line
+                Filename.concat dir line
               else
                 line
             else
@@ -178,6 +178,13 @@ let ld_conf_contents () =
   with Sys_error _ -> ()
   end;
   List.rev !path
+
+let ld_conf_contents () =
+  let dirs = [
+    Sys.getenv_opt "OCAMLLIB";
+    Sys.getenv_opt "CAMLLIB";
+    Some Config.standard_library_default] in
+  List.concat_map (Option.fold ~none:[] ~some:ld_conf_contents) dirs
 
 (* Split the CAML_LD_LIBRARY_PATH environment variable and return
    the corresponding list of directories.  *)

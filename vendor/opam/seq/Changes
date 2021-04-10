@@ -71,7 +71,9 @@ Working version
   was loaded from, and the default ld.conf now uses relative paths, rather than
   embedding the absolute path to the Standard Library. The brave may continue to
   put implicit paths in ld.conf. The interpretation of CAML_LD_LIBRARY_PATH is
-  unaltered.
+  unaltered. Additionally, ld.conf is loaded from all of $OCAMLLIB/ld.conf,
+  $CAMLLIB/ld.conf and standard_library_default/ld.conf rather than just the
+  first one found.
   (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
 
 - #12269, #12410, #13063: Fix unsafety, deadlocks, and/or leaks should

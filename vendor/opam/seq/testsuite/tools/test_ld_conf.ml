@@ -233,27 +233,28 @@ let tests _config env =
             stdlib = ["ld.conf"];
             outcome = outcome_caml_ld_library_path
                         @ if_ld_conf_found ["ld.conf"]} :: tests in
+    let ld_conf_outcome = if_ld_conf_found ["masked-stdlib"] in
     let tests =
-      (* An empty CAMLLIB should cause ld.conf in the Standard Library to be
-         ignored, but not CAML_LD_LIBRARY PATH *)
+      (* An empty CAMLLIB shouldn't hide ld.conf in the Standard Library *)
       {base with description = "Empty CAMLLIB";
                  caml_ld_library_path = Set ["env"];
                  camllib = Empty;
                  stdlib = ["masked-stdlib"];
-                 outcome = ["env"]} :: tests in
+                 outcome = "env" :: ld_conf_outcome} :: tests in
     let tests =
-      (* An empty OCAMLLIB should cause ld.conf in both the Standard Library and
-         CAMLLIB to be ignored, but not CAML_LD_LIBRARY_PATH *)
+      (* An empty OCAMLLIB shouldn't hide ld.conf in either the Standard Library
+         or CAMLLIB\ld.conf *)
       {description = "Empty OCAMLLIB";
        caml_ld_library_path = Set ["env"];
        ocamllib = Empty;
        camllib = Set ["masked-camllib"];
        stdlib = ["masked-stdlib"];
-       outcome = ["env"]} :: tests in
+       outcome = ["env"; "masked-camllib"] @ ld_conf_outcome} :: tests in
     tests
   in
   (* Batch 3: load priority, embedded NUL characters, EOL-at-EOF, etc. *)
   let tests =
+    let ld_conf_outcome = if_ld_conf_found ["libdir"] in
     let tests =
       (* OCAMLLIB should have priority over CAMLLIB and the Standard Library *)
       {description = "$OCAMLLIB/ld.conf";
@@ -261,19 +262,19 @@ let tests _config env =
        ocamllib = Set ["ocamllib\000"; "hidden"];
        camllib = Set ["camllib\000"; "hidden"];
        stdlib = ["libdir"];
-       outcome = ["env"; "ocamllib"]} :: tests in
+       outcome = ["env"; "ocamllib"; "camllib"] @ ld_conf_outcome} :: tests in
     let tests =
       (* CAMLLIB should have priority over the Standard Library *)
       {base with description = "$CAMLLIB/ld.conf";
                  caml_ld_library_path = Set ["env"];
                  camllib = Set ["camllib\000"; "hidden"];
                  stdlib = ["libdir"];
-                 outcome = ["env"; "camllib"]} :: tests in
+                 outcome = ["env"; "camllib"] @ ld_conf_outcome} :: tests in
     let tests =
       (* EOL-at-EOF should not add a blank entry to the search path *)
       {base with description = "EOF-at-EOF";
             stdlib = (if Sys.win32 then ["libdir\r\n"] else ["libdir\n"]);
-            outcome = if_ld_conf_found ["libdir"]} :: tests in
+            outcome = ld_conf_outcome} :: tests in
     tests
   in
   tests
@@ -364,31 +365,6 @@ let () =
         run_process ~runtime test_program []
       in
       if code = 0 then
-        let lines =
-          (* Known issue: Sys.getenv processes blank environment variables
-             differently from _wgetenv which in the tests will cause it load
-             ld.conf files. The tests have been written to allow for this by
-             having the lines which are _not_ expected to appear on Unix be
-             prefixed with "masked-". *)
-          if Sys.win32 then
-            if ((test.camllib = Empty
-                   && not (Environment.is_renamed env))
-                || test.ocamllib = Empty) then
-              let unmask s = not (String.starts_with ~prefix:"masked-" s) in
-              let lines' = List.filter unmask lines in
-              (* If Windows behaviour has been harmonised, then the filtered
-                 list of lines would be the same as the unfiltered list. If this
-                 happens, insert an extra line to "poison" the test output to
-                 prevent this behaviour from being silently fixed. *)
-              if lines = lines' then
-                "poisoned"::lines
-              else
-                lines'
-            else
-              lines
-          else
-            lines
-        in
         let lines =
           (* Known issue: ocamlc opens ld.conf in text mode on Cygwin but
              ocamlrun opens it in binary mode (the default). This means that

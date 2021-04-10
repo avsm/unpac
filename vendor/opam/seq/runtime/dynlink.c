@@ -124,7 +124,10 @@ static char_os *make_relative_path_absolute(char_os *path, char_os *root)
 
 CAMLexport char_os * caml_parse_ld_conf(void)
 {
-  const char_os * stdlib;
+  const char_os * const locations[3] = {
+    caml_secure_getenv(T("OCAMLLIB")),
+    caml_secure_getenv(T("CAMLLIB")),
+    OCAML_STDLIB_DIR};
   char_os * libroot, * ldconfname, * wconfig, * p, * q;
   char * config;
 #ifdef _WIN32
@@ -133,51 +136,57 @@ CAMLexport char_os * caml_parse_ld_conf(void)
   struct stat st;
 #endif
   int ldconf, nread;
-  size_t length;
-
-  stdlib = caml_get_stdlib_location();
-  libroot = caml_stat_strdup_os(stdlib);
-  length = strlen_os(libroot);
-  if (length > 1 && Is_separator(libroot[length - 1]))
-    libroot[length - 1] = '\0';
-  ldconfname = caml_stat_strconcat_os(3, libroot, CAML_DIR_SEP, LD_CONF_NAME);
-  if (stat_os(ldconfname, &st) == -1) {
-    caml_stat_free(ldconfname);
-    caml_stat_free(libroot);
-    return NULL;
-  }
-  ldconf = open_os(ldconfname, O_RDONLY, 0);
-  if (ldconf == -1)
-    caml_fatal_error("cannot read loader config file %s",
-                         caml_stat_strdup_of_os(ldconfname));
-  config = caml_stat_alloc(st.st_size + 1);
-  nread = read(ldconf, config, st.st_size);
-  if (nread == -1)
-    caml_fatal_error
-      ("error while reading loader config file %s",
-       caml_stat_strdup_of_os(ldconfname));
-  config[nread] = 0;
-  wconfig = caml_stat_strdup_to_os(config);
-  caml_stat_free(config);
+  size_t length = 0;
+  struct ext_table entries;
 
   /* Use a temporary ext_table to hold the individually-allocated entries */
-  struct ext_table entries;
   caml_ext_table_init(&entries, 8);
-  length = 0;
-  p = wconfig;
-  while (*p != '\0') {
-    for (q = p; *q != '\0' && *q != '\n'; q++) /*nothing*/;
-    char_os last = *q;
-    *q = '\0';
-    char_os *entry = make_relative_path_absolute(p, libroot);
-    length += strlen_os(entry) + 1;
-    caml_ext_table_add(&entries, entry);
-    p = q;
-    if (last == '\n')
-      p++;
+  for (int i = 0; i < sizeof(locations) / sizeof(locations[0]); i++) {
+    if (locations[i] != NULL) {
+      libroot = caml_stat_strdup_os(locations[i]);
+      size_t libroot_length = strlen_os(libroot);
+      while (libroot_length > 0 && Is_separator(libroot[libroot_length - 1]))
+        libroot[--libroot_length] = '\0';
+      ldconfname =
+        caml_stat_strconcat_os(3, libroot, CAML_DIR_SEP, LD_CONF_NAME);
+      if (stat_os(ldconfname, &st) == -1) {
+        caml_stat_free(ldconfname);
+        caml_stat_free(libroot);
+        continue;
+      }
+      ldconf = open_os(ldconfname, O_RDONLY, 0);
+      if (ldconf == -1)
+        caml_fatal_error("cannot read loader config file %s",
+                             caml_stat_strdup_of_os(ldconfname));
+      config = caml_stat_alloc(st.st_size + 1);
+      nread = read(ldconf, config, st.st_size);
+      if (nread == -1)
+        caml_fatal_error
+          ("error while reading loader config file %s",
+           caml_stat_strdup_of_os(ldconfname));
+      close(ldconf);
+      config[nread] = 0;
+      wconfig = caml_stat_strdup_to_os(config);
+      caml_stat_free(config);
+      caml_stat_free(ldconfname);
+
+      p = wconfig;
+      while (*p != '\0') {
+        for (q = p; *q != '\0' && *q != '\n'; q++) /*nothing*/;
+        char_os last = *q;
+        *q = '\0';
+        char_os *entry = make_relative_path_absolute(p, libroot);
+        length += strlen_os(entry) + 1;
+        caml_ext_table_add(&entries, entry);
+        p = q;
+        if (last == '\n')
+          p++;
+      }
+
+      caml_stat_free(wconfig);
+      caml_stat_free(libroot);
+    }
   }
-  caml_stat_free(ldconfname);
-  close(ldconf);
 
   /* Now concatenate them all and load the search path */
   char_os *result = caml_stat_alloc(length * sizeof(char_os));
@@ -190,8 +199,6 @@ CAMLexport char_os * caml_parse_ld_conf(void)
     p += length;
   }
   caml_ext_table_free(&entries, 1);
-  caml_stat_free(wconfig);
-  caml_stat_free(libroot);
 
   return result;
 }
@@ -234,6 +241,8 @@ void caml_build_primitive_table(char_os * lib_path,
      - directories specified on the command line with the -I option
      - directories specified in the CAML_LD_LIBRARY_PATH
      - directories specified in the executable
+     - directories specified in OCAMLLIB/ld.conf
+     - directories specified in CAMLLIB/ld.conf
      - directories specified in the file <stdlib>/ld.conf
 
      caml_shared_libs_path and caml_prim_name_table are not freed afterwards:
