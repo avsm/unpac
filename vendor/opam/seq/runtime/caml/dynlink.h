@@ -41,9 +41,6 @@ extern void caml_build_primitive_table_builtin(void);
 /* Unload all the previously loaded shared libraries */
 extern void caml_free_shared_libs(void);
 
-/* Return the effective location of the standard library */
-extern const char_os * caml_get_stdlib_location(void);
-
 /* If found, parse $OCAMLLIB/ld.conf, $CAMLLIB/ld.conf and
    OCAML_STDLIB_DIR/ld.conf in that order and add the lines read to
    caml_shared_libs_path. */

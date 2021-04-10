@@ -83,15 +83,6 @@ static c_primitive lookup_primitive(const char * name)
 
 #define LD_CONF_NAME T("ld.conf")
 
-CAMLexport const char_os * caml_get_stdlib_location(void)
-{
-  const char_os * stdlib;
-  stdlib = caml_secure_getenv(T("OCAMLLIB"));
-  if (stdlib == NULL) stdlib = caml_secure_getenv(T("CAMLLIB"));
-  if (stdlib == NULL) stdlib = OCAML_STDLIB_DIR;
-  return stdlib;
-}
-
 /* Return a copy of [path], interpreting explicit-relative paths relative to
    [root]. [root] must not end with a directory separator and is expected to be
    absolute. The result of this function can never be ".", ".." or a path
