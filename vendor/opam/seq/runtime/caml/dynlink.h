@@ -46,6 +46,10 @@ extern void caml_free_shared_libs(void);
 extern char_os * caml_parse_ld_conf(const char_os * stdlib,
                                     struct ext_table * table);
 
+/* The default location of the Standard Library as used by the runtime to find
+   ld.conf */
+extern const char_os *caml_runtime_standard_library_default;
+
 #endif /* CAML_INTERNALS */
 
 #endif /* CAML_DYNLINK_H */

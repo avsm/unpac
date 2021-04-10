@@ -379,7 +379,7 @@ static const char_os * get_stdlib_location(void)
   const char_os * stdlib;
   stdlib = caml_secure_getenv(T("OCAMLLIB"));
   if (stdlib == NULL) stdlib = caml_secure_getenv(T("CAMLLIB"));
-  if (stdlib == NULL) stdlib = OCAML_STDLIB_DIR;
+  if (stdlib == NULL) stdlib = caml_runtime_standard_library_default;
   return stdlib;
 }
 
@@ -392,7 +392,7 @@ static void do_print_config(void)
   /* Print the runtime configuration */
   printf("version: %s\n", OCAML_VERSION_STRING);
   printf("standard_library_default: %s\n",
-         caml_stat_strdup_of_os(OCAML_STDLIB_DIR));
+         caml_stat_strdup_of_os(caml_runtime_standard_library_default));
   printf("standard_library: %s\n",
          caml_stat_strdup_of_os(get_stdlib_location()));
   printf("int_size: %d\n", 8 * (int)sizeof(value));
@@ -431,7 +431,8 @@ static void do_print_config(void)
   puts("shared_libs_path:");
   caml_decompose_path(&caml_shared_libs_path,
                       caml_secure_getenv(T("CAML_LD_LIBRARY_PATH")));
-  caml_parse_ld_conf(OCAML_STDLIB_DIR, &caml_shared_libs_path);
+  caml_parse_ld_conf(caml_runtime_standard_library_default,
+                     &caml_shared_libs_path);
   for (int i = 0; i < caml_shared_libs_path.size; i++) {
     dir = caml_shared_libs_path.contents[i];
     if (dir[0] == 0)
