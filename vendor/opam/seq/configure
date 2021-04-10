@@ -800,6 +800,7 @@ build_os
 build_vendor
 build_cpu
 build
+target_libdir_is_relative
 ar_supports_response_files
 QS
 TARGET_LIBDIR
@@ -1045,6 +1046,7 @@ enable_force_safe_string
 enable_flat_float_array
 enable_function_sections
 enable_mmap_map_stack
+with_relative_libdir
 with_afl
 with_flexdll
 with_winpthreads_msvc
@@ -1775,6 +1777,9 @@ Optional Packages:
   --with-additional-stublibsdir
                           additional directory for searching for bytecode stub
                           libraries
+  --with-relative-libdir  location of the Standard Library, specified relative
+                          to --bindir (if no argument is given to
+                          --with-relative-libdir, defaults to ../lib/ocaml)
   --with-afl              use the AFL fuzzer
   --with-flexdll          bootstrap FlexDLL from the given sources
   --with-winpthreads-msvc build winpthreads (only for the MSVC port) from the
@@ -3372,6 +3377,7 @@ ocamltest_unix_impl="dummy"
 unix_library=""
 unix_directory=""
 diff_supports_color=false
+target_libdir_is_relative=false
 
 # Information about the package
 
@@ -3527,6 +3533,7 @@ LINEAR_MAGIC_NUMBER=Caml1999L037
 
 
  # TODO: rename this variable
+
 
 
 
@@ -4353,6 +4360,23 @@ fi
 if test ${enable_mmap_map_stack+y}
 then :
   enableval=$enable_mmap_map_stack;
+fi
+
+
+
+# Check whether --with-relative-libdir was given.
+if test ${with_relative_libdir+y}
+then :
+  withval=$with_relative_libdir; case $withval in #(
+  no) :
+    bindir_to_libdir='' ;; #(
+  yes) :
+    bindir_to_libdir="..${default_separator}lib${default_separator}ocaml" ;; #(
+  *) :
+    bindir_to_libdir="$withval" ;;
+esac
+else $as_nop
+  bindir_to_libdir=''
 fi
 
 
@@ -17792,6 +17816,13 @@ fi
 
 # Checks for header files
 
+ac_fn_c_check_header_compile "$LINENO" "libgen.h" "ac_cv_header_libgen_h" "$ac_includes_default"
+if test "x$ac_cv_header_libgen_h" = xyes
+then :
+  printf "%s\n" "#define HAS_LIBGEN_H 1" >>confdefs.h
+
+fi
+
 ac_fn_c_check_header_compile "$LINENO" "pthread_np.h" "ac_cv_header_pthread_np_h" "$ac_includes_default"
 if test "x$ac_cv_header_pthread_np_h" = xyes
 then :
@@ -24262,6 +24293,40 @@ fi ;; #(
      ;;
 esac
 
+if test x"$libdir" = x'${exec_prefix}/lib/ocaml'
+then :
+  if test x"$bindir_to_libdir" != 'x'
+then :
+  ocaml_libdir="$bindir_to_libdir"
+    target_libdir_is_relative=true
+    case $cygwin_build_env,$host in #(
+  true,*-w64-mingw32*|true,*-pc-windows) :
+    build_bindir_to_libdir="$(LC_ALL=C.UTF-8 cygpath \
+                                   "$bindir_to_libdir")" ;; #(
+  *) :
+    build_bindir_to_libdir="$bindir_to_libdir" ;;
+esac
+    case $build_bindir_to_libdir in #(
+  ./*) :
+    libdir="$bindir${build_bindir_to_libdir#.}" ;; #(
+  ../*) :
+    libdir="$bindir/$build_bindir_to_libdir" ;; #(
+  *) :
+    as_fn_error $? "--with-relative-libdir requires an explicit relative path" "$LINENO" 5 ;;
+esac
+fi
+else $as_nop
+  if test x"$bindir_to_libdir" != 'x'
+then :
+  as_fn_error $? "--with-relative-libdir and --libdir cannot both be specified" "$LINENO" 5
+fi
+fi
+
+if test x"$bindir_to_libdir" != 'x' && test x"$TARGET_LIBDIR" != 'x'
+then :
+  as_fn_error $? "--with-relative-libdir and TARGET_LIBDIR cannot both be specified" "$LINENO" 5
+fi
+
 # Define a few macros that were defined in config/m-nt.h
 # but whose value is not guessed properly by configure
 # (all this should be understood and fixed)
@@ -24454,15 +24519,43 @@ then :
   exec_prefix="$prefix"
 fi
   eval "exec_prefix=\"$exec_prefix\""
-  eval "ocaml_bindir=\"$ocaml_bindir\""
-  eval "ocaml_libdir=\"$ocaml_libdir\""
+  # Set variables necessary to create utils/config.generated.ml and the two
+  # runtime-launch-info templates in stdlib.
+  # $ocaml_bindir is used for utils/config.generated.ml and is _empty_ if the
+  #   compiler is configured with --with-relative-libdir (otherwise the path
+  #   would be embedded in config.cmo)
+  # $HOST_BINDIR and $TARGET_BINDIR are used to generate the two
+  #   runtime-launch-info files. $HOST_BINDIR is always the absolute path to the
+  #   binary directory, in host format (i.e. potentially with backslashes on
+  #   Windows). $TARGET_BINDIR can be specified by the caller when building
+  #   cross-compilers, and the value then is used unaltered. Otherwise,
+  #   $TARGET_BINDIR is set to '.' when the compiler is configured with
+  #   --with-relative-libdir or the value of $HOST_BINDIR otherwise.
+  eval "HOST_BINDIR=\"$ocaml_bindir\""
+  if test "x$bindir_to_libdir" = 'x'
+then :
+  ocaml_bindir="$HOST_BINDIR"
+else $as_nop
+  ocaml_bindir=''
+fi
   if test x"$TARGET_BINDIR" = 'x'
 then :
-  TARGET_BINDIR="$ocaml_bindir"
+  if test "x$bindir_to_libdir" = 'x'
+then :
+  TARGET_BINDIR="$HOST_BINDIR"
+else $as_nop
+  TARGET_BINDIR='.'
 fi
+fi
+  eval "ocaml_libdir=\"$ocaml_libdir\""
   if test x"$TARGET_LIBDIR" = 'x'
 then :
+  if test "x$bindir_to_libdir" = 'x'
+then :
   TARGET_LIBDIR="$ocaml_libdir"
+else $as_nop
+  TARGET_LIBDIR="$bindir_to_libdir"
+fi
 fi
   if test x"$target_launch_method" = 'x'
 then :
@@ -25426,7 +25519,7 @@ fi
   launch_method='$(echo "$launch_method" | sed -e "s/'/'\"'\"'/g")'
   target_launch_method=\
 '$(echo "$target_launch_method" | sed -e "s/'/'\"'\"'/g")'
-  ocaml_bindir='$(echo "$ocaml_bindir" | sed -e "s/'/'\"'\"'/g")'
+  HOST_BINDIR='$(echo "$HOST_BINDIR" | sed -e "s/'/'\"'\"'/g")'
   TARGET_BINDIR='$(echo "$TARGET_BINDIR" | sed -e "s/'/'\"'\"'/g")'
 
   ocamltest_unix_mod='$ocamltest_unix_mod'
@@ -26612,7 +26705,7 @@ ltmain=$ac_aux_dir/ltmain.sh
   chmod +x "$ofile"
 
  ;;
-    "shebang":C) printf '%s\n%s\000\n' "$launch_method" "$ocaml_bindir" \
+    "shebang":C) printf '%s\n%s\000\n' "$launch_method" "$HOST_BINDIR" \
     > stdlib/runtime.info
   printf '%s\n%s\000\n' "$target_launch_method" "$TARGET_BINDIR" \
     > stdlib/target_runtime.info ;;

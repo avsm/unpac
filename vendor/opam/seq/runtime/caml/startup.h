@@ -59,6 +59,7 @@ extern const enum caml_byte_program_mode caml_byte_program_mode;
 /* The default location of the Standard Library as used by the runtime to find
    ld.conf */
 extern const char_os *caml_runtime_standard_library_default;
+extern const char_os *caml_runtime_standard_library_effective;
 
 #endif /* CAML_INTERNALS */
 

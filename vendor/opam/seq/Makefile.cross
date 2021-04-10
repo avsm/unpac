@@ -48,7 +48,7 @@ CROSS_OVERRIDES=OCAMLRUN=ocamlrun NEW_OCAMLRUN=ocamlrun \
 # cross/lib/ocaml for Config.standard_library_default
 CROSS_COMPILER_OVERRIDES=$(CROSS_OVERRIDES) CAMLC=ocamlc CAMLOPT=ocamlopt \
   BEST_OCAMLC=ocamlc BEST_OCAMLOPT=ocamlopt BEST_OCAMLLEX=ocamllex \
-  "OC_CROSS_LINKFLAGS=-set-runtime-default 'standard_library_default=$(LIBDIR)'"
+  HOST_LIBDIR="$(LIBDIR)"
 CROSS_COMPILERLIBS_OVERRIDES=$(CROSS_OVERRIDES) CAMLC=ocamlc \
   CAMLOPT="$(ROOTDIR)/ocamlopt.opt$(EXE) $(STDLIBFLAGS)"
 

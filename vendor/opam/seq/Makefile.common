@@ -38,6 +38,8 @@ DIR_SEP = /
 CONVERT_PATH = $(strip $(1))
 endif
 
+QUOTE_SINGLE = '$(subst ','\'',$(1))'
+
 V ?= 0
 
 ifeq "$(V)" "0"
@@ -176,9 +178,13 @@ ifeq "$(FUNCTION_SECTIONS)" "true"
 OPTCOMPFLAGS += -function-sections
 endif
 
-# Allow Makefile.cross to add flags to OC_COMMON_LINKFLAGS
-OC_CROSS_LINKFLAGS ?=
-OC_COMMON_LINKFLAGS += $(OC_CROSS_LINKFLAGS)
+# Allow Makefile.cross to override the Standard Library default for the compiler
+# itself.
+HOST_LIBDIR ?= $(TARGET_LIBDIR)
+
+OC_COMMON_LINKFLAGS += \
+  -set-runtime-default \
+    $(call QUOTE_SINGLE,standard_library_default=$(HOST_LIBDIR))
 
 # The rule to compile C files
 

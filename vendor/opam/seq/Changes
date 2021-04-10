@@ -82,10 +82,14 @@ Working version
   normalised on both Windows and Unix.
   (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
 
-- #14244: Executables linked with `ocamlc -custom` now always attempt to load
-  bytecode from the executable itself, rather than first trying `argv[0]`.
-  (David Allsopp, review by Jonah Beckford, Antonin Décimo, Damien Doligez and
-   Samuel Hym)
+- #14244: Added --with-relative-libdir which allows the runtime and the
+  compilers to locate the Standard Library relative to where the binaries
+  themselves are installed, removing the absolute path previously embedded in
+  caml_standard_library_default. Executables linked with `ocamlc -custom` now
+  always attempt to load bytecode from the executable itself, rather than first
+  trying `argv[0]`.
+  (David Allsopp, review by Jonah Beckford, Antonin Décimo, Damien Doligez,
+   Samuel Hym and Vincent Laviron)
 
 - #12269, #12410, #13063: Fix unsafety, deadlocks, and/or leaks should
   rare errors happen during domain creation and thread

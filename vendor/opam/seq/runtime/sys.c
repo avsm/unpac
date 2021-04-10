@@ -754,6 +754,29 @@ CAMLprim value caml_sys_const_standard_library_default(value unit)
 }
 #endif
 
+CAMLprim value caml_sys_get_stdlib_dirs(value vstdlib_default)
+{
+  CAMLparam1(vstdlib_default);
+  CAMLlocal3(result, eff, root_dir);
+
+  char_os *stdlib_default = caml_stat_strdup_to_os(String_val(vstdlib_default));
+  char_os *root = NULL, *stdlib;
+
+  stdlib =
+    caml_locate_standard_library(caml_params->exe_name, stdlib_default, &root);
+
+  eff = caml_copy_string_of_os(stdlib);
+  if (root == NULL) {
+    root_dir = Val_none;
+  } else {
+    root_dir = caml_copy_string_of_os(root);
+    root_dir = caml_alloc_some(root_dir);
+  }
+  result = caml_alloc_2(0, eff, root_dir);
+
+  CAMLreturn(result);
+}
+
 CAMLprim value caml_sys_get_config(value unit)
 {
   CAMLparam0 ();   /* unit is unused */

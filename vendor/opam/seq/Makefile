@@ -899,7 +899,8 @@ flexlink.opt$(EXE): \
     $(FLEXDLL_SOURCES) | $(BYTE_BINDIR)/flexlink$(EXE) $(OPT_BINDIR)
 	rm -f $(FLEXDLL_SOURCE_DIR)/flexlink.exe
 	$(MAKE) -C $(FLEXDLL_SOURCE_DIR) $(FLEXLINK_BUILD_ENV) \
-	  OCAMLOPT='$(FLEXLINK_OCAMLOPT) -nostdlib -I ../stdlib' flexlink.exe
+	  OCAMLOPT='$(FLEXLINK_OCAMLOPT) $(USE_STDLIB) $(SET_RELATIVE_STDLIB)' \
+	  flexlink.exe
 	cp $(FLEXDLL_SOURCE_DIR)/flexlink.exe $@
 	rm -f $(OPT_BINDIR)/flexlink$(EXE)
 	cd $(OPT_BINDIR); $(LN) $(call ROOT_FROM, $(OPT_BINDIR))/$@ flexlink$(EXE)
@@ -1408,7 +1409,8 @@ $(SAK): runtime/sak.c runtime/caml/misc.h runtime/caml/config.h
 
 C_LITERAL = $(shell $(SAK) $(ENCODE_C_LITERAL) '$(1)')
 
-runtime/build_config.h: $(ROOTDIR)/Makefile.config $(SAK)
+runtime/build_config.h: $(ROOTDIR)/Makefile.config \
+                        $(ROOTDIR)/Makefile.build_config $(SAK)
 	$(V_GEN){ \
 	  echo '/* This file is generated from $(ROOTDIR)/Makefile.config */'; \
 	  printf '#define OCAML_STDLIB_DIR %s\n' \
@@ -2026,6 +2028,15 @@ test_in_prefix_LIBRARIES = \
 testsuite/tools/test_in_prefi%: CAMLC = $(BEST_OCAMLC) $(STDLIBFLAGS)
 
 test_in_prefix_BYTECODE_LINKFLAGS += -custom
+
+ifeq "$(TARGET_LIBDIR_IS_RELATIVE)" "true"
+# testsuite/tools/test_in_prefix cannot use a relative stdlib because it is run
+# from testsuite/tools, not from the installation tree (the alternative would be
+# to compile it directly with the installed compiler)
+test_in_prefix_NATIVE_LINKFLAGS =
+test_in_prefix_COMMON_LINKFLAGS = \
+  -set-runtime-default 'standard_library_default=$(LIBDIR)'
+endif
 
 testsuite/tools/test_in_prefi%: CAMLOPT = $(BEST_OCAMLOPT) $(STDLIBFLAGS)
 
