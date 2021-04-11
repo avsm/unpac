@@ -23,6 +23,16 @@
 val version: string
 (** The current version number of the system *)
 
+val release_number: int
+(** The release number for the compiler
+
+    @since 5.5 *)
+
+val is_official_release: bool
+(** True if the compiler is an unmodified official OCaml release
+
+    @since 5.5 *)
+
 val bindir: string
 (** The directory containing the binary programs. If the compiler was configured
     with [--with-relative-libdir] then this will be the directory containing the
@@ -393,6 +403,16 @@ type search_method =
 
 val shebangscripts : bool
 (** Whether the target supports shebang scripts
+
+    @since 5.5 *)
+
+val bytecode_runtime_id : string
+(** The Runtime ID for this build of the bytecode runtime system
+
+    @since 5.5 *)
+
+val native_runtime_id : string
+(** The Runtime ID for this build of the native runtime system
 
     @since 5.5 *)
 

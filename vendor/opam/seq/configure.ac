@@ -110,6 +110,7 @@ AC_SUBST([OCAML_VERSION_MINOR], [OCAML__VERSION_MINOR])
 AC_SUBST([OCAML_VERSION_PATCHLEVEL], [OCAML__VERSION_PATCHLEVEL])
 AC_SUBST([OCAML_VERSION_EXTRA], [OCAML__VERSION_EXTRA])
 AC_SUBST([OCAML_VERSION_SHORT], [OCAML__VERSION_SHORT])
+AC_SUBST([OCAML_RELEASE_NUMBER], [OCAML__RELEASE_NUMBER])
 AC_DEFINE([MAGIC_NUMBER_PREFIX], ["][MAGIC_NUMBER__PREFIX]["])
 AC_DEFINE([MAGIC_NUMBER_VERSION], ["][MAGIC_NUMBER__VERSION]["])
 AC_DEFINE([EXEC_MAGIC_LENGTH], [MAGIC_NUMBER__LENGTH])
@@ -279,6 +280,10 @@ AC_SUBST([target_libdir_is_relative])
 AC_SUBST([srcdir_abs])
 AC_SUBST([srcdir_abs_real])
 AC_SUBST([build_map_flags])
+AC_SUBST([zinc_runtime_id_lo])
+AC_SUBST([zinc_runtime_id_hi])
+AC_SUBST([bytecode_runtime_id])
+AC_SUBST([native_runtime_id])
 
 ## Generated files
 
@@ -308,6 +313,7 @@ m4_if([OCAML__VERSION_EXTRA],[], [],
   AC_DEFINE([OCAML_VERSION_EXTRA], ["][OCAML__VERSION_EXTRA]["])])
 AC_DEFINE([OCAML_VERSION], [OCAML__VERSION_NUMBER])
 AC_DEFINE([OCAML_VERSION_STRING], ["][OCAML__VERSION]["])
+AC_DEFINE([OCAML_RELEASE_NUMBER], [OCAML__RELEASE_NUMBER])
 
 # Works out how many "o"s are needed in quoted strings
 AC_CONFIG_COMMANDS_PRE(OCAML_QUOTED_STRING_ID)
@@ -3089,6 +3095,80 @@ AS_CASE([$target],
     # This is required as otherwise floats are printed
     # as "Infinity" and "Inf" instead of the expected "inf"
     [AC_DEFINE([HAS_BROKEN_PRINTF], [1])])
+
+# Determine the three Runtime IDs (see runtime/Mangling.md)
+m4_define([ALPHABET], [0123456789abcdefghijklmnopqrstuv])
+AC_DEFUN([BASE32], ["$(echo 'ALPHABET' | cut -c $(expr \( $1 \) + 1))"])
+
+m4_cond(OCAML__DEVELOPMENT_VERSION, [true],
+  [m4_define([ID_VERSION], m4_eval((OCAML__RELEASE_NUMBER << 1) + 1))],
+  [m4_define([ID_VERSION], m4_eval((OCAML__RELEASE_NUMBER << 1)))])
+
+# Bits 0-4 (dev + low 4 bits of release)
+m4_define([QUINTET0],
+  [m4_substr(ALPHABET, m4_eval(ID_VERSION & 31), [1])])
+
+# Bits 5-6 (high 2 bits of release)
+m4_define([QUINTET1_ZINC],
+  [m4_substr(ALPHABET, m4_eval(ID_VERSION >> 5), [1])])
+
+# Bits 7-9 (low 3 bits of reserved)
+quintet1="QUINTET1_ZINC + $(expr \( $reserved_header_bits \* 4 \) % 32)"
+quintet1=BASE32([$quintet1])
+
+# Bits 10-11 (high 2 bits of reserved)
+quintet2_byte=BASE32([$reserved_header_bits / 8])
+
+# Bit 12 (no-flat-float-array)
+AS_IF([$flat_float_array],
+  [quintet2_zinc='0'],
+  [quintet2_byte="4 + $quintet2_byte"
+  quintet2_zinc='4'])
+# Bit 13 (fp)
+AS_IF([$frame_pointers],
+  [quintet2_native="8 + $quintet2_byte"],
+  [quintet2_native="$quintet2_byte"])
+# Bit 14 (tsan)
+AS_IF([$tsan],
+  [quintet2_native="16 + $quintet2_native"])
+
+quintet2_zinc=BASE32([$quintet2_zinc])
+quintet2_byte=BASE32([$quintet2_byte])
+quintet2_native=BASE32([$quintet2_native])
+
+# Bit 15 (int31)
+AS_IF([$arch64],
+  [quintet3_zinc='0'],
+  [quintet3_zinc='1'])
+# Bit 16 (static)
+AS_IF([! $supports_shared_libraries],
+  [quintet3_zinc="2 + $quintet3_zinc"])
+# Bit 17 (no-compression)
+AS_IF([test x"$zstd_status" != 'xok'],
+  [quintet3_zinc="4 + $quintet3_zinc"])
+# Bit 18 (ansi)
+AS_CASE([$target,$windows_unicode],
+  [*-*-mingw32,0|*-pc-windows,0],
+    [quintet3="8 + $quintet3_zinc"],
+  [quintet3="$quintet3_zinc"])
+# Bit 19 (mutable-string) cannot be set since OCaml 5.0
+
+quintet3_zinc=BASE32([$quintet3_zinc])
+quintet3=BASE32([$quintet3])
+
+zinc_runtime_id_lo="QUINTET0[]QUINTET1_ZINC"
+zinc_runtime_id_hi="${quintet2_zinc}${quintet3_zinc}"
+bytecode_runtime_id="QUINTET0${quintet1}${quintet2_byte}${quintet3}"
+native_runtime_id="QUINTET0${quintet1}${quintet2_native}${quintet3}"
+
+# Update the values for is_official_release and release_number in
+# utils/config.common.ml.in (this is done when tools/autogen is run, not each
+# time configure is run!)
+m4_syscmd([sed -e '/^let is_official_release =/s/=.*/= ]'\
+'m4_if(OCAML__DEVELOPMENT_VERSION,true,false,true)[/' \
+    -e '/^let release_number =/s/=.*/= ]OCAML__RELEASE_NUMBER[/' \
+    utils/config.common.ml.in > utils/config.common.ml.in.new
+mv -f utils/config.common.ml.in.new utils/config.common.ml.in])
 
 # Do not permanently cache the result of flexdll.h
 unset ac_cv_header_flexdll_h

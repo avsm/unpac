@@ -165,6 +165,7 @@ git branch $BRANCH
 
 # update build-aux/ocaml_version.m4 with the new future branch,
 #   4.07.0+dev1-2018-06-26 => 4.08.0+dev0-2018-06-30
+# Also increment OCAML__RELEASE_NUMBER in build-aux/ocaml_version.m4
 # Update ocaml-variants.opam with new version.
 tools/autogen
 # Add a "Working version" section" to Changes
