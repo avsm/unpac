@@ -26,7 +26,8 @@ type search_method =
     (** Always search for the interpreter *)
 
 val read_runtime :
-  Bytesections.section_table -> in_channel -> (string * search_method) option
+  Bytesections.section_table -> in_channel
+  -> (string * Misc.RuntimeID.t option * search_method) option
 (** Returns the runtime used by this tendered/standalone image. If the runtime
     used cannot be parsed, or the image was linked using -without-runtime, then
     [None] is returned. *)

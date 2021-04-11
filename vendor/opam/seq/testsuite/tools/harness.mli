@@ -26,6 +26,7 @@ module Import : sig
   | Tendered of {header: launch_mode;
                  dlls: bool;
                  runtime: string;
+                 id: Misc.RuntimeID.t option;
                  search: Byterntm.search_method}
       (** Tendered bytecode image. Executable uses the given mechanism to locate
           a suitable runtime to execute the image. [dlls] is [true] if the
@@ -74,9 +75,15 @@ module Import : sig
     bytecode_shebangs_by_default: bool;
       (** True if ocamlc uses a shebang-style header rather than an executable
           header for tendered bytecode executables. *)
-    libraries: string list list
+    filename_mangling: bool;
+      (** True if the Runtime ID is being used for filename mangling. *)
+    libraries: string list list;
       (** Sorted list of basenames of libraries to test.
           Derived from {v [$(OTHERLIBRARIES)] v} - {v Makefile.config v} *)
+    zinc_bootstrapped: bool;
+      (** True if boot/ocamlc has been bootstrapped (temporary, to allow the
+          tests to pass on the bootstrap commit before they're updated following
+          the bootstrap) *)
   }
 end
 

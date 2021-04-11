@@ -49,13 +49,13 @@ let print_summary config header_size ~prefix ~bindir_suffix ~libdir_suffix
     \    @{<hint>libdir@} = [$prefix/]%s\n\
     \  - C compiler is %s [%s] for %s\n\
     \  - OCaml is %a%a; target binaries by default are %a\n\
-    \  - Executable header size is %.2fKiB (%d bytes)\n\
+    \  - Executable header size is %.2fKiB (%Ld bytes)\n\
     \  - Testing %s\n@?"
        prefix bindir_suffix libdir_suffix
        Config.c_compiler Config.c_compiler_vendor Config.target
        pp_relocatable relocatable pp_reproducible reproducible
        pp_relocatable target_relocatable
-       (float_of_int header_size /. 1024.0) header_size summary
+       (Int64.to_float header_size /. 1024.0) header_size summary
 
 let run_tests ~sh config env =
   TestDynlink.run config env Bytecode;
@@ -119,8 +119,11 @@ let () =
     in
     List.map add_dependencies libraries
   in
-  let header_size =
-    (Unix.stat (Filename.concat libdir "runtime-launch-info")).Unix.st_size in
+  let header_size, filename_mangling =
+    let file = Filename.concat libdir "runtime-launch-info" in
+    In_channel.with_open_bin file @@ fun ic ->
+      In_channel.length ic, (input_char ic <> '\000')
+  in
   let bytecode_shebangs_by_default =
     Config.launch_method <> Config.Executable in
   let launcher_searches_for_ocamlrun = Sys.win32 in
@@ -129,7 +132,8 @@ let () =
     {config with libraries;
                  launcher_searches_for_ocamlrun;
                  target_launcher_searches_for_ocamlrun;
-                 bytecode_shebangs_by_default}
+                 bytecode_shebangs_by_default;
+                 filename_mangling}
   in
   (* A compiler distribution is _Relocatable_ if its build, for a given system,
      satisfies the following three properties:
@@ -199,6 +203,15 @@ let () =
      | _ ->
          Harness.fail_because "Unexpected response from command -v sh"
   in
+  let config =
+    let boot_ocamlc = Environment.in_test_root env "../../boot/ocamlc" in
+    let ocamlrun = Environment.ocamlrun env in
+    let zinc_bootstrapped =
+      snd (Environment.run_process env ocamlrun [boot_ocamlc; "-config"])
+      |> List.exists (String.starts_with ~prefix:"zinc_runtime_id: ")
+    in
+    {config with zinc_bootstrapped}
+  in
   let run_tests = run_tests ~sh config in
   (* 1. Relocation test *)
   TestRelocation.run ~reproducible config env;
@@ -225,7 +238,12 @@ let () =
   Printf.printf "Re-running test programs\n%!";
   (* Verify that the searching runtimes are searching the directory containing
      the program itself first. *)
-  let runtime = "ocamlrun" in
+  let runtime =
+    if config.filename_mangling then
+      Misc.RuntimeID.(ocamlrun "" (make_zinc ()))
+    else
+      "ocamlrun"
+  in
   rename_exe_in_test_root env ("test-" ^ runtime) runtime;
   Fun.protect
     ~finally:(fun () -> rename_exe_in_test_root env runtime ("test-" ^ runtime))

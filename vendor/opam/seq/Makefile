@@ -1298,7 +1298,7 @@ runtime_BUILT_HEADERS = $(addprefix runtime/, \
 
 ## Targets to build and install
 
-runtime_PROGRAMS = runtime/ocamlrun$(EXE)
+runtime_PROGRAMS = ocamlrun
 runtime_BYTECODE_STATIC_LIBRARIES = runtime/libcamlrun.$(A)
 runtime_BYTECODE_SHARED_LIBRARIES =
 runtime_NATIVE_STATIC_LIBRARIES = \
@@ -1306,13 +1306,13 @@ runtime_NATIVE_STATIC_LIBRARIES = \
 runtime_NATIVE_SHARED_LIBRARIES =
 
 ifeq "$(RUNTIMED)" "true"
-runtime_PROGRAMS += runtime/ocamlrund$(EXE)
+runtime_PROGRAMS += ocamlrund
 runtime_BYTECODE_STATIC_LIBRARIES += runtime/libcamlrund.$(A)
 runtime_NATIVE_STATIC_LIBRARIES += runtime/libasmrund.$(A)
 endif
 
 ifeq "$(INSTRUMENTED_RUNTIME)" "true"
-runtime_PROGRAMS += runtime/ocamlruni$(EXE)
+runtime_PROGRAMS += ocamlruni
 runtime_BYTECODE_STATIC_LIBRARIES += runtime/libcamlruni.$(A)
 runtime_NATIVE_STATIC_LIBRARIES += runtime/libasmruni.$(A)
 endif
@@ -1374,7 +1374,7 @@ ocamlruni_CPPFLAGS = $(runtime_CPPFLAGS) -DCAML_INSTR
 .PHONY: runtime-all
 runtime-all: \
   $(runtime_BYTECODE_STATIC_LIBRARIES) $(runtime_BYTECODE_SHARED_LIBRARIES) \
-  $(runtime_PROGRAMS) $(SAK)
+  $(runtime_PROGRAMS:%=runtime/%$(EXE)) $(SAK)
 
 .PHONY: runtime-allopt
 ifeq "$(NATIVE_COMPILER)" "true"
@@ -1422,6 +1422,7 @@ runtime/build_config.h: $(ROOTDIR)/Makefile.config \
 	  printf '#define OCAML_STDLIB_DIR %s\n' \
 	         $(call QUOTE_SINGLE,$(call C_LITERAL,$(TARGET_LIBDIR))); \
 	  echo '#define HOST "$(HOST)"'; \
+	  echo '#define BYTECODE_RUNTIME_ID "$(BYTECODE_RUNTIME_ID)"'; \
 	} > $@
 
 runtime/prims.$(O): runtime/build_config.h
@@ -2755,8 +2756,9 @@ endif
 INSTALL_LIBDIR_DYNLINK = $(INSTALL_LIBDIR)/dynlink
 
 # Installation
+
 .PHONY: install
-install:
+install::
 	$(MKDIR) "$(INSTALL_BINDIR)"
 	$(MKDIR) "$(INSTALL_LIBDIR)"
 ifeq "$(SUPPORTS_SHARED_LIBRARIES)" "true"
@@ -2766,7 +2768,31 @@ endif
 	$(MKDIR) "$(INSTALL_DOCDIR)"
 	$(MKDIR) "$(INSTALL_INCDIR)"
 	$(MKDIR) "$(INSTALL_LIBDIR_PROFILING)"
-	$(INSTALL_PROG) $(runtime_PROGRAMS) "$(INSTALL_BINDIR)"
+
+ifeq "$(SUFFIXING)" "true"
+MANGLE_RUNTIME_NAME = $(TARGET)-$(1)-$(BYTECODE_RUNTIME_ID)$(EXE)
+else
+MANGLE_RUNTIME_NAME = $(1)$(EXE)
+endif
+
+define INSTALL_RUNTIME
+install::
+	$(INSTALL_PROG) \
+	  runtime/$(1)$(EXE) \
+	    "$(INSTALL_BINDIR)/$(call MANGLE_RUNTIME_NAME,$(1))"
+ifeq "$(SUFFIXING)" "true"
+	cd "$(INSTALL_BINDIR)" && \
+	  $(LN) "$(TARGET)-$(1)-$(BYTECODE_RUNTIME_ID)$(EXE)" "$(1)$(EXE)"
+	cd "$(INSTALL_BINDIR)" && \
+	  $(LN) "$(TARGET)-$(1)-$(BYTECODE_RUNTIME_ID)$(EXE)" \
+	    "$(1)-$(ZINC_RUNTIME_ID)$(EXE)"
+endif
+endef
+
+$(foreach runtime, $(runtime_PROGRAMS), \
+  $(eval $(call INSTALL_RUNTIME,$(runtime))))
+
+install::
 	$(INSTALL_DATA) runtime/ld.conf $(runtime_BYTECODE_STATIC_LIBRARIES) \
 	  "$(INSTALL_LIBDIR)"
 ifneq "$(runtime_BYTECODE_SHARED_LIBRARIES)" ""

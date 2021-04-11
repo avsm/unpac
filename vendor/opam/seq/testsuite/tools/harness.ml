@@ -19,6 +19,7 @@ module Import = struct
   | Tendered of {header: launch_mode;
                  dlls: bool;
                  runtime: string;
+                 id: Misc.RuntimeID.t option;
                  search: Byterntm.search_method}
   | Custom
   | Vanilla
@@ -35,7 +36,9 @@ module Import = struct
     launcher_searches_for_ocamlrun: bool;
     target_launcher_searches_for_ocamlrun: bool;
     bytecode_shebangs_by_default: bool;
-    libraries: string list list
+    filename_mangling: bool;
+    libraries: string list list;
+    zinc_bootstrapped: bool
   }
 end
 

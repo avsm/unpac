@@ -85,10 +85,13 @@ installopt-default:
 	  "$(INSTALL_LIBDIR)"
 
 runtime-launch-info: runtime.info tmpheader.exe
-	@cat $^ > $@
+	@{ cat $^; \
+	   printf '$(if $(filter true,$(SUFFIXING)),$(ZINC_RUNTIME_ID))'; } > $@
 
+MANGLING = $(filter true,$(SUFFIXING))
 target_runtime-launch-info: tmpheader.exe
-	@cat $^ > $@
+	@{ printf '$(if $(MANGLING),$(ZINC_RUNTIME_ID_HI),\000)'; \
+	   cat $^; } > $@
 
 # The mingw-w64 and MSVC versions of tmpheader.exe are linked with special flags
 # to reduce their size (considerably). In particular, the entry point is

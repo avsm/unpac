@@ -367,6 +367,23 @@ ROOT_LINK_FLAGS := $(BYTECODE_LAUNCHER_FLAGS)
 BYTECODE_LAUNCHER_FLAGS :=
 endif
 
+ifeq "$(SUFFIXING)-$(UNIX_OR_WIN32)" "true-win32"
+# Historically, the native Windows ports are assumed to be finding ocamlrun
+# using a PATH search. -use-runtime ocamlrun-$(ZINC_RUNTIME_ID) won't work here
+# as ocamlc will convert it to an absolute path. Instead, we (ab)use
+# -runtime-variant to append the -$(ZINC_RUNTIME_ID) to the default ocamlrun.
+BYTECODE_LAUNCHER_FLAGS += -runtime-variant -$(ZINC_RUNTIME_ID)
+# boot/ocamlc is built with suffixing disabled, so this works both before and
+# after bootstrapping, however this would cause $(ROOTDIR)/ocamlc to add the
+# suffix twice. Thwart this by further (ab)using -runtime-variant.
+ROOT_LINK_FLAGS += -runtime-variant ''
+else ifeq "$(SUFFIXING)" "true"
+# boot/ocamlc is built with suffixing disabled or not yet bootstrapped, so
+# either way pass the suffixed runtime name explicitly with -use-runtime.
+BYTECODE_LAUNCHER_FLAGS += \
+  -use-runtime $(call QUOTE_SINGLE,$(BINDIR)/ocamlrun-$(ZINC_RUNTIME_ID))
+endif
+
 MAYBE_ADD_BYTECODE_LAUNCHER_FLAGS = \
   $(if $(filter -custom, $(1)),,\
     -use-prims $(ROOTDIR)/runtime/primitives $(BYTECODE_LAUNCHER_FLAGS))
