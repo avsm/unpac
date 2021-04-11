@@ -107,4 +107,6 @@ let tsan = @tsan@
 
 let shebangscripts = @shebangscripts@
 
+let suffixing = @suffixing@
+
 let launch_method = {@QS@|@launch_method_target@|@QS@}

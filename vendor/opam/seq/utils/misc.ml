@@ -1546,4 +1546,16 @@ module RuntimeID = struct
       Printf.sprintf "ocamlrun%s-%s" variant (to_string runtime_id)
     else
       invalid_arg "Misc.RuntimeID.ocamlrun"
+
+  let shared_runtime ?runtime_id ?(host = Config.target) ?(prefix = "-l")
+                     backend_type =
+    match backend_type with
+    | Sys.Native ->
+        let runtime_id = Option.value ~default:(make_native ()) runtime_id in
+        Printf.sprintf "%sasmrun-%s-%s" prefix host (to_string runtime_id)
+    | Sys.Bytecode ->
+        let runtime_id = Option.value ~default:(make_bytecode ()) runtime_id in
+        Printf.sprintf "%scamlrun-%s-%s" prefix host (to_string runtime_id)
+    | Sys.Other _ ->
+        invalid_arg "Misc.RuntimeID.shared_runtime"
 end

@@ -953,6 +953,19 @@ module RuntimeID : sig
   val ocamlrun: string -> t -> string
   (** [ocamlrun variant runtime_id] returns the name for the runtime for the
       given Zinc Runtime ID. *)
+
+  val shared_runtime: ?runtime_id:t -> ?host:string
+    -> ?prefix:string -> Sys.backend_type -> string
+  (** [shared_runtime ?runtime_id ?host ?prefix backend] returns the name of the
+      shared runtime for the given [backend]. [runtime_id] defaults to
+      {!make_bytecode} if [backend = Sys.Bytecode] and {!make_native} if
+      [backend = Sys.Native] and [host] to {!Config.target}. [prefix] defaults
+      to ["-l"] and the function does not append {!Config.ext_dll}.
+
+      e.g. [shared_runtime ~host:"x86_64-pc-linux-gnu" Native
+              = "-lasmrun-x86_64-pc-linux-gnu-b100"] for a default OCaml 5.5
+           build on a 64-bit system with shared library support and compressed
+           marshalling. *)
 end
 
 (** {1 Miscellaneous type aliases} *)

@@ -1320,9 +1320,9 @@ endif
 ifeq "$(UNIX_OR_WIN32)" "unix"
 ifeq "$(SUPPORTS_SHARED_LIBRARIES)" "true"
 runtime_BYTECODE_STATIC_LIBRARIES += runtime/libcamlrun_pic.$(A)
-runtime_BYTECODE_SHARED_LIBRARIES += runtime/libcamlrun_shared.$(SO)
+runtime_BYTECODE_SHARED_LIBRARIES += camlrun
 runtime_NATIVE_STATIC_LIBRARIES += runtime/libasmrun_pic.$(A)
-runtime_NATIVE_SHARED_LIBRARIES += runtime/libasmrun_shared.$(SO)
+runtime_NATIVE_SHARED_LIBRARIES += asmrun
 endif
 endif
 
@@ -1373,13 +1373,15 @@ ocamlruni_CPPFLAGS = $(runtime_CPPFLAGS) -DCAML_INSTR
 
 .PHONY: runtime-all
 runtime-all: \
-  $(runtime_BYTECODE_STATIC_LIBRARIES) $(runtime_BYTECODE_SHARED_LIBRARIES) \
+  $(runtime_BYTECODE_STATIC_LIBRARIES) \
+  $(runtime_BYTECODE_SHARED_LIBRARIES:%=runtime/lib%_shared$(EXT_DLL)) \
   $(runtime_PROGRAMS:%=runtime/%$(EXE)) $(SAK)
 
 .PHONY: runtime-allopt
 ifeq "$(NATIVE_COMPILER)" "true"
 runtime-allopt: \
-  $(runtime_NATIVE_STATIC_LIBRARIES) $(runtime_NATIVE_SHARED_LIBRARIES)
+  $(runtime_NATIVE_STATIC_LIBRARIES) \
+  $(runtime_NATIVE_SHARED_LIBRARIES:%=runtime/lib%_shared$(EXT_DLL))
 else
 runtime-allopt:
 	$(error The build has been configured with --disable-native-compiler)
@@ -2771,8 +2773,10 @@ endif
 
 ifeq "$(SUFFIXING)" "true"
 MANGLE_RUNTIME_NAME = $(TARGET)-$(1)-$(BYTECODE_RUNTIME_ID)$(EXE)
+MANGLE_RUNTIME_DLL_NAME = lib$(1)-$(TARGET)-$($(2)_RUNTIME_ID)$(EXT_DLL)
 else
 MANGLE_RUNTIME_NAME = $(1)$(EXE)
+MANGLE_RUNTIME_DLL_NAME = lib$(1)_shared$(EXT_DLL)
 endif
 
 define INSTALL_RUNTIME
@@ -2788,6 +2792,21 @@ ifeq "$(SUFFIXING)" "true"
 	    "$(1)-$(ZINC_RUNTIME_ID)$(EXE)"
 endif
 endef
+define INSTALL_RUNTIME_LIB
+ifeq "$(2)" "BYTECODE"
+install::
+else
+installopt::
+endif
+	$(INSTALL_PROG) \
+	  runtime/lib$(1)_shared$(EXT_DLL) \
+	    "$(INSTALL_LIBDIR)/$(call MANGLE_RUNTIME_DLL_NAME,$(1),$(2))"
+ifeq "$(SUFFIXING)" "true"
+	cd "$(INSTALL_LIBDIR)" && \
+	  $(LN) "$(call MANGLE_RUNTIME_DLL_NAME,$(1),$(2))" \
+	  "lib$(1)_shared$(EXT_DLL)"
+endif
+endef
 
 $(foreach runtime, $(runtime_PROGRAMS), \
   $(eval $(call INSTALL_RUNTIME,$(runtime))))
@@ -2795,10 +2814,11 @@ $(foreach runtime, $(runtime_PROGRAMS), \
 install::
 	$(INSTALL_DATA) runtime/ld.conf $(runtime_BYTECODE_STATIC_LIBRARIES) \
 	  "$(INSTALL_LIBDIR)"
-ifneq "$(runtime_BYTECODE_SHARED_LIBRARIES)" ""
-	$(INSTALL_PROG) $(runtime_BYTECODE_SHARED_LIBRARIES) \
-	  "$(INSTALL_LIBDIR)"
-endif
+
+$(foreach shared_runtime, $(runtime_BYTECODE_SHARED_LIBRARIES), \
+  $(eval $(call INSTALL_RUNTIME_LIB,$(shared_runtime),BYTECODE)))
+
+install::
 	$(INSTALL_DATA) runtime/caml/domain_state.tbl runtime/caml/*.h \
 	  "$(INSTALL_INCDIR)"
 	$(INSTALL_PROG) ocaml$(EXE) "$(INSTALL_BINDIR)"
@@ -2950,11 +2970,13 @@ endif
 
 # Installation of the native-code compiler
 .PHONY: installopt
-installopt:
+installopt::
 	$(INSTALL_DATA) $(runtime_NATIVE_STATIC_LIBRARIES) "$(INSTALL_LIBDIR)"
-ifneq "$(runtime_NATIVE_SHARED_LIBRARIES)" ""
-	$(INSTALL_PROG) $(runtime_NATIVE_SHARED_LIBRARIES) "$(INSTALL_LIBDIR)"
-endif
+
+$(foreach shared_runtime, $(runtime_NATIVE_SHARED_LIBRARIES), \
+  $(eval $(call INSTALL_RUNTIME_LIB,$(shared_runtime),NATIVE)))
+
+installopt::
 ifeq "$(INSTALL_BYTECODE_PROGRAMS)" "true"
 	$(call INSTALL_STRIPPED_BYTE_PROG,\
                ocamlopt$(EXE),"$(INSTALL_BINDIR)/ocamlopt.byte$(EXE)")

@@ -843,13 +843,20 @@ value caml_startup_pooled_exn(char_os ** argv)
   if not with_main && !Clflags.debug then
     output_cds_file ((Filename.chop_extension outfile) ^ ".cds")
 
+let runtime_library_name runtime_variant =
+  if runtime_variant = "_shared" && Config.suffixing then
+    Misc.RuntimeID.shared_runtime Sys.Bytecode
+  else
+    "-lcamlrun" ^ runtime_variant
+
 (* Build a custom runtime *)
 
 let build_custom_runtime prim_name exec_name =
   let runtime_lib =
     if not !Clflags.with_runtime
     then ""
-    else "-lcamlrun" ^ !Clflags.runtime_variant in
+    else runtime_library_name !Clflags.runtime_variant
+  in
   let stable_name =
     if not !Clflags.keep_camlprimc_file then
       Some "camlprim.c"
@@ -992,7 +999,8 @@ const enum caml_byte_program_mode caml_byte_program_mode = APPENDED;
                  let runtime_lib =
                    if not !Clflags.with_runtime
                    then ""
-                   else "-lcamlrun" ^ !Clflags.runtime_variant in
+                   else runtime_library_name !Clflags.runtime_variant
+                 in
                  Ccomp.call_linker mode output_name
                    ([obj_file] @ List.rev !Clflags.ccobjs @ [runtime_lib])
                    c_libs = 0
