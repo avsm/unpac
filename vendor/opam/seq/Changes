@@ -339,6 +339,11 @@ Working version
   (Gabriel Scherer, review by Nicolás Ojeda Bär and Florian Angeletti,
    report by Kate Deplaix)
 
+- #14244: Add -set-runtime-default option to the compiler, allowing the default
+  value of the Standard Library location used by the runtime to be overridden.
+  (Antonin Décimo, review by David Allsopp, Jonah Beckford, Damien Doligez and
+   Samuel Hym)
+
 - #14190: `ocaml -e` now also processes `-init` (previously it was ignored).
   (Emile Trotignon, review by David Allsopp and @ygrek)
 

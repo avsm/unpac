@@ -529,7 +529,12 @@ let link_bytecode ?final_name tolink exec_name standalone =
           already included in the runtime. *)
        if standalone && needs_stdlib then begin
          (* OCaml Standard Library Default location *)
-         output_string outchan Config.standard_library_default;
+         let standard_library_default =
+           Option.value
+             ~default:Config.standard_library_default
+             !Clflags.standard_library_default
+         in
+         output_string outchan standard_library_default;
          Bytesections.record toc_writer OSLD
        end;
        (* The map of global identifiers *)
@@ -639,7 +644,10 @@ let c_string_literal_of_string s =
   Buffer.contents b
 
 let emit_runtime_standard_library_default outchan =
-  let literal = c_string_literal_of_string Config.standard_library_default in
+  let stdlib =
+    let default = Config.standard_library_default in
+    Option.value ~default !Clflags.standard_library_default in
+  let literal = c_string_literal_of_string stdlib in
   Printf.fprintf outchan
     "const char_os * caml_runtime_standard_library_default = %s;\n" literal
 

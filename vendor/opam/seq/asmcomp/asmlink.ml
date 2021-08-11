@@ -229,9 +229,12 @@ let make_startup_file ~ppf_dump units_list ~crc_interfaces =
     (fun i name -> compile_phrase (Cmm_helpers.predef_exception i name))
     Runtimedef.builtin_exceptions;
   if need_stdlib then begin
+    let standard_library_default =
+      Option.value ~default:Config.standard_library_default
+                   !Clflags.standard_library_default in
     compile_phrase
       (Cmm_helpers.emit_global_string_constant
-        "caml_standard_library_nat" Config.standard_library_default)
+        "caml_standard_library_nat" standard_library_default)
   end;
   compile_phrase (Cmm_helpers.global_table name_list);
   let globals_map = make_globals_map units_list ~crc_interfaces in
