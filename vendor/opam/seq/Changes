@@ -96,8 +96,10 @@ Working version
   harmoniously on a single system. The IDs are used, along with the host
   triplet, to provide mangled names for the ocamlrun executable and its variants
   and the DLL versions of both the bytecode and native runtimes, with symlinks
-  created for the original names. The behaviour is disabled by configuring with
-  --disable-suffixing.
+  created for the original names. They are also used to mangle the names of stub
+  libraries so that stub libraries compiled for a given configuration of the
+  runtime will only be sought by that runtime. The behaviour is disabled by
+  configuring with --disable-suffixing.
   (David Allsopp, review by Damien Doligez and Samuel Hym)
 
 - #12269, #12410, #13063: Fix unsafety, deadlocks, and/or leaks should

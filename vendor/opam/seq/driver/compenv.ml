@@ -626,7 +626,7 @@ type deferred_action =
   | ProcessCFile of string
   | ProcessOtherFile of string
   | ProcessObjects of string list
-  | ProcessDLLs of string list
+  | ProcessDLLs of bool * string list
 
 let c_object_of_filename name =
   Filename.chop_suffix (Filename.basename name) ".c" ^ Config.ext_obj
@@ -675,8 +675,8 @@ let process_action ctx action =
       ccobjs := obj_name :: !ccobjs
   | ProcessObjects names ->
       ccobjs := names @ !ccobjs
-  | ProcessDLLs names ->
-      dllibs := names @ !dllibs
+  | ProcessDLLs (suffixed, names) ->
+      dllibs := (List.map (fun n -> (~suffixed, n)) names) @ !dllibs
   | ProcessOtherFile name ->
       if Filename.check_suffix name ocaml_mod_ext
       || Filename.check_suffix name ocaml_lib_ext then
@@ -689,7 +689,7 @@ let process_action ctx action =
         ccobjs := name :: !ccobjs
       end
       else if not !native_code && Filename.check_suffix name Config.ext_dll then
-        dllibs := name :: !dllibs
+        dllibs := (~suffixed:false, name) :: !dllibs
       else
         match Compiler_pass.of_input_filename name with
         | Some start_from ->

@@ -553,13 +553,28 @@ let link_bytecode ?final_name tolink exec_name standalone =
        let start_code = pos_out outchan in
        Symtable.init();
        clear_crc_interfaces ();
-       let sharedobjs = List.map Dll.extract_dll_name !Clflags.dllibs in
+       let (tocheck, sharedobjs) =
+         let process_dllib ((~suffixed, name) as dllib) (tocheck, sharedobjs) =
+           let resolved_name = Dll.extract_dll_name dllib in
+           let partial_name =
+             if suffixed then
+               if String.starts_with ~prefix:"-l" name then
+                 (~suffixed, "dll" ^ String.sub name 2 (String.length name - 2))
+               else
+                 dllib
+             else
+               (~suffixed:false, resolved_name)
+           in
+           (resolved_name::tocheck, partial_name::sharedobjs)
+         in
+         List.fold_right process_dllib !Clflags.dllibs ([], [])
+       in
        let check_dlls = standalone && Config.target = Config.host in
        if check_dlls then begin
          (* Initialize the DLL machinery *)
          Dll.init_compile !Clflags.no_std_include;
          Dll.add_path (Load_path.get_path_list ());
-         try Dll.open_dlls Dll.For_checking sharedobjs
+         try Dll.open_dlls Dll.For_checking tocheck
          with Failure reason -> raise(Error(Cannot_open_dll reason))
        end;
        let output_fun buf =
@@ -576,11 +591,20 @@ let link_bytecode ?final_name tolink exec_name standalone =
        (* DLL stuff *)
        if standalone then begin
          (* The extra search path for DLLs *)
-         output_string outchan (concat_null_terminated !Clflags.dllpaths);
-         Bytesections.record toc_writer DLPT;
+         if !Clflags.dllpaths <> [] then begin
+           output_string outchan (concat_null_terminated !Clflags.dllpaths);
+           Bytesections.record toc_writer DLPT
+         end;
          (* The names of the DLLs *)
-         output_string outchan (concat_null_terminated sharedobjs);
-         Bytesections.record toc_writer DLLS
+         if sharedobjs <> [] then begin
+           let output_sharedobj (~suffixed, name) =
+             output_char outchan (if suffixed then '-' else ':');
+             output_string outchan name;
+             output_byte outchan 0
+           in
+           List.iter output_sharedobj sharedobjs;
+           Bytesections.record toc_writer DLLS
+         end
        end;
        (* The names of all primitives *)
        Symtable.output_primitive_names outchan;

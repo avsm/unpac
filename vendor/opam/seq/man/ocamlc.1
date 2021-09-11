@@ -355,6 +355,15 @@ to be loaded dynamically by the run-time system
 .BR ocamlrun (1)
 at program start-up time.
 .TP
+.BI \-dllib\-suffixed\ \-l libname
+As for
+.BI \-dllib
+but the name recorded is mangled by
+.BR ocamlrun (1)
+at program start-up time. This is used for C stub libraries; see
+.B ocamlmklib\ \-suffixed
+for further information.
+.TP
 .BI \-dllpath " dir"
 Adds the directory
 .I dir

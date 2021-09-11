@@ -229,6 +229,14 @@ Arrange for the C shared library "dll"\var{libname}".so"
 by the run-time system "ocamlrun" at program start-up time.
 }%comp
 
+\comp{
+\item["-dllib-suffixed" "-l"\var{libname}]
+As for "-dllib" but the name recorded is mangled with the Runtime ID and host of
+the interpreter before being loaded by the run-time system "ocamlrun" at program
+start-up time. Ths is used for C stub libraries, for example by DLLs produced
+with "ocamlmklib -suffixed".
+}%comp
+
 \comp{\item["-dllpath" \var{dir}]
 Adds the directory \var{dir} to the run-time search path for shared
 C libraries.  At link-time, shared libraries are searched in the

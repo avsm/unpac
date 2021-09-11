@@ -966,6 +966,17 @@ module RuntimeID : sig
               = "-lasmrun-x86_64-pc-linux-gnu-b100"] for a default OCaml 5.5
            build on a 64-bit system with shared library support and compressed
            marshalling. *)
+
+  val stubslib: ?runtime_id:t -> ?host:string -> string -> string
+  (** [stublibs ?runtime_id ?host dllname] returns the name for the given DLL
+      basename. [dllname] should not include {!Config.ext_dll} (and the result
+      does not include it either). [host] and [runtime_id] default to
+      {!Config.target} and {!make_bytecode} respectively.
+
+      e.g. [stubslib ~host:"x86_64-pc-linux-gnu" "dllunixbyt"
+              = "dllunixbyt-x86_64-pc-linux-gnu-001b"] for a default OCaml 5.5
+           build on a 64-bit system with shared library support and compressed
+           marshalling. *)
 end
 
 (** {1 Miscellaneous type aliases} *)

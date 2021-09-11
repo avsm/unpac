@@ -1558,4 +1558,9 @@ module RuntimeID = struct
         Printf.sprintf "%scamlrun-%s-%s" prefix host (to_string runtime_id)
     | Sys.Other _ ->
         invalid_arg "Misc.RuntimeID.shared_runtime"
+
+  let stubslib ?(runtime_id = make_bytecode ())
+               ?(host = Config.target)
+               name =
+    Printf.sprintf "%s-%s-%s" name host (to_string runtime_id)
 end
