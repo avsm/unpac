@@ -4453,13 +4453,6 @@ then :
   *) :
     as_fn_error $? "valid values are yes, no or fallback for --enable-runtime-search" "$LINENO" 5 ;;
 esac
-else $as_nop
-  case $host in #(
-      *-w64-mingw32*|*-pc-windows) :
-    runtime_search='enable' ;; #(
-  *) :
-     ;;
-esac
 fi
 
 
@@ -4475,13 +4468,6 @@ then :
     runtime_search_target='fallback' ;; #(
   *) :
     as_fn_error $? "valid values are yes, no or fallback for --enable-runtime-search-target" "$LINENO" 5 ;;
-esac
-else $as_nop
-  case $host in #(
-      *-w64-mingw32*|*-pc-windows) :
-    runtime_search_target='enable' ;; #(
-  *) :
-     ;;
 esac
 fi
 
