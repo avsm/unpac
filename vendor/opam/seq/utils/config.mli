@@ -401,6 +401,11 @@ type search_method =
 | Enable
     (** Always search for the interpreter *)
 
+val search_method : search_method
+(** Default search mechanism for bytecode executables
+
+    @since 5.5 *)
+
 val shebangscripts : bool
 (** Whether the target supports shebang scripts
 

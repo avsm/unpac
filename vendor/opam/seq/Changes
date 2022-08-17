@@ -471,6 +471,12 @@ Working version
   (David Allsopp, review by Jonah Beckford, Antonin Décimo, Damien Doligez and
    Samuel Hym)
 
+- #14245: New --enable-runtime-search configure option controls the
+  -runtime-search option used to build the bytecode binaries in the compiler
+  distribution. --enable-runtime-search-target controls the default value of
+  -runtime-search used for bytecode executables produced by the compiler.
+  (David Allsopp, review by Damien Doligez and Samuel Hym)
+
 ### Bug fixes:
 
 - #14036: Fix nontermination of cycle printing in recursive modules with

@@ -88,6 +88,8 @@ target_libdir_is_relative=false
 srcdir_abs=''
 srcdir_abs_real=''
 build_map_flags=''
+runtime_search=''
+runtime_search_target=''
 
 # Information about the package
 
@@ -285,6 +287,8 @@ AC_SUBST([zinc_runtime_id_hi])
 AC_SUBST([bytecode_runtime_id])
 AC_SUBST([native_runtime_id])
 AC_SUBST([suffixing])
+AC_SUBST([runtime_search])
+AC_SUBST([runtime_search_target])
 
 ## Generated files
 
@@ -717,6 +721,39 @@ AC_ARG_ENABLE([suffixing],
     [disable suffixing of runtime executables and shared libraries])],
   [AS_IF([test "x$enableval" = 'xno'], [suffixing=false], [suffixing=true])],
   [suffixing=true])
+
+AC_ARG_ENABLE([runtime-search],
+  [AS_HELP_STRING([--enable-runtime-search],
+    [allow the distribution's bytecode executables to search for ocamlrun])],
+  [AS_CASE([$enableval],
+    [no],[],
+    [yes],[runtime_search='enable'],
+    [fallback],[runtime_search='fallback'],
+    [AC_MSG_ERROR(m4_normalize([valid values are yes, no or fallback for
+       --enable-runtime-search]))])],
+  [AS_CASE([$host],
+dnl Historically, the native Windows ports are assumed to be finding ocamlrun
+dnl using a PATH search. *)
+    [*-w64-mingw32*|*-pc-windows],[runtime_search='enable'])])
+
+AC_ARG_ENABLE([runtime-search-target],
+  [AS_HELP_STRING([--enable-runtime-search-target],
+    [allow bytecode executables produced by ocamlc to search for ocamlrun])],
+  [AS_CASE([$enableval],
+    [no],[],
+    [yes],[runtime_search_target='enable'],
+    [fallback],[runtime_search_target='fallback'],
+    [AC_MSG_ERROR(m4_normalize([valid values are yes, no or fallback for
+       --enable-runtime-search-target]))])],
+  [AS_CASE([$host],
+dnl Historically, the native Windows ports are assumed to be finding ocamlrun
+dnl using a PATH search. *)
+    [*-w64-mingw32*|*-pc-windows],[runtime_search_target='enable'])])
+
+AS_CASE([$suffixing,$runtime_search,$runtime_search_target],
+  [true,*,*|false,,],[],
+  [false,*,*],[AC_MSG_ERROR(m4_normalize([--disable-suffixed cannot be used with
+       --enable-runtime-search or --enable-runtime-search-target]))])
 
 AC_ARG_WITH([afl],
   [AS_HELP_STRING([--with-afl],

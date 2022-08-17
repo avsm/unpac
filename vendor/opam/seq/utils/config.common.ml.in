@@ -84,6 +84,12 @@ let launch_method =
   | "sh" -> Shebang None
   | _ -> Shebang (Some launch_method)
 
+let search_method =
+  match search_method with
+  | "enable" -> Enable
+  | "fallback" -> Fallback
+  | _ -> Disable
+
 let interface_suffix = ref ".mli"
 
 let max_tag = 243

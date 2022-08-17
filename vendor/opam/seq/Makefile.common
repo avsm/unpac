@@ -345,7 +345,8 @@ endef # _OCAML_PROGRAM_BASE
 # $(ROOTDIR)/ocamlc needs -launch-method to be given explicitly as its default
 # values are those for the target (cf. --with-target-sh and TARGET_BINDIR).
 BYTECODE_LAUNCHER_FLAGS = \
-  -launch-method $(call QUOTE_SINGLE,$(LAUNCH_METHOD) $(BINDIR))
+  -launch-method $(call QUOTE_SINGLE,$(LAUNCH_METHOD) $(BINDIR)) \
+  -runtime-search $(if $(RUNTIME_SEARCH),$(RUNTIME_SEARCH),disable)
 
 MAYBE_ADD_BYTECODE_LAUNCHER_FLAGS = \
   $(if $(filter -custom, $(1)),,\
