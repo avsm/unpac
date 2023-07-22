@@ -63,6 +63,12 @@ Working version
   under certain conditions.
   (Antonin Décimo, review by Nicolás Ojeda Bär)
 
+- #12269, #12410, #13063: Fix unsafety, deadlocks, and/or leaks should
+  rare errors happen during domain creation and thread
+  creation/registration.
+  (Guillaume Munch-Maccagnoni, review by Gabriel Scherer, B. Szilvasy,
+   Miod Vallat)
+
 ### Code generation and optimizations:
 
 ### Standard library:
@@ -499,7 +505,6 @@ OCaml 5.4.0
   prefetching data.
   (Tim McGilchrist, review by Nick Barnes, Antonin Décimo,
    Stephen Dolan and Miod Vallat)
-
 
 - #13675: Make Unix.map_file memory show up in Gc.Memprof.
   (Stephen Dolan, review by Guillaume Munch-Maccagnoni and Gabriel Scherer)
