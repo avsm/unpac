@@ -33,6 +33,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <stdbool.h>
 #include "config.h"
 #include "mlvalues.h"
 #include "sys.h"
@@ -593,7 +594,7 @@ Caml_inline unsigned caml_plat_spin_step(unsigned spins,
   static const struct caml_plat_srcloc loc =                      \
     { __FILE__, __LINE__, __func__ };                             \
   for (unsigned spins = 0;                                        \
-       1;                                                         \
+       true;                                                      \
        spins = caml_plat_spin_step(spins, max_spins, &loc))
 
 #define SPIN_WAIT_BACK_OFF(N)                                     \
