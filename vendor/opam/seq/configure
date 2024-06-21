@@ -24170,10 +24170,13 @@ fi
 
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether mmap supports MAP_STACK" >&5
 printf %s "checking whether mmap supports MAP_STACK... " >&6; }
+  if test ${ocaml_cv_func_mmap_MAP_STACK+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
   if test "$cross_compiling" = yes
 then :
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no assumed" >&5
-printf "%s\n" "no assumed" >&6; }
+  ocaml_cv_func_mmap_MAP_STACK=no
 else $as_nop
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
@@ -24199,45 +24202,55 @@ main (void)
 _ACEOF
 if ac_fn_c_try_run "$LINENO"
 then :
-  has_mmap_map_stack=true
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
+  ocaml_cv_func_mmap_MAP_STACK=yes
 else $as_nop
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
+  ocaml_cv_func_mmap_MAP_STACK=no
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
   conftest.$ac_objext conftest.beam conftest.$ac_ext
 fi
 
+fi
 
-if test x"$enable_mmap_map_stack" = "xyes"
+  if test $cross_compiling = yes && \
+         test "x$ocaml_cv_func_mmap_MAP_STACK" = xno
 then :
-  if test x"$has_mmap_map_stack" = "xtrue"
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no assumed" >&5
+printf "%s\n" "no assumed" >&6; }
+else $as_nop
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ocaml_cv_func_mmap_MAP_STACK" >&5
+printf "%s\n" "$ocaml_cv_func_mmap_MAP_STACK" >&6; }
+fi
+
+if test "x$enable_mmap_map_stack" = xyes
+then :
+  if test "x$ocaml_cv_func_mmap_MAP_STACK" = xyes
 then :
   case $target in #(
   *-freebsd*) :
-    as_fn_error $? "mmap MAP_STACK not supported on FreeBSD" "$LINENO" 5 ;; #(
+    as_fn_error $? "mmap MAP_STACK is not supported on FreeBSD" "$LINENO" 5 ;; #(
   *) :
-    with_mmap_map_stack=true;
-        printf "%s\n" "#define USE_MMAP_MAP_STACK 1" >>confdefs.h
- ;;
+     ;;
 esac
 else $as_nop
   as_fn_error $? "mmap MAP_STACK requested but not found on $target" "$LINENO" 5
 fi
-
 else $as_nop
-  case $target in #(
-  *-openbsd*) :
-    with_mmap_map_stack=true;
-      printf "%s\n" "#define USE_MMAP_MAP_STACK 1" >>confdefs.h
-
-      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: using MAP_STACK on OpenBSD due to stack checking" >&5
-printf "%s\n" "$as_me: using MAP_STACK on OpenBSD due to stack checking" >&6;} ;; #(
+  case $target,$ocaml_cv_func_mmap_MAP_STACK,$enable_mmap_map_stack in #(
+  *-openbsd*,no,*|*-openbsd-*,*,no) :
+    as_fn_error $? "mmap MAP_STACK is required on OpenBSD" "$LINENO" 5 ;; #(
+  *-openbsd*,*,*) :
+    enable_mmap_map_stack=yes
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: Using MAP_STACK on OpenBSD due to stack checking" >&5
+printf "%s\n" "$as_me: Using MAP_STACK on OpenBSD due to stack checking" >&6;} ;; #(
   *) :
-    with_mmap_map_stack=false ;;
+     ;;
 esac
+fi
+if test x"$ocaml_cv_func_mmap_MAP_STACK$enable_mmap_map_stack" = xyesyes
+then :
+
+printf "%s\n" "#define USE_MMAP_MAP_STACK 1" >>confdefs.h
 
 fi
 

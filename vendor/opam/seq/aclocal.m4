@@ -222,8 +222,8 @@ camlPervasives__loop_1128:
 
 AC_DEFUN([OCAML_MMAP_SUPPORTS_MAP_STACK], [
   AC_MSG_CHECKING([whether mmap supports MAP_STACK])
-  AC_RUN_IFELSE(
-    [AC_LANG_PROGRAM([[
+  AC_CACHE_VAL([ocaml_cv_func_mmap_MAP_STACK],
+    [AC_RUN_IFELSE([AC_LANG_PROGRAM([[
 #include <sys/mman.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -235,10 +235,13 @@ AC_DEFUN([OCAML_MMAP_SUPPORTS_MAP_STACK], [
   if (block == MAP_FAILED)
      return 1;
     ]])],
-    [has_mmap_map_stack=true
-    AC_MSG_RESULT([yes])],
-    [AC_MSG_RESULT([no])],
-    [AC_MSG_RESULT([no assumed])])
+      [ocaml_cv_func_mmap_MAP_STACK=yes],
+      [ocaml_cv_func_mmap_MAP_STACK=no],
+      [ocaml_cv_func_mmap_MAP_STACK=no])])
+  AS_IF([test $cross_compiling = yes && \
+         test "x$ocaml_cv_func_mmap_MAP_STACK" = xno],
+    [AC_MSG_RESULT([no assumed])],
+    [AC_MSG_RESULT([$ocaml_cv_func_mmap_MAP_STACK])])
 ])
 
 AC_DEFUN([OCAML_MMAP_SUPPORTS_HUGE_PAGES], [
