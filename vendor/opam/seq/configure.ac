@@ -1610,7 +1610,7 @@ AS_CASE(["$ocaml_cc_vendor,$target"],
       [$warn_error_flag])])
 
 ## Check whether __attribute__((optimize("tree-vectorize")))) is supported
-OCAML_CC_SUPPORTS_TREE_VECTORIZE([$warn_error_flag])
+OCAML_CC_SUPPORTS_TREE_VECTORIZE
 
 # Check whether the C compiler supports the labels as values extension.
 OCAML_CC_SUPPORTS_LABELS_AS_VALUES

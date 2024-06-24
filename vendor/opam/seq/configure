@@ -18952,9 +18952,13 @@ esac
 
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler supports __attribute__((optimize(\"tree-vectorize\")))" >&5
 printf %s "checking whether the C compiler supports __attribute__((optimize(\"tree-vectorize\")))... " >&6; }
+if test ${ocaml_cv_prog_cc_optimize_tree_vectorize+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
   saved_CFLAGS="$CFLAGS"
-  CFLAGS="$warn_error_flag $CFLAGS"
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+    CFLAGS="$warn_error_flag $CFLAGS"
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 __attribute__((optimize("tree-vectorize"))) void f(void) {}
 int
@@ -18967,16 +18971,20 @@ f();
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"
 then :
-  printf "%s\n" "#define SUPPORTS_TREE_VECTORIZE 1" >>confdefs.h
-
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
+  ocaml_cv_prog_cc_optimize_tree_vectorize=yes
 else $as_nop
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
+  ocaml_cv_prog_cc_optimize_tree_vectorize=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
-  CFLAGS="$saved_CFLAGS"
+    CFLAGS="$saved_CFLAGS"
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ocaml_cv_prog_cc_optimize_tree_vectorize" >&5
+printf "%s\n" "$ocaml_cv_prog_cc_optimize_tree_vectorize" >&6; }
+  if test "x$ocaml_cv_prog_cc_optimize_tree_vectorize" = xyes
+then :
+  printf "%s\n" "#define SUPPORTS_TREE_VECTORIZE 1" >>confdefs.h
+
+fi
 
 
 # Check whether the C compiler supports the labels as values extension.
@@ -23888,10 +23896,13 @@ fi
 
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether mmap supports huge pages" >&5
 printf %s "checking whether mmap supports huge pages... " >&6; }
+  if test ${ocaml_cv_func_mmap_huge_pages+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
   if test "$cross_compiling" = yes
 then :
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no assumed" >&5
-printf "%s\n" "no assumed" >&6; }
+  ocaml_cv_func_mmap_huge_pages=no
 else $as_nop
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
@@ -23940,6 +23951,18 @@ main (void)
 _ACEOF
 if ac_fn_c_try_run "$LINENO"
 then :
+  ocaml_cv_func_mmap_huge_pages=yes
+else $as_nop
+  ocaml_cv_func_mmap_huge_pages=no
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+fi
+
+  if test x"$ocaml_cv_func_mmap_huge_pages" = "xyes"
+then :
   printf "%s\n" "#define HAS_HUGE_PAGES 1" >>confdefs.h
 
     printf "%s\n" "#define HUGE_PAGE_SIZE (4 * 1024 * 1024)" >>confdefs.h
@@ -23947,13 +23970,15 @@ then :
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf "%s\n" "yes" >&6; }
 else $as_nop
+  if test $cross_compiling = yes
+then :
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no assumed" >&5
+printf "%s\n" "no assumed" >&6; }
+else $as_nop
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
 printf "%s\n" "no" >&6; }
 fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
 fi
-
 
 
 printf "%s\n" "#define HEADER_RESERVED_BITS $reserved_header_bits" >>confdefs.h
