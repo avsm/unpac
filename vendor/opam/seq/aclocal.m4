@@ -140,29 +140,26 @@ AC_DEFUN([OCAML_CC_RESTORE_VARIABLES], [
 ])
 
 AC_DEFUN([OCAML_AS_HAS_DEBUG_PREFIX_MAP], [
-  AC_MSG_CHECKING([whether the assembler supports --debug-prefix-map])
+  AC_CACHE_CHECK([whether the assembler supports --debug-prefix-map],
+    [ocaml_cv_prog_as_debug_prefix_map],
+    [OCAML_CC_SAVE_VARIABLES
 
-  OCAML_CC_SAVE_VARIABLES
+    # Modify C-compiler variables to use the assembler
+    CC="$AS"
+    CFLAGS="--debug-prefix-map old=new -o conftest.$ac_objext"
+    CPPFLAGS=""
+    ac_ext="S"
+    ac_compile='$CC $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 
-  # Modify C-compiler variables to use the assembler
-  CC="$AS"
-  CFLAGS="--debug-prefix-map old=new -o conftest.$ac_objext"
-  CPPFLAGS=""
-  ac_ext="S"
-  ac_compile='$CC $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
-
-  AC_COMPILE_IFELSE(
-    [AC_LANG_SOURCE([
+    AC_COMPILE_IFELSE([AC_LANG_SOURCE([
 camlPervasives__loop_1128:
         .file   1       "pervasives.ml"
         .loc    1       193
     ])],
-    [as_has_debug_prefix_map=true
-    AC_MSG_RESULT([yes])],
-    [as_has_debug_prefix_map=false
-    AC_MSG_RESULT([no])])
+    [ocaml_cv_prog_as_debug_prefix_map=true],
+    [ocaml_cv_prog_as_debug_prefix_map=false])
 
-  OCAML_CC_RESTORE_VARIABLES
+    OCAML_CC_RESTORE_VARIABLES])
 ])
 
 AC_DEFUN([OCAML_AS_HAS_CFI_DIRECTIVES], [

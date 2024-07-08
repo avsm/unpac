@@ -864,7 +864,7 @@ build_ocamltex
 build_ocamldebug
 with_debugger
 as_is_cc
-as_has_debug_prefix_map
+ocaml_cv_prog_as_debug_prefix_map
 cc_has_debug_prefix_map
 unix_directory
 unix_library
@@ -23689,7 +23689,6 @@ printf "%s\n" "$as_me: the threads library is supported" >&6;} ;;
 esac
 
 ## Does the assembler support debug prefix map and CFI directives
-as_has_debug_prefix_map=false
 asm_cfi_supported=false
 if $native_compiler
 then :
@@ -23700,7 +23699,10 @@ then :
 
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the assembler supports --debug-prefix-map" >&5
 printf %s "checking whether the assembler supports --debug-prefix-map... " >&6; }
-
+if test ${ocaml_cv_prog_as_debug_prefix_map+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
 
   saved_CC="$CC"
   saved_CFLAGS="$CFLAGS"
@@ -23714,14 +23716,14 @@ printf %s "checking whether the assembler supports --debug-prefix-map... " >&6; 
   touch confdefs.h
 
 
-  # Modify C-compiler variables to use the assembler
-  CC="$AS"
-  CFLAGS="--debug-prefix-map old=new -o conftest.$ac_objext"
-  CPPFLAGS=""
-  ac_ext="S"
-  ac_compile='$CC $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+    # Modify C-compiler variables to use the assembler
+    CC="$AS"
+    CFLAGS="--debug-prefix-map old=new -o conftest.$ac_objext"
+    CPPFLAGS=""
+    ac_ext="S"
+    ac_compile='$CC $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
 camlPervasives__loop_1128:
@@ -23731,13 +23733,9 @@ camlPervasives__loop_1128:
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"
 then :
-  as_has_debug_prefix_map=true
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
+  ocaml_cv_prog_as_debug_prefix_map=true
 else $as_nop
-  as_has_debug_prefix_map=false
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
+  ocaml_cv_prog_as_debug_prefix_map=false
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
 
@@ -23751,6 +23749,9 @@ rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
   CC="$saved_CC"
   LIBS="$saved_LIBS"
 
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ocaml_cv_prog_as_debug_prefix_map" >&5
+printf "%s\n" "$ocaml_cv_prog_as_debug_prefix_map" >&6; }
 
 
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the assembler supports CFI directives" >&5
@@ -23861,6 +23862,8 @@ fi
 fi ;;
 esac
 fi
+# Always assign a valid default OCaml value
+: ${ocaml_cv_prog_as_debug_prefix_map:=false}
 
 ## Frame pointers
 
