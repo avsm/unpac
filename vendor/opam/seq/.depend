@@ -10778,11 +10778,13 @@ testsuite/tools/test_in_prefix.cmx : \
     testsuite/tools/test_in_prefix.cmi
 testsuite/tools/test_in_prefix.cmi :
 testsuite/tools/test_ld_conf.cmo : \
+    otherlibs/unix/unix.cmi \
     testsuite/tools/harness.cmi \
     testsuite/tools/environment.cmi \
     utils/config.cmi \
     testsuite/tools/test_ld_conf.cmi
 testsuite/tools/test_ld_conf.cmx : \
+    otherlibs/unix/unix.cmx \
     testsuite/tools/harness.cmx \
     testsuite/tools/environment.cmx \
     utils/config.cmx \

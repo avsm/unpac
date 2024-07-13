@@ -64,8 +64,9 @@ let () =
       let runtime =
         mode = Bytecode && Harness.ocamlc_fails_after_rename config in
       (* In the Renamed phase, Config.standard_library will still point to the
-         Original location *)
-      let stdlib = true in
+         Original location, unless the compiler has been configured with a
+         relative libdir *)
+      let stdlib = (config.has_relative_libdir = None) in
       let (_, output) =
         Environment.run_process ~runtime ~stdlib env compiler args in
       Environment.display_output output
@@ -88,12 +89,15 @@ let () =
       mode = Bytecode
       && expected_exit_code = None
       && not config.target_launcher_searches_for_ocamlrun
+      && config.has_relative_libdir = None
     in
     (* If the library needs C stubs to be loaded dynamically, then the runtime
        will need CAML_LD_LIBRARY_PATH set in the Renamed phase. *)
     let stubs =
       has_c_stubs
       && expected_exit_code = None
+      && Config.supports_shared_libraries
+      && config.has_relative_libdir = None
     in
     let expected_exit_code =
       match expected_exit_code with
@@ -136,11 +140,16 @@ let () =
   let not_dynlink l = not (List.mem "dynlink" l) in
   let files, re_compile = compile_test_program () in
   let expected_exit_code =
-    (* Bytecode executables launched using the executable header require
-       caml_executable_name to know where the runtime is. As the Standard
-       Library is only stored as an absolute path, this doesn't affect the
-       execution of the test driver (yet). *)
-    None in
+    (* Relocatable OCaml bytecode executables launched using the executable
+       header require caml_executable_name, or they end up being accidentally
+       relative, since the exec call leaves argv[0] as being the bytecode image
+       itself. *)
+    if mode = Bytecode && config.has_relative_libdir <> None
+       && Harness.no_caml_executable_name
+       && Environment.launched_via_stub test_program then
+      Some 2
+    else
+      None in
   let libraries = List.filter not_dynlink config.libraries in
   let () =
     List.iter (test_libraries_in_prog ?expected_exit_code env) libraries;
