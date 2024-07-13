@@ -32,7 +32,7 @@ module Import = struct
     has_ocamlnat: bool;
     has_ocamlopt: bool;
     has_relative_libdir: string option;
-    has_runtime_search: bool option;
+    has_runtime_search: Config.search_method;
     launcher_searches_for_ocamlrun: bool;
     target_launcher_searches_for_ocamlrun: bool;
     bytecode_shebangs_by_default: bool;

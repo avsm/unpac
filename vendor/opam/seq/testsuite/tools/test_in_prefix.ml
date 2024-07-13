@@ -126,8 +126,10 @@ let () =
   in
   let bytecode_shebangs_by_default =
     Config.launch_method <> Config.Executable in
-  let launcher_searches_for_ocamlrun = Sys.win32 in
-  let target_launcher_searches_for_ocamlrun = Sys.win32 in
+  let launcher_searches_for_ocamlrun =
+    (config.has_runtime_search <> Config.Disable) in
+  let target_launcher_searches_for_ocamlrun =
+    (Config.search_method <> Config.Disable) in
   let config =
     {config with libraries;
                  launcher_searches_for_ocamlrun;
@@ -150,7 +152,7 @@ let () =
      relocatable and also required support from the assembler and C compiler. *)
   let relocatable =
     config.has_relative_libdir <> None
-    && config.launcher_searches_for_ocamlrun
+    && config.has_runtime_search <> Config.Disable
   in
   let reproducible =
     relocatable
@@ -161,7 +163,7 @@ let () =
     && (not Toolchain.c_compiler_always_embeds_build_path
         || not Toolchain.c_compiler_debug_paths_can_be_absolute)
   in
-  let target_relocatable = config.target_launcher_searches_for_ocamlrun in
+  let target_relocatable = (Config.search_method <> Config.Disable) in
   (* Use Harness.pp_path unless --verbose was specified *)
   let pp_path =
     if verbose then

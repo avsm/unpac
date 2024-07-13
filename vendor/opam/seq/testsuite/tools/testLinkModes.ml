@@ -501,7 +501,10 @@ let compile_test usr_bin_sh config env test test_program description =
             | _ ->
                 [] in
           let target_launcher_searches_for_ocamlrun =
-            (search_method <> Config.Disable)
+            if search_method = Config.search_method then
+              None
+            else
+              Some (search_method <> Config.Disable)
           in
           let param =
             match search_method with
@@ -509,8 +512,13 @@ let compile_test usr_bin_sh config env test test_program description =
             | Fallback -> "fallback"
             | Enable -> "enable"
           in
-          let args = "-runtime-search" :: param :: args in
-          f ~target_launcher_searches_for_ocamlrun ~tendered:true args
+          let args =
+            if search_method = Config.search_method then
+              args
+            else
+              "-runtime-search" :: param :: args
+          in
+          f ?target_launcher_searches_for_ocamlrun ~tendered:true args
       | Default_ocamlopt ->
           f ~mode:Native []
       | Custom_runtime Static ->
