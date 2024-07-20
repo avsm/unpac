@@ -77,18 +77,16 @@ function set_configuration {
 
   case "$1" in
     cygwin*)
-      args+=('--disable-dependency-generation' '--enable-native-toplevel');;
+      args+=('--enable-native-toplevel');;
     mingw32)
-      args+=('--host=i686-w64-mingw32' '--disable-dependency-generation');;
+      args+=('--host=i686-w64-mingw32');;
     mingw64)
-      args+=('--host=x86_64-w64-mingw32' '--disable-dependency-generation' \
-             '--disable-stdlib-manpages' '--enable-native-toplevel');;
-    msvc32)
-      args+=('--host=i686-pc-windows' '--disable-dependency-generation');;
-    msvc64)
-      # Explicitly test dependency generation on msvc64
-      args+=('--host=x86_64-pc-windows' '--enable-dependency-generation' \
+      args+=('--host=x86_64-w64-mingw32' '--disable-stdlib-manpages' \
              '--enable-native-toplevel');;
+    msvc32)
+      args+=('--host=i686-pc-windows');;
+    msvc64)
+      args+=('--host=x86_64-pc-windows' '--enable-native-toplevel');;
   esac
   if [[ $RELOCATABLE = 'true' ]]; then
     args+=('--with-relative-libdir' \

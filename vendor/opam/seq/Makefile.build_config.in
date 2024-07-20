@@ -72,7 +72,12 @@ OPTIONAL_NATIVE_TOOLS = @optional_native_tools@
 INSTALL_OCAMLNAT = @install_ocamlnat@
 
 # The command to generate C dependency information
-DEP_CC=@DEP_CC@ -MM
+DEP_CC=@DEP_CC@
+ifeq "@compute_deps@-$(CC)" "true-$(DEP_CC)"
+DEP_FLAGS = -MMD -MT $(1) -MF $(2)
+else
+DEP_FLAGS =
+endif
 COMPUTE_DEPS=@compute_deps@
 
 BUILD_PATH_LOGICAL = @srcdir_abs@

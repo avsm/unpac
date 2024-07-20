@@ -166,27 +166,43 @@ distclean:: clean
 %.cmx: %.ml
 	$(V_OCAMLOPT)$(CAMLOPT) -c $(COMPFLAGS) $(OPTCOMPFLAGS) $<
 
+ifeq "$(COMPUTE_DEPS)" "true"
+%.b.$(O): %.c $(REQUIRED_HEADERS) | $(DEPDIR)
+	$(V_CC)$(CC) $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) \
+	  $(OUTPUTOBJ)$@ $(call DEP_FLAGS,$@,$(DEPDIR)/$(@:.$(O)=.$(D))) -c $<
+# MSVC doesn't emit usable dependency information, but if GCC is available
+# then it can instead be called in order to generate the .d file.
+ifneq "$(CC)" "$(DEP_CC)"
+	$(V_CCDEPS)$(DEP_CC) $(OC_CPPFLAGS) $(CPPFLAGS) $< -MM -MT $@ \
+   -MF $(DEPDIR)/$(@:.$(O)=.$(D))
+endif # ifneq "$(CC)" "$(DEP_CC)"
+
+%.n.$(O): %.c $(REQUIRED_HEADERS) | $(DEPDIR)
+	$(V_CC)$(CC) $(OC_CFLAGS) $(CFLAGS) \
+	  $(OC_CPPFLAGS) $(CPPFLAGS) $(OUTPUTOBJ)$@ \
+	  $(call DEP_FLAGS,$@,$(DEPDIR)/$(@:.$(O)=.$(D))) -c $<
+# MSVC doesn't emit usable dependency information, but if GCC is available
+# then it can instead be called in order to generate the .d file.
+ifneq "$(CC)" "$(DEP_CC)"
+	$(V_CCDEPS)$(DEP_CC) $(OC_CPPFLAGS) $(CPPFLAGS) $< -MM -MT $@ \
+   -MF $(DEPDIR)/$(@:.$(O)=.$(D))
+endif # ifneq "$(CC)" "$(DEP_CC)"
+else
 %.b.$(O): %.c $(REQUIRED_HEADERS)
 	$(V_CC)$(CC) $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) \
 	  $(OUTPUTOBJ)$@ -c $<
 
-%.n.$(O): OC_CFLAGS += $(OC_NATIVE_CFLAGS)
-
 %.n.$(O): %.c $(REQUIRED_HEADERS)
 	$(V_CC)$(CC) $(OC_CFLAGS) $(CFLAGS) \
 	  $(OC_CPPFLAGS) $(CPPFLAGS) $(OUTPUTOBJ)$@ -c $<
+endif # ifeq "$(COMPUTE_DEPS)" "true"
+
+%.n.$(O): OC_CFLAGS += $(OC_NATIVE_CFLAGS)
 
 ifeq "$(COMPUTE_DEPS)" "true"
 ifneq "$(COBJS_BYTECODE)" ""
-include $(addprefix $(DEPDIR)/, $(COBJS_BYTECODE:.$(O)=.$(D)))
-ifeq "$(NATIVE_COMPILER)" "true"
-include $(addprefix $(DEPDIR)/, $(COBJS_NATIVE:.$(O)=.$(D)))
+GENERATED_DEPEND_FILES := $(wildcard $(DEPDIR)/*.$(D))
+.PHONY: $(GENERATED_DEPEND_FILES)
+include $(GENERATED_DEPEND_FILES)
 endif
 endif
-endif
-
-$(DEPDIR)/%.b.$(D): %.c | $(DEPDIR)
-	$(V_CCDEPS)$(DEP_CC) $(OC_CPPFLAGS) $(CPPFLAGS) $< -MT '$*.b.$(O)' -MF $@
-
-$(DEPDIR)/%.n.$(D): %.c | $(DEPDIR)
-	$(V_CCDEPS)$(DEP_CC) $(OC_CPPFLAGS) $(CPPFLAGS) $< -MT '$*.n.$(O)' -MF $@
