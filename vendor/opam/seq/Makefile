@@ -1514,7 +1514,7 @@ $(DEPDIR)/runtime/%.npic.$(D): \
 # (without the extension, which is added by the macro)
 define COMPILE_C_FILE
 ifeq "$(COMPUTE_DEPS)" "true"
-ifneq "$(1)" "%"
+ifneq "$(if $(3),%,$(1))" "%"
 # -MG would ensure that the dependencies are generated even if the files listed
 # in $$(runtime_BUILT_HEADERS) haven't been assembled yet. However,
 # this goes subtly wrong if the user has the headers installed,
@@ -1556,6 +1556,8 @@ $(eval $(call COMPILE_C_FILE,runtime/$(UNIX_OR_WIN32)_non_shared.%, \
 $(foreach runtime_OBJECT_TYPE,$(subst %,,$(runtime_OBJECT_TYPES)), \
   $(eval \
     runtime/dynlink$(runtime_OBJECT_TYPE).$(O): $(ROOTDIR)/Makefile.config))
+
+$(eval $(call COMPILE_C_FILE,yacc/%,yacc/%,no-deps))
 
 ## Compilation of runtime assembly files
 
@@ -2276,6 +2278,7 @@ endif
 endif
 
 # Check that the stack limit is reasonable (Unix-only)
+$(eval $(call COMPILE_C_FILE,tools/checkstack,tools/checkstack,no-deps))
 .PHONY: checkstack
 ifeq "$(UNIX_OR_WIN32)" "unix"
 checkstack: tools/checkstack$(EXE)
