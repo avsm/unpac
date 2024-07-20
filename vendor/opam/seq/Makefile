@@ -3059,6 +3059,7 @@ ifeq "$(INSTALL_SOURCE_ARTIFACTS)" "true"
 	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
 endif
 
+.PHONY: .depend
 include .depend
 
 # Include the cross-compiler recipes only when relevant

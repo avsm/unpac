@@ -154,4 +154,5 @@ $(foreach object_type, b n, $(eval $(call GEN_RULE,$(object_type))))
 depend:
 	$(V_GEN)$(OCAMLRUN) $(ROOTDIR)/boot/ocamlc -depend -slash *.mli *.ml > .depend
 
+.PHONY: .depend
 include .depend
