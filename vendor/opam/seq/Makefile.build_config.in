@@ -74,7 +74,7 @@ INSTALL_OCAMLNAT = @install_ocamlnat@
 # The command to generate C dependency information
 DEP_CC=@DEP_CC@
 ifeq "@compute_deps@-$(CC)" "true-$(DEP_CC)"
-DEP_FLAGS = -MMD -MT $(1) -MF $(2)
+DEP_FLAGS = $(addprefix @DEP_CC_PREFIX@,-MMD -MT $(1) -MF $(2))
 else
 DEP_FLAGS =
 endif

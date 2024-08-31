@@ -131,6 +131,8 @@ AC_SUBST([CMT_MAGIC_NUMBER], [CMT__MAGIC_NUMBER])
 AC_SUBST([LINEAR_MAGIC_NUMBER], [LINEAR__MAGIC_NUMBER])
 AC_SUBST([CC])
 AC_SUBST([ocaml_cc_vendor])
+AC_SUBST([DEP_CC])
+AC_SUBST([DEP_CC_PREFIX])
 AC_SUBST([SAK_BUILD])
 AC_SUBST([SAK])
 AC_SUBST([encode_C_literal])
@@ -839,14 +841,22 @@ popdef([host])dnl
 OCAML_WITH_NONEXECSTACK_NOTE
 OCAML_ASM_SIZE_TYPE_DIRECTIVES
 
+## Find vendor of the C compiler
+OCAML_CC_VENDOR
+
+DEP_CC_PREFIX=''
 AS_CASE([$host],
   [sparc-sun-solaris*],
     [DEP_CC="false"],
   [*-pc-windows],
-    [AC_CHECK_TOOLS(
-      [DEP_CC],
-      [$DEP_CC gcc cc x86_64-w64-mingw32-gcc i686-w64-mingw32-gcc],
-      [false])],
+    [AS_CASE([$ocaml_cc_vendor],
+      [msvc-*-clang-*],
+      [DEP_CC="$CC"
+      DEP_CC_PREFIX='/clang:'],
+      [AC_CHECK_TOOLS(
+        [DEP_CC],
+        [$DEP_CC gcc cc x86_64-w64-mingw32-gcc i686-w64-mingw32-gcc],
+        [false])])],
   [DEP_CC="$CC"])
 
 AS_CASE([$enable_dependency_generation],
@@ -882,9 +892,6 @@ AS_CASE([$target],
   [
     mklib="rm -f \$(1) && ${AR} rc \$(1) \$(2)"
   ])
-
-## Find vendor of the C compiler
-OCAML_CC_VENDOR
 
 ## In cross-compilation mode, can we run executables produced?
 # At the moment, it's required, but the fact is used in C99 function detection
