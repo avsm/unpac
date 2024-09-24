@@ -717,6 +717,7 @@ ac_includes_default="\
 ac_header_c_list=
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+DIFF_FLAGS
 DIFF
 PTHREAD_CFLAGS
 PTHREAD_LIBS
@@ -945,8 +946,7 @@ libext
 ac_tool_prefix
 CSCFLAGS
 CSC
-diff_supports_color
-DIFF_FLAGS
+ocaml_cv_prog_diff_supports_color
 encode_C_literal
 SAK
 SAK_BUILD
@@ -3397,7 +3397,6 @@ ocamltest_libunix=None
 ocamltest_unix_impl="dummy"
 unix_library=""
 unix_directory=""
-diff_supports_color=false
 target_libdir_is_relative=false
 srcdir_abs=''
 srcdir_abs_real=''
@@ -3465,7 +3464,6 @@ CMXS_MAGIC_NUMBER=Caml1999D037
 CMT_MAGIC_NUMBER=Caml1999T037
 
 LINEAR_MAGIC_NUMBER=Caml1999L037
-
 
 
 
@@ -24116,42 +24114,47 @@ fi
 
   test -n "$DIFF" && break
 done
-test -n "$DIFF" || DIFF="none"
+test -n "$DIFF" || DIFF="as_fn_error $? "ocamltest requires a diff tool" "$LINENO" 5"
 
-  DIFF_FLAGS=""
-  flags=""
   case $DIFF in #(
   diff) :
-    flags="--strip-trailing-cr -u" ;; #(
-  none) :
-    as_fn_error $? "ocamltest requires a diff tool" "$LINENO" 5 ;; #(
+    flags_to_test='--strip-trailing-cr -u' ;; #(
   *) :
      ;;
 esac
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for extra $DIFF flags" >&5
+printf %s "checking for extra $DIFF flags... " >&6; }
+if test ${ocaml_cv_prog_diff_flags+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
+  flags=""
+    for flag in ${flags_to_test}; do
+      "$DIFF" $flag /dev/zero /dev/zero >/dev/null 2>&1 && \
+        flags="${flags:+$flags }$flag"
+    done
+    ocaml_cv_prog_diff_flags="$flags"
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ocaml_cv_prog_diff_flags" >&5
+printf "%s\n" "$ocaml_cv_prog_diff_flags" >&6; }
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether $DIFF supports --color={auto,always,never}" >&5
 printf %s "checking whether $DIFF supports --color={auto,always,never}... " >&6; }
+if test ${ocaml_cv_prog_diff_supports_color+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
   if $DIFF --color=auto $0 $0 > /dev/null 2>&1
 then :
-  diff_supports_color=true; { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-else $as_nop
-  diff_supports_color=false; { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
+  ocaml_cv_prog_diff_supports_color=true
 fi
-  for flag in ${flags}; do
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether $DIFF supports $flag" >&5
-printf %s "checking whether $DIFF supports $flag... " >&6; };
-    if $DIFF $DIFF_FLAGS $flag $0 $0 > /dev/null 2>&1
-then :
-  DIFF_FLAGS="$DIFF_FLAGS $flag"
-      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-else $as_nop
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
 fi
-  done
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ocaml_cv_prog_diff_supports_color" >&5
+printf "%s\n" "$ocaml_cv_prog_diff_supports_color" >&6; }
 fi
+DIFF_FLAGS=$ocaml_cv_prog_diff_flags
+
+# Always assign a valid default OCaml value
+: ${ocaml_cv_prog_diff_supports_color:=false}
 
 if test x"$enable_flambda" = "xyes"
 then :
