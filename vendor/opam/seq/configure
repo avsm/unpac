@@ -18473,6 +18473,14 @@ fi
 # Support for C11 atomic types
 
 
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for options needed to enable C11 atomic support" >&5
+printf %s "checking for options needed to enable C11 atomic support... " >&6; }
+  if test ${ocaml_cv_prog_cc_c11_atomic_cflags+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
+  ocaml_cv_prog_cc_c11_atomic_cflags=no
+    for ocaml_arg in         ''        '-experimental:c11atomics'        '-std:c11'        '-std:c11 -experimental:c11atomics'    ; do
 
   saved_CC="$CC"
   saved_CFLAGS="$CFLAGS"
@@ -18485,20 +18493,12 @@ fi
   mv confdefs.h confdefs.h.bak
   touch confdefs.h
 
-
-  opts=""
-  if test -n ""
+      CFLAGS="$CFLAGS $ocaml_arg"
+      if test -n "$cclibs"
 then :
-  CFLAGS="$CFLAGS "; opts=""
+  LIBS="$LIBS $cclibs"
 fi
-  if test -n "$cclibs"
-then :
-  LIBS="$LIBS $cclibs"; opts="${opts:+$opts }$cclibs"
-fi
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking if $CC supports _Atomic types with ${opts:-no additional options}" >&5
-printf %s "checking if $CC supports _Atomic types with ${opts:-no additional options}... " >&6; }
-
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+      cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
 #include <stdint.h>
@@ -18522,17 +18522,12 @@ main (void)
 _ACEOF
 if ac_fn_c_try_link "$LINENO"
 then :
-  cc_supports_atomic=true
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
+  if test x"$ocaml_arg" = x
+then :
+  ocaml_cv_prog_cc_c11_atomic_cflags=''
 else $as_nop
-  cc_supports_atomic=false
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
+  ocaml_cv_prog_cc_c11_atomic_cflags="$ocaml_arg"
 fi
-rm -f core conftest.err conftest.$ac_objext conftest.beam \
-    conftest$ac_exeext conftest.$ac_ext
-
 
   # Restore the content of confdefs.h
   mv confdefs.h.bak confdefs.h
@@ -18543,70 +18538,10 @@ rm -f core conftest.err conftest.$ac_objext conftest.beam \
   CC="$saved_CC"
   LIBS="$saved_LIBS"
 
-
-case $cc_supports_atomic,$ocaml_cc_vendor in #(
-  false,msvc-*) :
-
-
-  saved_CC="$CC"
-  saved_CFLAGS="$CFLAGS"
-  saved_CPPFLAGS="$CPPFLAGS"
-  saved_LIBS="$LIBS"
-  saved_ac_ext="$ac_ext"
-  saved_ac_compile="$ac_compile"
-  # Move the content of confdefs.h to another file so it does not
-  # get included
-  mv confdefs.h confdefs.h.bak
-  touch confdefs.h
-
-
-  opts=""
-  if test -n "-std:c11"
-then :
-  CFLAGS="$CFLAGS -std:c11"; opts="-std:c11"
-fi
-  if test -n ""
-then :
-  LIBS="$LIBS "; opts="${opts:+$opts }"
-fi
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking if $CC supports _Atomic types with ${opts:-no additional options}" >&5
-printf %s "checking if $CC supports _Atomic types with ${opts:-no additional options}... " >&6; }
-
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-#include <stdint.h>
-#include <stdatomic.h>
-
-int
-main (void)
-{
-
-  _Atomic int64_t n;
-  int m;
-  int * _Atomic p = &m;
-  atomic_store_explicit(&n, 123, memory_order_release);
-  * atomic_exchange(&p, 0) = 45;
-  if (atomic_load_explicit(&n, memory_order_acquire))
-    return 1;
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"
-then :
-  cc_supports_atomic=true
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-else $as_nop
-  cc_supports_atomic=false
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
+      break
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam \
     conftest$ac_exeext conftest.$ac_ext
-
 
   # Restore the content of confdefs.h
   mv confdefs.h.bak confdefs.h
@@ -18617,99 +18552,27 @@ rm -f core conftest.err conftest.$ac_objext conftest.beam \
   CC="$saved_CC"
   LIBS="$saved_LIBS"
 
-
-     if $cc_supports_atomic
-then :
-  common_cflags="$common_cflags -std:c11"
-else $as_nop
-
-
-  saved_CC="$CC"
-  saved_CFLAGS="$CFLAGS"
-  saved_CPPFLAGS="$CPPFLAGS"
-  saved_LIBS="$LIBS"
-  saved_ac_ext="$ac_ext"
-  saved_ac_compile="$ac_compile"
-  # Move the content of confdefs.h to another file so it does not
-  # get included
-  mv confdefs.h confdefs.h.bak
-  touch confdefs.h
-
-
-  opts=""
-  if test -n "-std:c11 -experimental:c11atomics"
-then :
-  CFLAGS="$CFLAGS -std:c11 -experimental:c11atomics"; opts="-std:c11 -experimental:c11atomics"
-fi
-  if test -n ""
-then :
-  LIBS="$LIBS "; opts="${opts:+$opts }"
-fi
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking if $CC supports _Atomic types with ${opts:-no additional options}" >&5
-printf %s "checking if $CC supports _Atomic types with ${opts:-no additional options}... " >&6; }
-
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-#include <stdint.h>
-#include <stdatomic.h>
-
-int
-main (void)
-{
-
-  _Atomic int64_t n;
-  int m;
-  int * _Atomic p = &m;
-  atomic_store_explicit(&n, 123, memory_order_release);
-  * atomic_exchange(&p, 0) = 45;
-  if (atomic_load_explicit(&n, memory_order_acquire))
-    return 1;
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"
-then :
-  cc_supports_atomic=true
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-else $as_nop
-  cc_supports_atomic=false
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.beam \
-    conftest$ac_exeext conftest.$ac_ext
-
-
-  # Restore the content of confdefs.h
-  mv confdefs.h.bak confdefs.h
-  ac_compile="$saved_ac_compile"
-  ac_ext="$saved_ac_ext"
-  CPPFLAGS="$saved_CPPFLAGS"
-  CFLAGS="$saved_CFLAGS"
-  CC="$saved_CC"
-  LIBS="$saved_LIBS"
-
-
-        if $cc_supports_atomic
-then :
-  common_cflags="$common_cflags -std:c11 -experimental:c11atomics"
+    done
 fi
 
-fi ;; #(
-  *) :
-     ;;
-esac
-if ! $cc_supports_atomic
+  if test "x$ocaml_cv_prog_cc_c11_atomic_cflags" = xno
 then :
   { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
 printf "%s\n" "$as_me: error: in \`$ac_pwd':" >&2;}
 as_fn_error $? "C11 atomic support is required, use another C compiler
 See \`config.log' for more details" "$LINENO" 5; }
+else $as_nop
+  if test "x$ocaml_cv_prog_cc_c11_atomic_cflags" = x
+then :
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: none needed" >&5
+printf "%s\n" "none needed" >&6; }
+else $as_nop
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ocaml_cv_prog_cc_c11_atomic_cflags" >&5
+printf "%s\n" "$ocaml_cv_prog_cc_c11_atomic_cflags" >&6; }
+      common_cflags="$common_cflags $ocaml_cv_prog_cc_c11_atomic_cflags"
 fi
+fi
+
 
 # Full support for thread local storage
 # macOS and MinGW-w64 have problems with thread local storage accessed from DLLs
