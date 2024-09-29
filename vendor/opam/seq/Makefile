@@ -483,9 +483,11 @@ utils/config_boot.ml: utils/config.fixed.ml utils/config.common.ml
 utils/config_main.ml: utils/config.generated.ml utils/config.common.ml
 	$(V_GEN)cat $^ > $@
 
+ADDITIONAL_CONFIGURE_ARGS ?=
 .PHONY: reconfigure
 reconfigure:
-	ac_read_git_config=true ./configure $(CONFIGURE_ARGS)
+	ac_read_git_config=true ./configure $(CONFIGURE_ARGS) \
+	                                    $(ADDITIONAL_CONFIGURE_ARGS)
 
 utils/domainstate.ml: utils/domainstate.ml.c runtime/caml/domain_state.tbl
 	$(V_GEN)$(CPP) -I runtime/caml $< > $@
