@@ -22,14 +22,21 @@
 #include "caml/mlvalues.h"
 #include "caml/exec.h"
 
-Caml_inline unsigned long read_size(const char * const ptr)
+/* C11's _Noreturn is deprecated in C23 in favour of attributes */
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L
+  #define NORETURN [[noreturn]]
+#else
+  #define NORETURN _Noreturn
+#endif
+
+static unsigned long read_size(const char * const ptr)
 {
   const unsigned char * const p = (const unsigned char * const) ptr;
   return ((unsigned long) p[0] << 24) | ((unsigned long) p[1] << 16) |
          ((unsigned long) p[2] << 8) | p[3];
 }
 
-Caml_inline char * read_runtime_path(HANDLE h)
+static char * read_runtime_path(HANDLE h)
 {
   char buffer[TRAILER_SIZE];
   static char runtime_path[MAX_PATH];
@@ -91,8 +98,7 @@ static void write_console(HANDLE hOut, WCHAR *wstr)
   }
 }
 
-CAMLnoret Caml_inline void run_runtime(wchar_t * runtime,
-         wchar_t * const cmdline)
+NORETURN static void run_runtime(wchar_t * runtime, wchar_t * const cmdline)
 {
   wchar_t path[MAX_PATH];
   STARTUPINFO stinfo;
@@ -134,7 +140,7 @@ CAMLnoret Caml_inline void run_runtime(wchar_t * runtime,
   ExitProcess(retcode);
 }
 
-_Noreturn void __cdecl wmainCRTStartup(void)
+NORETURN void __cdecl wmainCRTStartup(void)
 {
   wchar_t truename[MAX_PATH];
   wchar_t * cmdline = GetCommandLine();
