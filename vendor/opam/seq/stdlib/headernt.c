@@ -22,15 +22,6 @@
 #include "caml/mlvalues.h"
 #include "caml/exec.h"
 
-#ifndef __MINGW32__
-#pragma comment(linker , "/subsystem:console")
-#pragma comment(lib , "kernel32")
-#ifdef _UCRT
-#pragma comment(lib , "ucrt.lib")
-#pragma comment(lib , "vcruntime.lib")
-#endif
-#endif
-
 Caml_inline unsigned long read_size(const char * const ptr)
 {
   const unsigned char * const p = (const unsigned char * const) ptr;
@@ -91,10 +82,10 @@ static void write_console(HANDLE hOut, WCHAR *wstr)
 
   if (GetConsoleMode(hOut, &consoleMode) != 0) {
     /* The output stream is a Console */
-    WriteConsole(hOut, wstr, wcslen(wstr), &numwritten, NULL);
+    WriteConsole(hOut, wstr, lstrlen(wstr), &numwritten, NULL);
   } else { /* The output stream is redirected */
     len =
-      WideCharToMultiByte(CP, 0, wstr, wcslen(wstr), str, sizeof(str),
+      WideCharToMultiByte(CP, 0, wstr, lstrlen(wstr), str, sizeof(str),
                           NULL, NULL);
     WriteFile(hOut, str, len, &numwritten, NULL);
   }
@@ -143,7 +134,7 @@ CAMLnoret Caml_inline void run_runtime(wchar_t * runtime,
   ExitProcess(retcode);
 }
 
-int wmain(void)
+_Noreturn void __cdecl wmainCRTStartup(void)
 {
   wchar_t truename[MAX_PATH];
   wchar_t * cmdline = GetCommandLine();
