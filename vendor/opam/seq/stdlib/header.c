@@ -22,14 +22,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "caml/mlvalues.h"
 #include "caml/exec.h"
-
-#ifndef MAXPATHLEN
-#define MAXPATHLEN 1024
-#endif
 
 #ifndef S_ISREG
 #define S_ISREG(mode) (((mode) & S_IFMT) == S_IFREG)
@@ -45,7 +42,7 @@
 
 static char * searchpath(char * name)
 {
-  static char fullname[MAXPATHLEN + 1];
+  static char fullname[PATH_MAX + 1];
   char * path;
   struct stat st;
 
@@ -57,11 +54,11 @@ static char * searchpath(char * name)
   while(1) {
     char * p;
     for (p = fullname; *path != 0 && *path != ':'; p++, path++)
-      if (p < fullname + MAXPATHLEN) *p = *path;
-    if (p != fullname && p < fullname + MAXPATHLEN)
+      if (p < fullname + PATH_MAX) *p = *path;
+    if (p != fullname && p < fullname + PATH_MAX)
       *p++ = '/';
     for (char *q = name; *q != 0; p++, q++)
-      if (p < fullname + MAXPATHLEN) *p = *q;
+      if (p < fullname + PATH_MAX) *p = *q;
     *p = 0;
     if (stat(fullname, &st) == 0 && S_ISREG(st.st_mode)) break;
     if (*path == 0) return name;
@@ -130,7 +127,7 @@ static unsigned long read_size(char * ptr)
 static char * read_runtime_path(int fd)
 {
   char buffer[TRAILER_SIZE];
-  static char runtime_path[MAXPATHLEN];
+  static char runtime_path[PATH_MAX];
   int num_sections;
   uint32_t path_size;
   long ofs;
@@ -151,7 +148,7 @@ static char * read_runtime_path(int fd)
       ofs += read_size(buffer + 4);
   }
   if (path_size == 0) return NULL;
-  if (path_size >= MAXPATHLEN) return NULL;
+  if (path_size >= PATH_MAX) return NULL;
   lseek(fd, -ofs, SEEK_END);
   if (read(fd, runtime_path, path_size) != path_size) return NULL;
   return runtime_path;
