@@ -28,6 +28,11 @@
 #include "caml/mlvalues.h"
 #include "caml/exec.h"
 
+/* O_BINARY is defined in Gnulib, but is not POSIX */
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
+
 #ifndef __CYGWIN__
 
 /* Normal Unix search path function */
@@ -150,10 +155,6 @@ static void errwrite(const char * msg)
 {
   fputs(msg, stderr);
 }
-
-#ifndef O_BINARY
-#define O_BINARY 0
-#endif
 
 int main(int argc, char ** argv)
 {
