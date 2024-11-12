@@ -131,7 +131,9 @@ NORETURN void __cdecl wmainCRTStartup(void)
   PROCESS_INFORMATION procinfo;
   DWORD retcode;
 
-  GetModuleFileName(NULL, truename, sizeof(truename)/sizeof(wchar_t));
+  if (GetModuleFileName(NULL, truename, sizeof(truename)/sizeof(wchar_t)) == 0)
+    exit_with_error(L"Out of memory", NULL, NULL);
+
   h = CreateFile(truename, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                  NULL, OPEN_EXISTING, 0, NULL);
   if (h == INVALID_HANDLE_VALUE ||
