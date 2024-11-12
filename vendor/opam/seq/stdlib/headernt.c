@@ -60,11 +60,11 @@ static void write_console(HANDLE hOut, WCHAR *wstr)
   }
 }
 
-static unsigned long read_size(const char * const ptr)
+static uint32_t read_size(const char *ptr)
 {
-  const unsigned char * const p = (const unsigned char * const) ptr;
-  return ((unsigned long) p[0] << 24) | ((unsigned long) p[1] << 16) |
-         ((unsigned long) p[2] << 8) | p[3];
+  const unsigned char *p = (const unsigned char *)ptr;
+  return ((uint32_t) p[0] << 24) | ((uint32_t) p[1] << 16) |
+         ((uint32_t) p[2] << 8) | p[3];
 }
 
 static char * read_runtime_path(HANDLE h)
