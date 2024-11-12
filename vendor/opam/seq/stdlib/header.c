@@ -113,6 +113,11 @@ static char * searchpath(char * name)
 
 #endif
 
+static void errwrite(const char * msg)
+{
+  fputs(msg, stderr);
+}
+
 static unsigned long read_size(char * ptr)
 {
   unsigned char * p = (unsigned char *) ptr;
@@ -148,11 +153,6 @@ static char * read_runtime_path(int fd)
   lseek(fd, -ofs, SEEK_END);
   if (read(fd, runtime_path, path_size) != path_size) return NULL;
   return runtime_path;
-}
-
-static void errwrite(const char * msg)
-{
-  fputs(msg, stderr);
 }
 
 int main(int argc, char ** argv)

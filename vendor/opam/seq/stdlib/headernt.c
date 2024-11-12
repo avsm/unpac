@@ -30,6 +30,36 @@
   #define NORETURN _Noreturn
 #endif
 
+#if WINDOWS_UNICODE
+#define CP CP_UTF8
+#else
+#define CP CP_ACP
+#endif
+
+static BOOL WINAPI ctrl_handler(DWORD event)
+{
+  if (event == CTRL_C_EVENT || event == CTRL_BREAK_EVENT)
+    return TRUE;                /* pretend we've handled them */
+  else
+    return FALSE;
+}
+
+static void write_console(HANDLE hOut, WCHAR *wstr)
+{
+  DWORD consoleMode, numwritten, len;
+  static char str[MAX_PATH];
+
+  if (GetConsoleMode(hOut, &consoleMode) != 0) {
+    /* The output stream is a Console */
+    WriteConsole(hOut, wstr, lstrlen(wstr), &numwritten, NULL);
+  } else { /* The output stream is redirected */
+    len =
+      WideCharToMultiByte(CP, 0, wstr, lstrlen(wstr), str, sizeof(str),
+                          NULL, NULL);
+    WriteFile(hOut, str, len, &numwritten, NULL);
+  }
+}
+
 static unsigned long read_size(const char * const ptr)
 {
   const unsigned char * const p = (const unsigned char * const) ptr;
@@ -67,36 +97,6 @@ static char * read_runtime_path(HANDLE h)
   if (! ReadFile(h, runtime_path, path_size, &nread, NULL)) return NULL;
   if (nread != path_size) return NULL;
   return runtime_path;
-}
-
-static BOOL WINAPI ctrl_handler(DWORD event)
-{
-  if (event == CTRL_C_EVENT || event == CTRL_BREAK_EVENT)
-    return TRUE;                /* pretend we've handled them */
-  else
-    return FALSE;
-}
-
-#if WINDOWS_UNICODE
-#define CP CP_UTF8
-#else
-#define CP CP_ACP
-#endif
-
-static void write_console(HANDLE hOut, WCHAR *wstr)
-{
-  DWORD consoleMode, numwritten, len;
-  static char str[MAX_PATH];
-
-  if (GetConsoleMode(hOut, &consoleMode) != 0) {
-    /* The output stream is a Console */
-    WriteConsole(hOut, wstr, lstrlen(wstr), &numwritten, NULL);
-  } else { /* The output stream is redirected */
-    len =
-      WideCharToMultiByte(CP, 0, wstr, lstrlen(wstr), str, sizeof(str),
-                          NULL, NULL);
-    WriteFile(hOut, str, len, &numwritten, NULL);
-  }
 }
 
 NORETURN static void run_runtime(wchar_t * runtime, wchar_t * const cmdline)
