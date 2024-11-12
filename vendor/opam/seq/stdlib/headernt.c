@@ -36,6 +36,17 @@
 #define CP CP_ACP
 #endif
 
+#define SEEK_END FILE_END
+
+#define lseek(h, offset, origin) SetFilePointer((h), (offset), NULL, (origin))
+
+static int read(HANDLE h, LPVOID buffer, DWORD buffer_size)
+{
+  DWORD nread = 0;
+  ReadFile(h, buffer, buffer_size, &nread, NULL);
+  return nread;
+}
+
 static BOOL WINAPI ctrl_handler(DWORD event)
 {
   if (event == CTRL_C_EVENT || event == CTRL_BREAK_EVENT)
@@ -79,23 +90,22 @@ static uint32_t read_size(const char *ptr)
          ((uint32_t) p[2] << 8) | p[3];
 }
 
-static char * read_runtime_path(HANDLE h)
+static char * read_runtime_path(HANDLE fd)
 {
   char buffer[TRAILER_SIZE];
   static char runtime_path[MAX_PATH];
-  DWORD nread;
-  int num_sections, path_size;
+  int num_sections;
+  uint32_t path_size;
   long ofs;
 
-  if (SetFilePointer(h, -TRAILER_SIZE, NULL, FILE_END) == -1) return NULL;
-  if (! ReadFile(h, buffer, TRAILER_SIZE, &nread, NULL)) return NULL;
-  if (nread != TRAILER_SIZE) return NULL;
+  if (lseek(fd, -TRAILER_SIZE, SEEK_END) == -1) return NULL;
+  if (read(fd, buffer, TRAILER_SIZE) < TRAILER_SIZE) return NULL;
   num_sections = read_size(buffer);
   ofs = TRAILER_SIZE + num_sections * 8;
-  if (SetFilePointer(h, - ofs, NULL, FILE_END) == -1) return NULL;
+  if (lseek(fd, -ofs, SEEK_END) == -1) return NULL;
   path_size = 0;
   for (int i = 0; i < num_sections; i++) {
-    if (! ReadFile(h, buffer, 8, &nread, NULL) || nread != 8) return NULL;
+    if (read(fd, buffer, 8) < 8) return NULL;
     if (buffer[0] == 'R' && buffer[1] == 'N' &&
         buffer[2] == 'T' && buffer[3] == 'M') {
       path_size = read_size(buffer + 4);
@@ -105,9 +115,9 @@ static char * read_runtime_path(HANDLE h)
   }
   if (path_size == 0) return NULL;
   if (path_size >= MAX_PATH) return NULL;
-  if (SetFilePointer(h, -ofs, NULL, FILE_END) == -1) return NULL;
-  if (! ReadFile(h, runtime_path, path_size, &nread, NULL)) return NULL;
-  if (nread != path_size) return NULL;
+  if (lseek(fd, -ofs, SEEK_END) == -1) return NULL;
+  if (read(fd, runtime_path, path_size) != path_size) return NULL;
+
   return runtime_path;
 }
 
