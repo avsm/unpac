@@ -133,11 +133,11 @@ static char * read_runtime_path(int fd)
   uint32_t path_size;
   long ofs;
 
-  lseek(fd, (long) -TRAILER_SIZE, SEEK_END);
+  if (lseek(fd, -TRAILER_SIZE, SEEK_END) == -1) return NULL;
   if (read(fd, buffer, TRAILER_SIZE) < TRAILER_SIZE) return NULL;
   num_sections = read_size(buffer);
   ofs = TRAILER_SIZE + num_sections * 8;
-  lseek(fd, -ofs, SEEK_END);
+  if (lseek(fd, -ofs, SEEK_END) == -1) return NULL;
   path_size = 0;
   for (int i = 0; i < num_sections; i++) {
     if (read(fd, buffer, 8) < 8) return NULL;
@@ -150,7 +150,7 @@ static char * read_runtime_path(int fd)
   }
   if (path_size == 0) return NULL;
   if (path_size >= PATH_MAX) return NULL;
-  lseek(fd, -ofs, SEEK_END);
+  if (lseek(fd, -ofs, SEEK_END) == -1) return NULL;
   if (read(fd, runtime_path, path_size) != path_size) return NULL;
   return runtime_path;
 }
