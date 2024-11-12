@@ -13,9 +13,10 @@
 /*                                                                        */
 /**************************************************************************/
 
-#define CAML_INTERNALS
-
 /* The launcher for bytecode executables (if #! is not working) */
+
+#define CAML_INTERNALS
+#include "caml/exec.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,8 +26,6 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include "caml/mlvalues.h"
-#include "caml/exec.h"
 
 /* O_BINARY is defined in Gnulib, but is not POSIX */
 #ifndef O_BINARY
