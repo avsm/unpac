@@ -44,10 +44,10 @@ static BOOL WINAPI ctrl_handler(DWORD event)
     return FALSE;
 }
 
-static void write_console(HANDLE hOut, WCHAR *wstr)
+static void write_error(const wchar_t *wstr, HANDLE hOut)
 {
   DWORD consoleMode, numwritten, len;
-  static char str[MAX_PATH];
+  char str[MAX_PATH];
 
   if (GetConsoleMode(hOut, &consoleMode) != 0) {
     /* The output stream is a Console */
@@ -58,6 +58,18 @@ static void write_console(HANDLE hOut, WCHAR *wstr)
                           NULL, NULL);
     WriteFile(hOut, str, len, &numwritten, NULL);
   }
+}
+
+NORETURN static void exit_with_error(const wchar_t *wstr1,
+                                     const wchar_t *wstr2,
+                                     const wchar_t *wstr3)
+{
+  HANDLE hOut = GetStdHandle(STD_ERROR_HANDLE);
+  if (wstr1) write_error(wstr1, hOut);
+  if (wstr2) write_error(wstr2, hOut);
+  if (wstr3) write_error(wstr3, hOut);
+  write_error(L"\r\n", hOut);
+  ExitProcess(2);
 }
 
 static uint32_t read_size(const char *ptr)
@@ -104,7 +116,7 @@ NORETURN void __cdecl wmainCRTStartup(void)
   wchar_t truename[MAX_PATH];
   char *runtime_path;
   wchar_t wruntime_path[MAX_PATH];
-  HANDLE h, errh;
+  HANDLE h;
   STARTUPINFO stinfo;
   PROCESS_INFORMATION procinfo;
   DWORD retcode;
@@ -115,12 +127,9 @@ NORETURN void __cdecl wmainCRTStartup(void)
   if (h == INVALID_HANDLE_VALUE ||
       (runtime_path = read_runtime_path(h)) == NULL ||
       !MultiByteToWideChar(CP, 0, runtime_path, -1, wruntime_path,
-                           sizeof(wruntime_path)/sizeof(wchar_t))) {
-    errh = GetStdHandle(STD_ERROR_HANDLE);
-    write_console(errh, truename);
-    write_console(errh, L" not found or is not a bytecode executable file\r\n");
-    ExitProcess(2);
-  }
+                           sizeof(wruntime_path)/sizeof(wchar_t)))
+    exit_with_error(NULL, truename,
+                    L" not found or is not a bytecode executable file");
   CloseHandle(h);
   if (SearchPath(NULL, wruntime_path, L".exe", sizeof(truename)/sizeof(wchar_t),
                  truename, NULL)) {
@@ -145,9 +154,5 @@ NORETURN void __cdecl wmainCRTStartup(void)
     }
   }
 
-  errh = GetStdHandle(STD_ERROR_HANDLE);
-  write_console(errh, L"Cannot exec ");
-  write_console(errh, wruntime_path);
-  write_console(errh, L"\r\n");
-  ExitProcess(2);
+  exit_with_error(L"Cannot exec ", wruntime_path, NULL);
 }
