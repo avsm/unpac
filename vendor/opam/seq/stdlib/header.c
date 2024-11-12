@@ -28,14 +28,6 @@
 #include "caml/mlvalues.h"
 #include "caml/exec.h"
 
-#ifndef S_ISREG
-#define S_ISREG(mode) (((mode) & S_IFMT) == S_IFREG)
-#endif
-
-#ifndef SEEK_END
-#define SEEK_END 2
-#endif
-
 #ifndef __CYGWIN__
 
 /* Normal Unix search path function */
