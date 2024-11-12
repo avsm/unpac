@@ -179,8 +179,9 @@ int main(int argc, char ** argv)
     exit_with_error(NULL, truename,
                     " not found or is not a bytecode executable file");
   close(fd);
+
   argv[0] = truename;
-  execv(runtime_path, argv);
+  execvp(runtime_path, argv);
 
   exit_with_error("Cannot exec ", runtime_path, NULL);
 }
