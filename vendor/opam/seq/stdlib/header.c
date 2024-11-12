@@ -178,6 +178,7 @@ int main(int argc, char ** argv)
   if (fd == -1 || (runtime_path = read_runtime_path(fd)) == NULL)
     exit_with_error(NULL, truename,
                     " not found or is not a bytecode executable file");
+  close(fd);
   argv[0] = truename;
   execv(runtime_path, argv);
 
