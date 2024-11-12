@@ -105,40 +105,35 @@ NORETURN static void run_runtime(wchar_t * runtime, wchar_t * const cmdline)
   STARTUPINFO stinfo;
   PROCESS_INFORMATION procinfo;
   DWORD retcode;
+  HANDLE errh;
   if (SearchPath(NULL, runtime, L".exe", sizeof(path)/sizeof(wchar_t),
-                 path, NULL) == 0) {
-    HANDLE errh;
-    errh = GetStdHandle(STD_ERROR_HANDLE);
-    write_console(errh, L"Cannot exec ");
-    write_console(errh, runtime);
-    write_console(errh, L"\r\n");
-    ExitProcess(2);
-  }
-  /* Need to ignore ctrl-C and ctrl-break, otherwise we'll die and take
-     the underlying OCaml program with us! */
-  SetConsoleCtrlHandler(ctrl_handler, TRUE);
+                 path, NULL)) {
+    /* Need to ignore ctrl-C and ctrl-break, otherwise we'll die and take
+       the underlying OCaml program with us! */
+    SetConsoleCtrlHandler(ctrl_handler, TRUE);
 
-  stinfo.cb = sizeof(stinfo);
-  stinfo.lpReserved = NULL;
-  stinfo.lpDesktop = NULL;
-  stinfo.lpTitle = NULL;
-  stinfo.dwFlags = 0;
-  stinfo.cbReserved2 = 0;
-  stinfo.lpReserved2 = NULL;
-  if (!CreateProcess(path, cmdline, NULL, NULL, TRUE, 0, NULL, NULL,
-                     &stinfo, &procinfo)) {
-    HANDLE errh;
-    errh = GetStdHandle(STD_ERROR_HANDLE);
-    write_console(errh, L"Cannot exec ");
-    write_console(errh, runtime);
-    write_console(errh, L"\r\n");
-    ExitProcess(2);
+    stinfo.cb = sizeof(stinfo);
+    stinfo.lpReserved = NULL;
+    stinfo.lpDesktop = NULL;
+    stinfo.lpTitle = NULL;
+    stinfo.dwFlags = 0;
+    stinfo.cbReserved2 = 0;
+    stinfo.lpReserved2 = NULL;
+    if (CreateProcess(path, cmdline, NULL, NULL, TRUE, 0, NULL, NULL,
+                      &stinfo, &procinfo)) {
+      CloseHandle(procinfo.hThread);
+      WaitForSingleObject(procinfo.hProcess, INFINITE);
+      GetExitCodeProcess(procinfo.hProcess, &retcode);
+      CloseHandle(procinfo.hProcess);
+      ExitProcess(retcode);
+    }
   }
-  CloseHandle(procinfo.hThread);
-  WaitForSingleObject(procinfo.hProcess , INFINITE);
-  GetExitCodeProcess(procinfo.hProcess , &retcode);
-  CloseHandle(procinfo.hProcess);
-  ExitProcess(retcode);
+
+  errh = GetStdHandle(STD_ERROR_HANDLE);
+  write_console(errh, L"Cannot exec ");
+  write_console(errh, runtime);
+  write_console(errh, L"\r\n");
+  ExitProcess(2);
 }
 
 NORETURN void __cdecl wmainCRTStartup(void)
