@@ -15,8 +15,80 @@
 
 /* The launcher for bytecode executables (if #! is not available) */
 
-#define CAML_INTERNALS
-#include "caml/exec.h"
+/* C11's _Noreturn is deprecated in C23 in favour of attributes */
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L
+  #define NORETURN [[noreturn]]
+#else
+  #define NORETURN _Noreturn
+#endif
+
+#ifdef _WIN32
+
+#define STRICT
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#if WINDOWS_UNICODE
+#define CP CP_UTF8
+#else
+#define CP CP_ACP
+#endif
+
+/* mingw-w64 has a limits.h which defines PATH_MAX as an alias for MAX_PATH */
+#if !defined(PATH_MAX)
+#define PATH_MAX MAX_PATH
+#endif
+
+#define SEEK_END FILE_END
+
+#define lseek(h, offset, origin) SetFilePointer((h), (offset), NULL, (origin))
+
+typedef HANDLE file_descriptor;
+
+static int read(HANDLE h, LPVOID buffer, DWORD buffer_size)
+{
+  DWORD nread = 0;
+  ReadFile(h, buffer, buffer_size, &nread, NULL);
+  return nread;
+}
+
+static BOOL WINAPI ctrl_handler(DWORD event)
+{
+  if (event == CTRL_C_EVENT || event == CTRL_BREAK_EVENT)
+    return TRUE;                /* pretend we've handled them */
+  else
+    return FALSE;
+}
+
+static void write_error(const wchar_t *wstr, HANDLE hOut)
+{
+  DWORD consoleMode, numwritten, len;
+  char str[MAX_PATH];
+
+  if (GetConsoleMode(hOut, &consoleMode) != 0) {
+    /* The output stream is a Console */
+    WriteConsole(hOut, wstr, lstrlen(wstr), &numwritten, NULL);
+  } else { /* The output stream is redirected */
+    len =
+      WideCharToMultiByte(CP, 0, wstr, lstrlen(wstr), str, sizeof(str),
+                          NULL, NULL);
+    WriteFile(hOut, str, len, &numwritten, NULL);
+  }
+}
+
+NORETURN static void exit_with_error(const wchar_t *wstr1,
+                                     const wchar_t *wstr2,
+                                     const wchar_t *wstr3)
+{
+  HANDLE hOut = GetStdHandle(STD_ERROR_HANDLE);
+  if (wstr1) write_error(wstr1, hOut);
+  if (wstr2) write_error(wstr2, hOut);
+  if (wstr3) write_error(wstr3, hOut);
+  write_error(L"\r\n", hOut);
+  ExitProcess(2);
+}
+
+#else
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,13 +102,6 @@
 /* O_BINARY is defined in Gnulib, but is not POSIX */
 #ifndef O_BINARY
 #define O_BINARY 0
-#endif
-
-/* C11's _Noreturn is deprecated in C23 in favour of attributes */
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L
-  #define NORETURN [[noreturn]]
-#else
-  #define NORETURN _Noreturn
 #endif
 
 typedef int file_descriptor;
@@ -133,6 +198,11 @@ NORETURN static void exit_with_error(const char *str1,
   exit(2);
 }
 
+#endif /* defined(_WIN32) */
+
+#define CAML_INTERNALS
+#include "caml/exec.h"
+
 static uint32_t read_size(const char *ptr)
 {
   const unsigned char *p = (const unsigned char *)ptr;
@@ -170,9 +240,61 @@ static char * read_runtime_path(file_descriptor fd)
   return runtime_path;
 }
 
-int main(int argc, char ** argv)
+#ifdef _WIN32
+
+NORETURN void __cdecl wmainCRTStartup(void)
 {
-  char * truename, * runtime_path;
+  wchar_t truename[MAX_PATH];
+  char *runtime_path;
+  wchar_t wruntime_path[MAX_PATH];
+  HANDLE h;
+  STARTUPINFO stinfo;
+  PROCESS_INFORMATION procinfo;
+  DWORD retcode;
+
+  if (GetModuleFileName(NULL, truename, sizeof(truename)/sizeof(wchar_t)) == 0)
+    exit_with_error(L"Out of memory", NULL, NULL);
+
+  h = CreateFile(truename, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                 NULL, OPEN_EXISTING, 0, NULL);
+  if (h == INVALID_HANDLE_VALUE ||
+      (runtime_path = read_runtime_path(h)) == NULL ||
+      !MultiByteToWideChar(CP, 0, runtime_path, -1, wruntime_path,
+                           sizeof(wruntime_path)/sizeof(wchar_t)))
+    exit_with_error(NULL, truename,
+                    L" not found or is not a bytecode executable file");
+  CloseHandle(h);
+  if (SearchPath(NULL, wruntime_path, L".exe", sizeof(truename)/sizeof(wchar_t),
+                 truename, NULL)) {
+    /* Need to ignore ctrl-C and ctrl-break, otherwise we'll die and take
+       the underlying OCaml program with us! */
+    SetConsoleCtrlHandler(ctrl_handler, TRUE);
+
+    stinfo.cb = sizeof(stinfo);
+    stinfo.lpReserved = NULL;
+    stinfo.lpDesktop = NULL;
+    stinfo.lpTitle = NULL;
+    stinfo.dwFlags = 0;
+    stinfo.cbReserved2 = 0;
+    stinfo.lpReserved2 = NULL;
+    if (CreateProcess(truename, GetCommandLine(), NULL, NULL, TRUE, 0,
+                      NULL, NULL, &stinfo, &procinfo)) {
+      CloseHandle(procinfo.hThread);
+      WaitForSingleObject(procinfo.hProcess, INFINITE);
+      GetExitCodeProcess(procinfo.hProcess, &retcode);
+      CloseHandle(procinfo.hProcess);
+      ExitProcess(retcode);
+    }
+  }
+
+  exit_with_error(L"Cannot exec ", wruntime_path, NULL);
+}
+
+#else
+
+int main(int argc, char *argv[])
+{
+  char *truename, *runtime_path;
   int fd;
 
   truename = searchpath(argv[0]);
@@ -187,3 +309,5 @@ int main(int argc, char ** argv)
 
   exit_with_error("Cannot exec ", runtime_path, NULL);
 }
+
+#endif /* defined(_WIN32) */

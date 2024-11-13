@@ -84,12 +84,6 @@ installopt-default:
 	  stdlib.cmxa stdlib.$(A) std_exit.$(O) *.cmx \
 	  "$(INSTALL_LIBDIR)"
 
-ifeq "$(UNIX_OR_WIN32)" "unix"
-HEADERPROGRAM = header
-else # Windows
-HEADERPROGRAM = headernt
-endif
-
 %-launch-info: %.info tmpheader.exe
 	@cat $^ > $@
 
@@ -97,9 +91,9 @@ endif
 # to reduce their size (considerably). In particular, the entry point is
 # overridden, which prevents the linking of crt0.
 ifeq "$(TOOLCHAIN)" "mingw"
-# mingw-w64: optimise headernt.o for space and remove all unused sections during
+# mingw-w64: optimise header.o for space and remove all unused sections during
 # linking.
-headernt.o: OC_CFLAGS += -Os
+header.o: OC_CFLAGS += -Os
 ifeq "$(SYSTEM)" "mingw"
   ENTRYPOINT = _wmainCRTStartup
 else
@@ -112,13 +106,13 @@ tmpheader.exe: OC_LDFLAGS += \
   -nostdlib -nostartfiles -Wl,--gc-sections -Wl,-e,$(ENTRYPOINT)
 HEADERLIBS = -lkernel32
 else ifeq "$(TOOLCHAIN)" "msvc"
-# MSVC: Optimise headernt.obj for space. cl doesn't have an equivalent of
+# MSVC: Optimise header.obj for space. cl doesn't have an equivalent of
 # -nostdlib, however it also doesn't have default libraries in the same way as
 # GCC - the equivalent of crt0.o is linked because it provides the entry point
 # symbol, rather than by being explicitly added to the linking command line.
 # /GS- disables compilation of runtime security checks and /NOCOFFGRPINFO is an
 # undocumented linker flag which removes the debug directory from the PE+ image.
-headernt.obj: OC_CFLAGS += /GS- /Os
+header.obj: OC_CFLAGS += /GS- /Os
 tmpheader.exe: OC_LDFLAGS += /NOCOFFGRPINFO /subsystem:console
 HEADERLIBS = kernel32.lib
 else
@@ -126,7 +120,7 @@ HEADERLIBS =
 endif
 
 .INTERMEDIATE: tmpheader.exe
-tmpheader.exe: $(HEADERPROGRAM).$(O)
+tmpheader.exe: header.$(O)
 	$(V_MKEXE)$(call MKEXE_VIA_CC,$@,$^ $(HEADERLIBS))
 # Do not strip the header produced by cl
 ifneq "$(TOOLCHAIN)" "msvc"
