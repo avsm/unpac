@@ -379,6 +379,18 @@ val launch_method : launch_method
 
     @since 5.5 *)
 
+(** Mechanisms used by tendered bytecode executables to locate the interpreter
+
+    @since 5.5 *)
+type search_method =
+| Disable
+    (** Interpreter searching disabled - check fixed absolute location only *)
+| Fallback
+    (** Check fixed absolute location first, but fall back to a search if that
+        fails *)
+| Enable
+    (** Always search for the interpreter *)
+
 val shebangscripts : bool
 (** Whether the target supports shebang scripts
 

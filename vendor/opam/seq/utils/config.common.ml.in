@@ -70,6 +70,7 @@ let default_safe_string = true
 let naked_pointers = false
 
 type launch_method = Executable | Shebang of string option
+type search_method = Disable | Fallback | Enable
 
 let launch_method =
   match launch_method with

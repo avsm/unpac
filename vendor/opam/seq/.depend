@@ -10611,12 +10611,15 @@ testsuite/tools/expect.cmi : \
 testsuite/tools/harness.cmo : \
     otherlibs/unix/unix.cmi \
     utils/config.cmi \
+    bytecomp/byterntm.cmi \
     testsuite/tools/harness.cmi
 testsuite/tools/harness.cmx : \
     otherlibs/unix/unix.cmx \
     utils/config.cmx \
+    bytecomp/byterntm.cmx \
     testsuite/tools/harness.cmi
-testsuite/tools/harness.cmi :
+testsuite/tools/harness.cmi : \
+    bytecomp/byterntm.cmi
 testsuite/tools/lexcmm.cmo : \
     testsuite/tools/parsecmm.cmi \
     utils/misc.cmi \

@@ -292,8 +292,14 @@ let p_list title print = function
       p_title title;
       List.iter print l
 
-let p_runtime =
-  printf "Runtime:\n\t%s\n"
+let p_runtime (runtime, search) =
+  let runtime =
+    match search with
+    | Byterntm.Enable -> runtime
+    | Byterntm.Disable dir -> dir ^ runtime
+    | Byterntm.Fallback dir -> Printf.sprintf "[%s]%s" dir runtime
+  in
+  printf "Runtime:\n\t%s\n" runtime
 
 let dump_byte ic =
   let toc = Bytesections.read_toc ic in

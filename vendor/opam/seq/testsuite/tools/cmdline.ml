@@ -160,11 +160,11 @@ let parse argv =
   let has_ocamlnat has_ocamlnat () = config := {!config with has_ocamlnat} in
   let has_ocamlopt has_ocamlopt () = config := {!config with has_ocamlopt} in
   let parse_search = function
-  | "enable" -> true
-  | "always" -> false
+  | "fallback" -> true
+  | "enable" -> false
   | _ ->
       raise (Arg.Bad
-        "--with-runtime-search: argument should be either enable or always")
+        "--with-runtime-search: argument should be either fallback or enable")
   in
   let has_runtime_search arg =
     let has_runtime_search = Option.map parse_search arg in

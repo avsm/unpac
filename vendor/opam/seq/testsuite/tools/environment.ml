@@ -84,10 +84,10 @@ let classify_executable file =
       | Bytesections.{name = Name.DLLS; len} when len > 0 -> true
       | _ -> false
       in
-      let tendered runtime =
+      let tendered (runtime, search) =
         let header = if start = "#!" then Header_shebang else Header_exe in
         let dlls = List.exists is_DLLS sections in
-        Tendered {header; dlls; runtime}
+        Tendered {header; dlls; runtime; search}
       in
       Option.fold ~none:Custom ~some:tendered (Byterntm.read_runtime toc ic))
   with End_of_file | Bytesections.Bad_magic_number ->

@@ -331,27 +331,104 @@ let find_bin_sh () =
   remove_file output_file;
   result
 
+(* Writes the shell script version of the bytecode launcher to outchan *)
+let write_sh_launcher outchan bin_sh bindir search runtime =
+  let open struct type tag = DFE | F | FE end in
+  let l tag fmt =
+    let output s =
+      match tag, search with
+      | DFE, _
+      | F, Config.Fallback
+      | FE, (Config.Fallback | Config.Enable) ->
+          output_string outchan (String.trim s);
+          output_char outchan '\n'
+      | _ ->
+          ()
+    in
+    Printf.ksprintf output fmt
+  in
+  let runtime = Filename.quote runtime in
+  let bin = Filename.quote (Filename.concat bindir "") in
+  let exec =
+    if search = Config.Disable then
+      runtime
+    else
+      {|"$c"|}
+  in
+  let release =
+    Printf.sprintf "%d.%d" Sys.ocaml_release.major Sys.ocaml_release.minor
+  in
+  (* Each of the three search modes requires a slightly different shell script.
+     However, these shell scripts do have one very useful property: the script
+     for Fallback adds lines to the script for Enable which adds lines to the
+     script for Disable, but none of them change lines (apart from a trivial
+     tweak to the exec line for the Disable script).
+     The lines below are laid out to reflect this, with the tag letters
+     D(isable), F(allback) and E(nable) for the lines in each script. If a line
+     is emitted, it is first passed to String.trim, which allows indentation and
+     a column-based layout to be used.
+
+     The Disable script just needs to exec the runtime. The two searching modes
+     do a few more calculations and will ultimately exec the contents of $c
+     (which is why exec_arg above is set to the literal string {v "$c" v}).
+
+     In the script itself:
+     - $r is the name of the runtime ('ocamlrun', 'ocamlrund', etc.)
+     - $d is calculated in the script as $(dirname "$0") - i.e. the directory
+       containing the bytecode executable itself
+     - $c will ultimately be the runtime to exec. If it is empty, then the
+       script displays an error message. For Fallback, $c will be the first
+       runtime to try (i.e. the runtime in bindir), and the bindir passed must
+       end with a separator (which is ensured by Filename.concat above)
+
+     The script tries up to three options:
+     - exec $c, if it exists (prefer the runtime in bindir)
+     - exec $d/$r, if it exists (prefer a runtime in the same directory
+       as the bytecode executable)
+     - otherwise try $(command -v "$r") (search PATH for the runtime)
+
+     If the script fails to find an interpreter, $c will always be empty
+       (since [command -v] will have returned an empty string) and an
+       error message can be displayed. *)
+  l DFE {|#!%s                                                     |} bin_sh;
+  l  FE {|r=%s                                                     |} runtime;
+  l  F  {|c=%s"$r"                                                 |} bin;
+  l  F  {|if ! test -f "$c"; then                                  |};
+  l  FE {|  d="$(dirname "$0" 2>/dev/null)"                        |};
+  l  FE {|  test -z "$d" || d="${d%%/}/"                           |};
+  l  FE {|  c="$(command -v "$d$r")"                               |};
+  l  FE {|  test -n "$c" || c="$(command -v "$r")"                 |};
+  l  F  {|fi                                                       |};
+  l  FE {|if test -z "$c"; then                                    |};
+  l  FE {|  echo 'This program requires an OCaml %s interpreter'>&2|} release;
+  l  FE {|  echo "$r not found either alongside $0 or in \$PATH">&2|};
+  l  FE {|else                                                     |};
+  l DFE {|  exec %s "$0" "$@"                                      |} exec;
+  l  FE {|fi                                                       |};
+  l  FE {|exit 126                                                 |}
+
 (* Writes the executable header to outchan and writes the RNTM section, if
    needed. Returns a toc_writer (i.e. Bytesections.init_record is always
    called) *)
 
 let write_header outchan =
-  let runtime =
+  let runtime, search =
     if String.length !Clflags.use_runtime > 0 then
       (* Do not use BUILD_PATH_PREFIX_MAP mapping for this. *)
       let runtime = !Clflags.use_runtime in
       if Filename.is_relative runtime then
-        Filename.concat (Sys.getcwd ()) runtime
+        Filename.concat (Sys.getcwd ()) runtime, Config.Disable
       else
-        runtime
+        runtime, Config.Disable
     else
       let runtime = "ocamlrun" ^ !Clflags.runtime_variant in
-      (* Historically, the native Windows ports are assumed to be finding
-         ocamlrun using a PATH search. *)
-      if Sys.win32 then
-        runtime
-      else
-        Filename.concat !Clflags.target_bindir runtime
+      let runtime =
+        if !Clflags.search_method = Config.Disable then
+          Filename.concat !Clflags.target_bindir runtime
+        else
+          runtime
+      in
+      runtime, !Clflags.search_method
   in
   (* Determine which method will be used for launching the executable:
      Executable: concatenate the bytecode image to the executable stub
@@ -362,7 +439,7 @@ let write_header outchan =
     | Config.Executable ->
         Executable
     | Config.Shebang sh ->
-        if invalid_for_shebang_line runtime then
+        if search <> Config.Disable || invalid_for_shebang_line runtime then
           let sh =
             match sh with
             | Some sh -> sh
@@ -390,14 +467,13 @@ let write_header outchan =
   (* Write the header *)
   match launcher with
   | Shebang_runtime ->
+      assert (search = Config.Disable);
       (* Use the runtime directly *)
       Printf.fprintf outchan "#!%s\n" runtime;
       Bytesections.init_record outchan
   | Shebang_bin_sh bin_sh ->
-      (* exec the runtime using sh *)
-      Printf.fprintf outchan "\
-        #!%s\n\
-        exec %s \"$0\" \"$@\"\n" bin_sh (Filename.quote runtime);
+      (* Use the shebang launcher *)
+      write_sh_launcher outchan bin_sh bindir search runtime;
       Bytesections.init_record outchan
   | Executable ->
       (* Use the executable stub launcher *)
@@ -413,7 +489,21 @@ let write_header outchan =
       write_exe_launcher data;
       (* The runtime name needs recording in RNTM *)
       let toc_writer = Bytesections.init_record outchan in
-      Printf.fprintf outchan "%s\000" runtime;
+      (* stdlib/header.c determines which mode is needed based on whether the
+         RNTM section contains an embedded NUL character. For Disable, the path
+         is written verbatim (no extra NUL), otherwise the directory separator
+         just before the basename is effectively turned into a NUL (for Enable,
+         there is no dirname, so the string "begins" with a NUL character). *)
+      if search = Disable then
+        output_string outchan runtime
+      else begin
+        if search = Fallback then
+          (* Ensure bindir does _not_ end up with a separator *)
+          output_string outchan
+            (Filename.(dirname (concat bindir current_dir_name)));
+        output_char outchan '\000';
+        output_string outchan runtime
+      end;
       Bytesections.record toc_writer RNTM;
       toc_writer
 

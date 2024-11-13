@@ -23,7 +23,10 @@ module Import : sig
 
   (** Kinds of executable *)
   type executable =
-  | Tendered of {header: launch_mode; dlls: bool; runtime: string}
+  | Tendered of {header: launch_mode;
+                 dlls: bool;
+                 runtime: string;
+                 search: Byterntm.search_method}
       (** Tendered bytecode image. Executable uses the given mechanism to locate
           a suitable runtime to execute the image. [dlls] is [true] if the
           bytecode image requires additional C libraries to be loaded. [runtime]

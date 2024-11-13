@@ -685,6 +685,23 @@ only recursive types where the recursion goes through an object type
 are supported. \notop{Note that once you have created an interface using this
 flag, you must use it again for all dependencies.}
 
+\comp{%
+\item["-runtime-search" \var{method}]
+Controls whether the header used by normal bytecode executables is permitted to
+search for the interpreter, or requires it to be at a fixed location.
+The following methods are supported:
+\begin{description}
+  \item["disable"] A fixed absolute path to the interpreter is used, and the
+  executable will not launch if the interpreter is not found at this location.
+  \item["fallback"] A fixed absolute path to the interpreter is used, but if the
+  executable cannot find the interpreter at this location then it will search
+  first in the directory containing the executable and then in "PATH".
+  \item["enable"] The executable searches for the interpreter first in the
+  directory containing the executable and then in "PATH". No absolute path to
+  the interpreter is recorded.
+\end{description}
+}%comp
+
 \notop{%
 \item["-runtime-variant" \var{suffix}]
 Add the \var{suffix} string to the name of the runtime library used by

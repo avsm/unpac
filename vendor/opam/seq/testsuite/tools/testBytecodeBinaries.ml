@@ -83,18 +83,36 @@ let run config env =
                                            program
                     else
                       failed, "compiled with -custom"
-                | Tendered {runtime; header; _} ->
-                    let expected_runtime =
+                | Tendered {runtime; header; search; _} ->
+                    let reported_runtime =
+                      match search with
+                      | Disable dir ->
+                          dir ^ runtime
+                      | Fallback dir ->
+                          Printf.sprintf "[%s/]%s" dir runtime
+                      | Enable ->
+                          runtime
+                    in
+                    let expected_search =
                       if Sys.win32 then
-                        "ocamlrun"
+                        Byterntm.Enable
                       else
-                        ocamlrun
+                        Byterntm.Disable
+                          (Filename.concat (Environment.bindir env) "")
                     in
                     let expected_launch_mode =
                       if Config.shebangscripts then
                         Header_shebang
                       else
                         Header_exe
+                    in
+                    let pp_search f = function
+                    | Byterntm.Disable _ ->
+                        Format.pp_print_string f "disable"
+                    | Byterntm.Fallback _ ->
+                        Format.pp_print_string f "fallback"
+                    | Byterntm.Enable ->
+                        Format.pp_print_string f "enable"
                     in
                     let pp_launch f = function
                     | Header_shebang -> Format.pp_print_string f "shebang"
@@ -110,12 +128,14 @@ let run config env =
                     in
                     let failed =
                       failed
-                      |> check expected_runtime runtime
+                      |> check expected_search search
+                               "search mechanism" pp_search
+                      |> check "ocamlrun" runtime
                                "runtime" Format.pp_print_string
                       |> check expected_launch_mode header
                                "launch mode" pp_launch
                     in
-                    failed, runtime
+                    failed, reported_runtime
               in
               Printf.printf "  Runtime: %s\n  Output: %s\n" runtime output;
               if Sys.win32 && Filename.extension binary = ".exe" then begin
