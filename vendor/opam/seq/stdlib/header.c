@@ -13,7 +13,7 @@
 /*                                                                        */
 /**************************************************************************/
 
-/* The launcher for bytecode executables (if #! is not working) */
+/* The launcher for bytecode executables (if #! is not available) */
 
 #define CAML_INTERNALS
 #include "caml/exec.h"
@@ -38,6 +38,8 @@
 #else
   #define NORETURN _Noreturn
 #endif
+
+typedef int file_descriptor;
 
 #ifndef __CYGWIN__
 
@@ -138,7 +140,7 @@ static uint32_t read_size(const char *ptr)
          ((uint32_t) p[2] << 8) | p[3];
 }
 
-static char * read_runtime_path(int fd)
+static char * read_runtime_path(file_descriptor fd)
 {
   char buffer[TRAILER_SIZE];
   static char runtime_path[PATH_MAX];

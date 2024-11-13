@@ -13,7 +13,7 @@
 /*                                                                        */
 /**************************************************************************/
 
-/* The launcher for bytecode executables */
+/* The launcher for bytecode executables (as #! is not available) */
 
 #define CAML_INTERNALS
 #include "caml/exec.h"
@@ -36,9 +36,16 @@
 #define CP CP_ACP
 #endif
 
+/* mingw-w64 has a limits.h which defines PATH_MAX as an alias for MAX_PATH */
+#if !defined(PATH_MAX)
+#define PATH_MAX MAX_PATH
+#endif
+
 #define SEEK_END FILE_END
 
 #define lseek(h, offset, origin) SetFilePointer((h), (offset), NULL, (origin))
+
+typedef HANDLE file_descriptor;
 
 static int read(HANDLE h, LPVOID buffer, DWORD buffer_size)
 {
@@ -90,10 +97,10 @@ static uint32_t read_size(const char *ptr)
          ((uint32_t) p[2] << 8) | p[3];
 }
 
-static char * read_runtime_path(HANDLE fd)
+static char * read_runtime_path(file_descriptor fd)
 {
   char buffer[TRAILER_SIZE];
-  static char runtime_path[MAX_PATH];
+  static char runtime_path[PATH_MAX];
   int num_sections;
   uint32_t path_size;
   long ofs;
@@ -114,7 +121,7 @@ static char * read_runtime_path(HANDLE fd)
       ofs += read_size(buffer + 4);
   }
   if (path_size == 0) return NULL;
-  if (path_size >= MAX_PATH) return NULL;
+  if (path_size >= PATH_MAX) return NULL;
   if (lseek(fd, -ofs, SEEK_END) == -1) return NULL;
   if (read(fd, runtime_path, path_size) != path_size) return NULL;
 
