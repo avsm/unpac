@@ -2771,7 +2771,6 @@ AS_CASE([$enable_systhreads,$enable_unix_lib],
   AC_MSG_NOTICE([the threads library is supported])])
 
 ## Does the assembler support debug prefix map and CFI directives
-asm_cfi_supported=false
 AS_IF([$native_compiler],
   [AS_CASE([$target],
     [*-w64-mingw32*|*-pc-windows], [],
@@ -2779,6 +2778,7 @@ AS_IF([$native_compiler],
     OCAML_AS_HAS_CFI_DIRECTIVES])])
 # Always assign a valid default OCaml value
 : ${ocaml_cv_prog_as_debug_prefix_map:=false}
+: ${asm_cfi_supported:=false}
 
 ## Frame pointers
 
