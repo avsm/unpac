@@ -23,7 +23,7 @@
 CAMLprim value caml_unix_accept(value cloexec, value sock)
 {
   CAMLparam0();
-  CAMLlocal2(fd, adr);
+  CAMLlocal2(fd, vaddr);
   SOCKET sconn = Socket_val(sock);
   SOCKET snew;
   value res;
@@ -42,9 +42,9 @@ CAMLprim value caml_unix_accept(value cloexec, value sock)
   }
   caml_win32_set_cloexec((HANDLE) snew, cloexec);
   fd = caml_win32_alloc_socket(snew);
-  adr = caml_unix_alloc_sockaddr(&addr, addr_len, snew);
+  vaddr = caml_unix_alloc_sockaddr(&addr, addr_len, snew);
   res = caml_alloc_small(2, 0);
   Field(res, 0) = fd;
-  Field(res, 1) = adr;
+  Field(res, 1) = vaddr;
   CAMLreturn(res);
 }

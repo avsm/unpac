@@ -71,7 +71,7 @@ extern "C" {
 #define alloc_inet_addr caml_unix_alloc_inet_addr
 #endif /* CAML_BUILDING_UNIX */
 
-extern void caml_unix_get_sockaddr (value mladdr,
+extern void caml_unix_get_sockaddr (value vaddr,
                                union sock_addr_union * addr /*out*/,
                                socklen_param_type * addr_len /*out*/);
 extern value caml_unix_alloc_sockaddr (union sock_addr_union * addr /*in*/,

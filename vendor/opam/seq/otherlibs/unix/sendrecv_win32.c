@@ -53,7 +53,7 @@ CAMLprim value caml_unix_recvfrom(value sock, value buff, value ofs, value len,
                              value flags)
 {
   CAMLparam1(buff);
-  CAMLlocal1(adr);
+  CAMLlocal1(vaddr);
   SOCKET s = Socket_val(sock);
   int flg = caml_convert_flag_list(flags, msg_flag_table);
   int ret;
@@ -76,10 +76,10 @@ CAMLprim value caml_unix_recvfrom(value sock, value buff, value ofs, value len,
     caml_uerror("recvfrom", Nothing);
   }
   memmove (&Byte(buff, Long_val(ofs)), iobuf, ret);
-  adr = caml_unix_alloc_sockaddr(&addr, addr_len, -1);
+  vaddr = caml_unix_alloc_sockaddr(&addr, addr_len, -1);
   res = caml_alloc_small(2, 0);
   Field(res, 0) = Val_int(ret);
-  Field(res, 1) = adr;
+  Field(res, 1) = vaddr;
   CAMLreturn(res);
 }
 

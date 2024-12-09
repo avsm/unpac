@@ -28,22 +28,22 @@ CAMLprim value caml_unix_string_of_inet_addr(value a)
 #ifdef HAS_IPV6
 #ifdef _WIN32
   char buffer[64];
-  union sock_addr_union sa;
+  union sock_addr_union addr;
   int len;
   int retcode;
   if (caml_string_length(a) == 16) {
-    memset(&sa.s_inet6, 0, sizeof(struct sockaddr_in6));
-    sa.s_inet6.sin6_family = AF_INET6;
-    sa.s_inet6.sin6_addr = GET_INET6_ADDR(a);
+    memset(&addr.s_inet6, 0, sizeof(struct sockaddr_in6));
+    addr.s_inet6.sin6_family = AF_INET6;
+    addr.s_inet6.sin6_addr = GET_INET6_ADDR(a);
     len = sizeof(struct sockaddr_in6);
   } else {
-    memset(&sa.s_inet, 0, sizeof(struct sockaddr_in));
-    sa.s_inet.sin_family = AF_INET;
-    sa.s_inet.sin_addr = GET_INET_ADDR(a);
+    memset(&addr.s_inet, 0, sizeof(struct sockaddr_in));
+    addr.s_inet.sin_family = AF_INET;
+    addr.s_inet.sin_addr = GET_INET_ADDR(a);
     len = sizeof(struct sockaddr_in);
   }
   retcode = getnameinfo
-    (&sa.s_gen, len, buffer, sizeof(buffer), NULL, 0, NI_NUMERICHOST);
+    (&addr.s_gen, len, buffer, sizeof(buffer), NULL, 0, NI_NUMERICHOST);
   if (retcode != 0)
     res = NULL;
   else
