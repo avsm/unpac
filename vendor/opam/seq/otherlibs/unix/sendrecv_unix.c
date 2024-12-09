@@ -56,7 +56,7 @@ CAMLprim value caml_unix_recvfrom(value sock, value buff, value ofs, value len,
   long numbytes;
   char iobuf[UNIX_BUFFER_SIZE];
   value res;
-  union sock_addr_union addr;
+  struct sockaddr_storage addr;
   socklen_param_type addr_len;
 
   cv_flags = caml_convert_flag_list(flags, msg_flag_table);
@@ -65,7 +65,7 @@ CAMLprim value caml_unix_recvfrom(value sock, value buff, value ofs, value len,
   addr_len = sizeof(addr);
   caml_enter_blocking_section();
   ret = recvfrom(Int_val(sock), iobuf, (int) numbytes, cv_flags,
-                 &addr.s_gen, &addr_len);
+                 (struct sockaddr *) &addr, &addr_len);
   caml_leave_blocking_section();
   if (ret == -1) caml_uerror("recvfrom", Nothing);
   memmove (&Byte(buff, Long_val(ofs)), iobuf, ret);
@@ -100,7 +100,7 @@ CAMLprim value caml_unix_sendto_native(value sock, value buff, value ofs,
   int ret, cv_flags;
   long numbytes;
   char iobuf[UNIX_BUFFER_SIZE];
-  union sock_addr_union addr;
+  struct sockaddr_storage addr;
   socklen_param_type addr_len;
 
   cv_flags = caml_convert_flag_list(flags, msg_flag_table);
@@ -110,7 +110,7 @@ CAMLprim value caml_unix_sendto_native(value sock, value buff, value ofs,
   memmove (iobuf, &Byte(buff, Long_val(ofs)), numbytes);
   caml_enter_blocking_section();
   ret = sendto(Int_val(sock), iobuf, (int) numbytes, cv_flags,
-               &addr.s_gen, addr_len);
+               (struct sockaddr *) &addr, addr_len);
   caml_leave_blocking_section();
   if (ret == -1) caml_uerror("sendto", Nothing);
   return Val_int(ret);

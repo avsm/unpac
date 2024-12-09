@@ -23,6 +23,8 @@
 #ifdef HAS_SOCKETS
 
 #include "caml/socketaddr.h"
+#undef caml_unix_get_sockaddr
+#undef caml_unix_alloc_sockaddr
 
 #ifdef _WIN32
 #undef EAFNOSUPPORT
@@ -48,49 +50,52 @@ CAMLexport value caml_unix_alloc_inet6_addr(struct in6_addr * a)
 #endif
 
 void caml_unix_get_sockaddr(value vaddr,
-                       union sock_addr_union * addr /*out*/,
+                       struct sockaddr_storage * addr /*out*/,
                        socklen_param_type * addr_len /*out*/)
 {
   switch(Tag_val(vaddr)) {
   case 0:                       /* ADDR_UNIX */
     { value path;
       mlsize_t len;
+      struct sockaddr_un *s_unix = (struct sockaddr_un *) addr;
       path = Field(vaddr, 0);
       len = caml_string_length(path);
-      addr->s_unix.sun_family = AF_UNIX;
-      if (len >= sizeof(addr->s_unix.sun_path)) {
+      s_unix->sun_family = AF_UNIX;
+      if (len >= sizeof(s_unix->sun_path)) {
         caml_unix_error(ENAMETOOLONG, "", path);
       }
       /* "Abstract" sockets in Linux have names starting with '\0' */
       if (Byte(path, 0) != 0 && ! caml_string_is_c_safe(path)) {
         caml_unix_error(ENOENT, "", path);
       }
-      memmove (addr->s_unix.sun_path, String_val(path), len + 1);
+      memmove(s_unix->sun_path, String_val(path), len + 1);
       *addr_len = offsetof(struct sockaddr_un, sun_path) + len;
       break;
     }
   case 1:                       /* ADDR_INET */
 #ifdef HAS_IPV6
     if (caml_string_length(Field(vaddr, 0)) == 16) {
-      memset(&addr->s_inet6, 0, sizeof(struct sockaddr_in6));
-      addr->s_inet6.sin6_family = AF_INET6;
-      addr->s_inet6.sin6_addr = GET_INET6_ADDR(Field(vaddr, 0));
-      addr->s_inet6.sin6_port = htons(Int_val(Field(vaddr, 1)));
+      struct sockaddr_in6 *s_inet6 = (struct sockaddr_in6 *) addr;
+      memset(s_inet6, 0, sizeof(struct sockaddr_in6));
+      s_inet6->sin6_family = AF_INET6;
+      s_inet6->sin6_addr = GET_INET6_ADDR(Field(vaddr, 0));
+      s_inet6->sin6_port = htons(Int_val(Field(vaddr, 1)));
 #ifdef SIN6_LEN
-      addr->s_inet6.sin6_len = sizeof(struct sockaddr_in6);
+      s_inet6->sin6_len = sizeof(struct sockaddr_in6);
 #endif
       *addr_len = sizeof(struct sockaddr_in6);
-      break;
-    }
+    } else {
 #endif
-    memset(&addr->s_inet, 0, sizeof(struct sockaddr_in));
-    addr->s_inet.sin_family = AF_INET;
-    addr->s_inet.sin_addr = GET_INET_ADDR(Field(vaddr, 0));
-    addr->s_inet.sin_port = htons(Int_val(Field(vaddr, 1)));
+      struct sockaddr_in *s_inet = (struct sockaddr_in *) addr;
+      memset(s_inet, 0, sizeof(struct sockaddr_in));
+      s_inet->sin_family = AF_INET;
+      s_inet->sin_addr = GET_INET_ADDR(Field(vaddr, 0));
+      s_inet->sin_port = htons(Int_val(Field(vaddr, 1)));
 #ifdef SIN6_LEN
-    addr->s_inet.sin_len = sizeof(struct sockaddr_in);
+      s_inet->sin_len = sizeof(struct sockaddr_in);
 #endif
-    *addr_len = sizeof(struct sockaddr_in);
+      *addr_len = sizeof(struct sockaddr_in);
+    }
     break;
   }
 }
@@ -103,7 +108,7 @@ static value alloc_unix_sockaddr(value path) {
   CAMLreturn(res);
 }
 
-value caml_unix_alloc_sockaddr(union sock_addr_union * addr /*in*/,
+value caml_unix_alloc_sockaddr(struct sockaddr_storage * addr /*in*/,
                           socklen_param_type addr_len, int close_on_error)
 {
   CAMLparam0();
@@ -115,10 +120,11 @@ value caml_unix_alloc_sockaddr(union sock_addr_union * addr /*in*/,
     CAMLreturn(alloc_unix_sockaddr(caml_alloc_string(0)));
   }
 
-  switch(addr->s_gen.sa_family) {
+  switch(addr->ss_family) {
   case AF_UNIX:
-    { /* Based on recommendation in section BUGS of Linux unix(7). See
-         http://man7.org/linux/man-pages/man7/unix.7.html. */
+    { struct sockaddr_un *s_unix = (struct sockaddr_un *) addr;
+      /* Based on recommendation in section BUGS of Linux unix(7). See
+         https://man7.org/linux/man-pages/man7/unix.7.html#BUGS. */
       size_t struct_offset = offsetof(struct sockaddr_un, sun_path);
       size_t path_length = 0;
       if (addr_len > struct_offset) {
@@ -128,30 +134,31 @@ value caml_unix_alloc_sockaddr(union sock_addr_union * addr /*in*/,
          * start with a null, and may contain internal nulls. */
         path_length = (
 #ifdef __linux__
-          (addr->s_unix.sun_path[0] == '\0') ? path_length :
+          (s_unix->sun_path[0] == '\0') ? path_length :
 #endif
-          strnlen(addr->s_unix.sun_path, path_length)
+          strnlen(s_unix->sun_path, path_length)
         );
       }
 
       res = alloc_unix_sockaddr(
-        caml_alloc_initialized_string(path_length,
-                                      (char *)addr->s_unix.sun_path));
+        caml_alloc_initialized_string(path_length, s_unix->sun_path));
       break;
     }
   case AF_INET:
-    { a = caml_unix_alloc_inet_addr(&addr->s_inet.sin_addr);
+    { struct sockaddr_in *s_inet = (struct sockaddr_in *) addr;
+      a = caml_unix_alloc_inet_addr(&s_inet->sin_addr);
       res = caml_alloc_small(2, 1);
       Field(res,0) = a;
-      Field(res,1) = Val_int(ntohs(addr->s_inet.sin_port));
+      Field(res,1) = Val_int(ntohs(s_inet->sin_port));
       break;
     }
 #ifdef HAS_IPV6
   case AF_INET6:
-    { a = caml_unix_alloc_inet6_addr(&addr->s_inet6.sin6_addr);
+    { struct sockaddr_in6 *s_inet6 = (struct sockaddr_in6 *) addr;
+      a = caml_unix_alloc_inet6_addr(&s_inet6->sin6_addr);
       res = caml_alloc_small(2, 1);
       Field(res,0) = a;
-      Field(res,1) = Val_int(ntohs(addr->s_inet6.sin6_port));
+      Field(res,1) = Val_int(ntohs(s_inet6->sin6_port));
       break;
     }
 #endif

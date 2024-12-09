@@ -27,13 +27,13 @@ CAMLprim value caml_unix_accept(value cloexec, value sock)
   SOCKET sconn = Socket_val(sock);
   SOCKET snew;
   value res;
-  union sock_addr_union addr;
+  struct sockaddr_storage addr;
   socklen_param_type addr_len;
   DWORD err = 0;
 
   addr_len = sizeof(addr);
   caml_enter_blocking_section();
-  snew = accept(sconn, &addr.s_gen, &addr_len);
+  snew = accept(sconn, (struct sockaddr *) &addr, &addr_len);
   if (snew == INVALID_SOCKET) err = WSAGetLastError ();
   caml_leave_blocking_section();
   if (snew == INVALID_SOCKET) {

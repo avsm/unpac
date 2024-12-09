@@ -20,11 +20,11 @@
 CAMLprim value caml_unix_getsockname(value sock)
 {
   int retcode;
-  union sock_addr_union addr;
+  struct sockaddr_storage addr;
   socklen_param_type addr_len;
 
   addr_len = sizeof(addr);
-  retcode = getsockname(Socket_val(sock), &addr.s_gen, &addr_len);
+  retcode = getsockname(Socket_val(sock), (struct sockaddr *) &addr, &addr_len);
   if (retcode == -1) {
     caml_win32_maperr(WSAGetLastError());
     caml_uerror("getsockname", Nothing);
