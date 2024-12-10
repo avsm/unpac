@@ -28,7 +28,7 @@ CAMLprim value caml_unix_accept(value cloexec, value sock)
   SOCKET snew;
   value res;
   struct sockaddr_storage addr;
-  socklen_param_type addr_len;
+  socklen_t addr_len;
   DWORD err = 0;
 
   addr_len = sizeof(addr);

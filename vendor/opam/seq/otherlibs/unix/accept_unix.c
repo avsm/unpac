@@ -32,7 +32,7 @@ CAMLprim value caml_unix_accept(value cloexec, value sock)
   int retcode;
   value res;
   struct sockaddr_storage addr;
-  socklen_param_type addr_len;
+  socklen_t addr_len;
   int clo = caml_unix_cloexec_p(cloexec);
 
   addr_len = sizeof(addr);

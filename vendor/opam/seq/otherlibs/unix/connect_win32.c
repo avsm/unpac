@@ -22,7 +22,7 @@ CAMLprim value caml_unix_connect(value socket, value address)
 {
   SOCKET s = Socket_val(socket);
   struct sockaddr_storage addr;
-  socklen_param_type addr_len;
+  socklen_t addr_len;
   DWORD err = 0;
 
   caml_unix_get_sockaddr(address, &addr, &addr_len);

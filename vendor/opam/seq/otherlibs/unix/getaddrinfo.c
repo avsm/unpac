@@ -39,7 +39,7 @@ static value convert_addrinfo(const struct addrinfo * a)
   CAMLparam0();
   CAMLlocal3(vres,vaddr,vcanonname);
   struct sockaddr_storage addr;
-  socklen_param_type len;
+  socklen_t len;
 
   len = a->ai_addrlen;
   if (len > sizeof(addr)) len = sizeof(addr);

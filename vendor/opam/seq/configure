@@ -20744,29 +20744,6 @@ then :
 
 fi
 
-## socklen_t
-
-case $target in #(
-  *-w64-mingw32*|*-pc-windows) :
-    ac_fn_c_check_type "$LINENO" "socklen_t" "ac_cv_type_socklen_t" "#include <ws2tcpip.h>
-"
-if test "x$ac_cv_type_socklen_t" = xyes
-then :
-  printf "%s\n" "#define HAS_SOCKLEN_T 1" >>confdefs.h
-
-fi
- ;; #(
-  *) :
-    ac_fn_c_check_type "$LINENO" "socklen_t" "ac_cv_type_socklen_t" "#include <sys/socket.h>
-"
-if test "x$ac_cv_type_socklen_t" = xyes
-then :
-  printf "%s\n" "#define HAS_SOCKLEN_T 1" >>confdefs.h
-
-fi
- ;;
-esac
-
 ac_fn_c_check_func "$LINENO" "inet_aton" "ac_cv_func_inet_aton"
 if test "x$ac_cv_func_inet_aton" = xyes
 then :

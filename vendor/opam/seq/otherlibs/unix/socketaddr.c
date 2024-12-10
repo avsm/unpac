@@ -51,7 +51,7 @@ CAMLexport value caml_unix_alloc_inet6_addr(struct in6_addr * a)
 
 void caml_unix_get_sockaddr(value vaddr,
                        struct sockaddr_storage * addr /*out*/,
-                       socklen_param_type * addr_len /*out*/)
+                       socklen_t * addr_len /*out*/)
 {
   switch(Tag_val(vaddr)) {
   case 0:                       /* ADDR_UNIX */
@@ -109,7 +109,7 @@ static value alloc_unix_sockaddr(value path) {
 }
 
 value caml_unix_alloc_sockaddr(struct sockaddr_storage * addr /*in*/,
-                          socklen_param_type addr_len, int close_on_error)
+                          socklen_t addr_len, int close_on_error)
 {
   CAMLparam0();
   CAMLlocal1(a);

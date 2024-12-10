@@ -25,7 +25,7 @@ CAMLprim value caml_unix_bind(value socket, value address)
 {
   int ret;
   struct sockaddr_storage addr;
-  socklen_param_type addr_len;
+  socklen_t addr_len;
 
   caml_unix_get_sockaddr(address, &addr, &addr_len);
   ret = bind(Int_val(socket), (struct sockaddr *) &addr, addr_len);

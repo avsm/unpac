@@ -23,7 +23,6 @@
 #ifdef HAS_SOCKETS
 
 #include "caml/socketaddr.h"
-#include <ws2tcpip.h>
 
 extern const int caml_unix_socket_domain_table[]; /* from socket.c */
 extern const int caml_unix_socket_type_table[]; /* from socket.c */
@@ -40,7 +39,7 @@ static int socketpair(int domain, int type, int protocol,
 {
   wchar_t dirname[MAX_PATH + 1], path[MAX_PATH + 1];
   struct sockaddr_un addr;
-  socklen_param_type socklen;
+  socklen_t socklen;
 
   /* POSIX states that in case of error, the contents of socket_vector
      shall be unmodified. */

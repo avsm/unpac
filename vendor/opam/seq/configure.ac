@@ -2184,15 +2184,6 @@ AS_CASE([$target],
 
 AS_IF([$sockets], [AC_DEFINE([HAS_SOCKETS], [1])])
 
-## socklen_t
-
-AS_CASE([$target],
-  [*-w64-mingw32*|*-pc-windows],
-    [AC_CHECK_TYPE([socklen_t], [AC_DEFINE([HAS_SOCKLEN_T], [1])], [],
-      [#include <ws2tcpip.h>])],
-  [AC_CHECK_TYPE([socklen_t], [AC_DEFINE([HAS_SOCKLEN_T], [1])], [],
-    [#include <sys/socket.h>])])
-
 AC_CHECK_FUNC([inet_aton], [AC_DEFINE([HAS_INET_ATON], [1])])
 
 ## Unix domain sockets support on Windows

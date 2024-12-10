@@ -38,7 +38,7 @@ CAMLprim value caml_unix_getnameinfo(value vaddr, value vopts)
   CAMLparam0();
   CAMLlocal3(vhost, vserv, vres);
   struct sockaddr_storage addr;
-  socklen_param_type addr_len;
+  socklen_t addr_len;
   char host[4096];
   char serv[1024];
   int opts, retcode;

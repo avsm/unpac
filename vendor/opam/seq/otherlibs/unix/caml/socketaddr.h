@@ -23,6 +23,7 @@
 /* Code duplication with runtime/debugger.c is inevitable, because
  * pulling winsock2.h creates many naming conflicts. */
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #ifdef HAS_AFUNIX_H
 #include <afunix.h>
 #else
@@ -56,11 +57,8 @@ union sock_addr_union {
   struct sockaddr_storage s_storage;
 };
 
-#ifdef HAS_SOCKLEN_T
+/* Deprecated: use socklen_t */
 typedef socklen_t socklen_param_type;
-#else
-typedef int socklen_param_type;
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -75,9 +73,9 @@ extern "C" {
 
 extern void caml_unix_get_sockaddr (value vaddr,
                                struct sockaddr_storage * addr /*out*/,
-                               socklen_param_type * addr_len /*out*/);
+                               socklen_t * addr_len /*out*/);
 extern value caml_unix_alloc_sockaddr (struct sockaddr_storage * addr /*in*/,
-                                  socklen_param_type addr_len,
+                                  socklen_t addr_len,
                                   int close_on_error);
 extern value caml_unix_alloc_inet_addr (struct in_addr * inaddr);
 #define GET_INET_ADDR(v) (*((struct in_addr *) (v)))

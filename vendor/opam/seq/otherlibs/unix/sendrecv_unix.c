@@ -57,7 +57,7 @@ CAMLprim value caml_unix_recvfrom(value sock, value buff, value ofs, value len,
   char iobuf[UNIX_BUFFER_SIZE];
   value res;
   struct sockaddr_storage addr;
-  socklen_param_type addr_len;
+  socklen_t addr_len;
 
   cv_flags = caml_convert_flag_list(flags, msg_flag_table);
   numbytes = Long_val(len);
@@ -101,7 +101,7 @@ CAMLprim value caml_unix_sendto_native(value sock, value buff, value ofs,
   long numbytes;
   char iobuf[UNIX_BUFFER_SIZE];
   struct sockaddr_storage addr;
-  socklen_param_type addr_len;
+  socklen_t addr_len;
 
   cv_flags = caml_convert_flag_list(flags, msg_flag_table);
   caml_unix_get_sockaddr(dest, &addr, &addr_len);

@@ -26,7 +26,7 @@ CAMLprim value caml_unix_connect(value socket, value address)
 {
   int retcode;
   struct sockaddr_storage addr;
-  socklen_param_type addr_len;
+  socklen_t addr_len;
 
   caml_unix_get_sockaddr(address, &addr, &addr_len);
   caml_enter_blocking_section();

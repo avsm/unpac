@@ -25,7 +25,7 @@ CAMLprim value caml_unix_getpeername(value sock)
 {
   int retcode;
   struct sockaddr_storage addr;
-  socklen_param_type addr_len;
+  socklen_t addr_len;
 
   addr_len = sizeof(addr);
   retcode = getpeername(Int_val(sock), (struct sockaddr *) &addr, &addr_len);

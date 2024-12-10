@@ -21,7 +21,7 @@ CAMLprim value caml_unix_getsockname(value sock)
 {
   int retcode;
   struct sockaddr_storage addr;
-  socklen_param_type addr_len;
+  socklen_t addr_len;
 
   addr_len = sizeof(addr);
   retcode = getsockname(Socket_val(sock), (struct sockaddr *) &addr, &addr_len);
