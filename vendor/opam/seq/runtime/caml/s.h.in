@@ -324,6 +324,11 @@
 
 #undef HAVE_MAX_ALIGN_T
 
+#undef HAVE_GETGRNAM_R
+#undef HAVE_GETGRGID_R
+#undef HAVE_GETPWNAM_R
+#undef HAVE_GETPWUID_R
+
 /* 3. Language extensions. */
 
 /* Define if the C compiler supports the labels as values extension. */
