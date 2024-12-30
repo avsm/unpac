@@ -226,6 +226,9 @@
 
 /* Define HAS_MKTIME if you have mktime(). */
 
+#undef HAVE_GMTIME_R
+#undef HAVE_LOCALTIME_R
+
 #undef HAS_SETSID
 
 /* Define HAS_SETSID if you have setsid(). */

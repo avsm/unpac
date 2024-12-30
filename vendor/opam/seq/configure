@@ -3173,6 +3173,8 @@ as_fn_append ac_func_c_list " getgrnam_r HAVE_GETGRNAM_R"
 as_fn_append ac_func_c_list " getgrgid_r HAVE_GETGRGID_R"
 as_fn_append ac_func_c_list " getpwnam_r HAVE_GETPWNAM_R"
 as_fn_append ac_func_c_list " getpwuid_r HAVE_GETPWUID_R"
+as_fn_append ac_func_c_list " gmtime_r HAVE_GMTIME_R"
+as_fn_append ac_func_c_list " localtime_r HAVE_LOCALTIME_R"
 
 # Auxiliary files required by this configure script.
 ac_aux_files="install-sh ltmain.sh config.guess config.sub"
@@ -21281,6 +21283,9 @@ then :
   printf "%s\n" "#define HAS_MKTIME 1" >>confdefs.h
 
 fi
+
+
+
 
 
 ## setsid

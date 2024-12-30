@@ -2415,6 +2415,7 @@ AC_CHECK_FUNC([gettimeofday],
 ## mktime
 
 AC_CHECK_FUNC([mktime], [AC_DEFINE([HAS_MKTIME], [1])])
+AC_CHECK_FUNCS_ONCE([gmtime_r localtime_r])
 
 ## setsid
 

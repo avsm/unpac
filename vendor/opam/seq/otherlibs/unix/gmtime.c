@@ -21,7 +21,7 @@
 #include <time.h>
 #include <errno.h>
 
-static value alloc_tm(struct tm *tm)
+static value alloc_tm(const struct tm *tm)
 {
   value res;
   res = caml_alloc_small(9, 0);
@@ -39,21 +39,29 @@ static value alloc_tm(struct tm *tm)
 
 CAMLprim value caml_unix_gmtime(value t)
 {
-  time_t clock;
+  time_t clock = (time_t) Double_val(t);
   struct tm * tm;
-  clock = (time_t) Double_val(t);
+#ifdef HAVE_GMTIME_R
+  struct tm result;
+  tm = gmtime_r(&clock, &result);
+#else
   tm = gmtime(&clock);
-  if (tm == NULL) caml_unix_error(EINVAL, "gmtime", Nothing);
+#endif
+  if (tm == NULL) caml_uerror("gmtime", Nothing);
   return alloc_tm(tm);
 }
 
 CAMLprim value caml_unix_localtime(value t)
 {
-  time_t clock;
+  time_t clock = (time_t) Double_val(t);
   struct tm * tm;
-  clock = (time_t) Double_val(t);
+#ifdef HAVE_LOCALTIME_R
+  struct tm result;
+  tm = localtime_r(&clock, &result);
+#else
   tm = localtime(&clock);
-  if (tm == NULL) caml_unix_error(EINVAL, "localtime", Nothing);
+#endif
+  if (tm == NULL) caml_uerror("localtime", Nothing);
   return alloc_tm(tm);
 }
 
