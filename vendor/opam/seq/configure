@@ -3169,6 +3169,7 @@ as_fn_append ac_header_c_list " strings.h strings_h HAVE_STRINGS_H"
 as_fn_append ac_header_c_list " sys/stat.h sys_stat_h HAVE_SYS_STAT_H"
 as_fn_append ac_header_c_list " sys/types.h sys_types_h HAVE_SYS_TYPES_H"
 as_fn_append ac_header_c_list " unistd.h unistd_h HAVE_UNISTD_H"
+as_fn_append ac_func_c_list " getlogin_r HAVE_GETLOGIN_R"
 as_fn_append ac_func_c_list " getgrnam_r HAVE_GETGRNAM_R"
 as_fn_append ac_func_c_list " getgrgid_r HAVE_GETGRGID_R"
 as_fn_append ac_func_c_list " getpwnam_r HAVE_GETPWNAM_R"
@@ -21146,6 +21147,7 @@ do
     ac_func=$ac_item
   fi
 done
+
 
 
 
