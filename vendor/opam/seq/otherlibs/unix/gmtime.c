@@ -81,11 +81,11 @@ CAMLprim value caml_unix_mktime(value t)
   tm.tm_mday = Int_val(Field(t, 3));
   tm.tm_mon = Int_val(Field(t, 4));
   tm.tm_year = Int_val(Field(t, 5));
-  tm.tm_wday = Int_val(Field(t, 6));
-  tm.tm_yday = Int_val(Field(t, 7));
-  tm.tm_isdst = -1; /* tm.tm_isdst = Bool_val(Field(t, 8)); */
+  tm.tm_isdst = -1;
+  tm.tm_wday = -1;
   clock = mktime(&tm);
-  if (clock == (time_t) -1) caml_unix_error(ERANGE, "mktime", Nothing);
+  if (clock == (time_t) -1 && tm.tm_wday == -1)
+    caml_uerror("mktime", Nothing);
   tmval = alloc_tm(&tm);
   clkval = caml_copy_double((double) clock);
   res = caml_alloc_small(2, 0);
