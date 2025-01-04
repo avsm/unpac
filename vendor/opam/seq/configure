@@ -24464,19 +24464,10 @@ fi
 # but whose value is not guessed properly by configure
 # (all this should be understood and fixed)
 case $target in #(
-  *-w64-mingw32*) :
+  *-w64-mingw32*|*-pc-windows) :
     printf "%s\n" "#define HAS_BROKEN_PRINTF 1" >>confdefs.h
 
     printf "%s\n" "#define HAS_IPV6 1" >>confdefs.h
-
-    printf "%s\n" "#define HAS_NICE 1" >>confdefs.h
- ;; #(
-  *-pc-windows) :
-    printf "%s\n" "#define HAS_BROKEN_PRINTF 1" >>confdefs.h
-
-    printf "%s\n" "#define HAS_IPV6 1" >>confdefs.h
-
-    printf "%s\n" "#define HAS_NICE 1" >>confdefs.h
  ;; #(
   *-*-solaris*) :
     # This is required as otherwise floats are printed
