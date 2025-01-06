@@ -2315,11 +2315,9 @@ AC_CHECK_FUNC([getcwd], [AC_DEFINE([HAS_GETCWD], [1])])
 AC_CHECK_FUNC([system], [AC_DEFINE([HAS_SYSTEM], [1])])
 
 ## utime
-## Note: this was defined in config/s-nt.h but the autoconf macros do not
-# seem to detect it properly on Windows so we hardcode the definition
-# of HAS_UTIME on Windows but this will probably need to be clarified
 AS_CASE([$target],
-  [*-w64-mingw32*|*-pc-windows], [AC_DEFINE([HAS_UTIME], [1])],
+  # SetFileTime is used instead of _utime,
+  [*-w64-mingw32*|*-pc-windows], [],
   [AC_CHECK_HEADER([sys/types.h],
     [AC_CHECK_HEADER([utime.h],
       [AC_CHECK_FUNC([utime], [AC_DEFINE([HAS_UTIME], [1])])])])])
