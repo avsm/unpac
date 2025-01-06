@@ -124,7 +124,7 @@ static_assert(
 
            BT_INIT  <---------------------------------------+
               |                                             |
-   (install_backup_thread)                                  |
+   (install_backup_thread_exn)                              |
        [main thread]                                        |
               |                                             |
               v                                             |
@@ -1198,7 +1198,7 @@ static void* backup_thread_func(void* v)
   return 0;
 }
 
-static void install_backup_thread (dom_internal* di)
+static value install_backup_thread_exn (dom_internal* di)
 {
   int err;
 #ifndef _WIN32
@@ -1224,13 +1224,15 @@ static void install_backup_thread (dom_internal* di)
 
   atomic_store_release(&di->backup_thread_msg, BT_ENTERING_OCAML);
   err = pthread_create(&di->backup_thread, 0, backup_thread_func, (void*)di);
-  caml_check_error(err, "failed to create domain backup thread");
 
 #ifndef _WIN32
   pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
 #endif
 
+  if (err != 0)
+      return caml_check_error_exn(err, "failed to create domain backup thread");
   pthread_detach(di->backup_thread);
+  return Val_unit;
 }
 
 static void terminate_backup_thread(dom_internal *di)
@@ -1340,7 +1342,7 @@ static void* domain_thread_func(void* v)
   /* Cannot access p below here. */
 
   if (domain_self) {
-    install_backup_thread(domain_self);
+    install_backup_thread_exn(domain_self);
 
     caml_gc_log("Domain starting (unique_id = %" CAML_PRIuNAT ")",
                 domain_self->interruptor.unique_id);
@@ -1420,6 +1422,15 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
   if (caml_debugger_in_use)
     caml_fatal_error("ocamldebug does not support spawning multiple domains");
 #endif
+
+  /* Domain 0 does not need a backup thread when it is the sole
+     domain. We create its backup thread before spawning domain 1. */
+  domain_self->tid = pthread_self();
+  if (!backup_thread_running(domain_self)) {
+    value res = install_backup_thread_exn(domain_self);
+    if (Is_exception_result(res)) caml_raise(Extract_exception(res));
+  }
+
   p.parent = domain_self;
   p.status = Dom_starting;
 
@@ -1457,11 +1468,6 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
     free_domain_ml_values(p.ml_values);
     caml_failwith("failed to allocate domain");
   }
-  /* When domain 0 first spawns a domain, the backup thread is not active, we
-     ensure it is started here. */
-  domain_self->tid = pthread_self();
-  if (!backup_thread_running(domain_self))
-    install_backup_thread(domain_self);
 
   CAMLreturn (Val_long(p.unique_id));
 }
