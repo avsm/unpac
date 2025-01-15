@@ -581,6 +581,18 @@ AC_ARG_WITH([target-sh],
     [target_launch_method="$withval"])],
   [target_launch_method=''])
 
+AC_ARG_WITH([additional-stublibsdir],
+  [AS_HELP_STRING([--with-additional-stublibsdir],
+    [additional directory for searching for bytecode stub libraries])],
+  [AS_CASE([$withval],
+    [no],
+      [ocaml_additional_stublibs_dir=''],
+    [yes],
+      [ocaml_additional_stublibs_dir='"${prefix}/lib/stublibs"'],
+    [ocaml_additional_stublibs_dir=\
+"'$(echo "$withval" | sed -e "s/'/'\"'\"'/g")'"])],
+  [ocaml_additional_stublibs_dir=''])
+
 AC_ARG_ENABLE([reserved-header-bits],
   [AS_HELP_STRING([--enable-reserved-header-bits=BITS],
     [reserve BITS (between 0 and 31) bits in block headers])],
@@ -2936,11 +2948,23 @@ AC_CONFIG_COMMANDS_PRE([
   eval "exec_prefix=\"$exec_prefix\""
   eval "ocaml_bindir=\"$bindir\""
   eval "ocaml_libdir=\"$libdir\""
+  eval "ocaml_additional_stublibs_dir=$ocaml_additional_stublibs_dir"
   AS_IF([test x"$TARGET_BINDIR" = 'x'],[TARGET_BINDIR="$ocaml_bindir"])
   AS_IF([test x"$target_launch_method" = 'x'],
     [target_launch_method="$launch_method"])
   prefix="$saved_prefix"
   exec_prefix="$saved_exec_prefix"])
+
+# Create ld.conf
+AC_CONFIG_COMMANDS([runtime/ld.conf],
+  [rm -f runtime/ld.conf
+  test x"$ocaml_additional_stublibs_dir" = 'x' || \
+    echo "$ocaml_additional_stublibs_dir" > runtime/ld.conf
+  echo "$ocaml_libdir/stublibs" >> runtime/ld.conf
+  echo "$ocaml_libdir" >> runtime/ld.conf],
+  [ocaml_additional_stublibs_dir=\
+'$(echo "$ocaml_additional_stublibs_dir" | sed -e "s/'/'\"'\"'/g")'
+  ocaml_libdir='$(echo "$ocaml_libdir" | sed -e "s/'/'\"'\"'/g")'])
 
 # Just before config.status is generated, determine the final values for MKEXE,
 # MKDLL, MKMAINDLL and MKEXE_VIA_CC. The final variables controlling these are:
