@@ -41,10 +41,10 @@ extern void caml_build_primitive_table_builtin(void);
 /* Unload all the previously loaded shared libraries */
 extern void caml_free_shared_libs(void);
 
-/* If found, parse $OCAMLLIB/ld.conf, $CAMLLIB/ld.conf and
-   OCAML_STDLIB_DIR/ld.conf in that order and add the lines read to
-   caml_shared_libs_path. */
-extern char_os * caml_parse_ld_conf(void);
+/* If found, parse $OCAMLLIB/ld.conf, $CAMLLIB/ld.conf and stdlib/ld.conf in
+   that order and add the lines read to table. */
+extern char_os * caml_parse_ld_conf(const char_os * stdlib,
+                                    struct ext_table * table);
 
 #endif /* CAML_INTERNALS */
 

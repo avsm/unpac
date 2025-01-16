@@ -78,6 +78,8 @@ static c_primitive lookup_primitive(const char * name)
   return NULL;
 }
 
+#endif /* NATIVE_CODE */
+
 /* Parse the ld.conf file and add the directories
    listed there to the search path */
 
@@ -113,12 +115,13 @@ static char_os *make_relative_path_absolute(char_os *path, char_os *root)
   }
 }
 
-CAMLexport char_os * caml_parse_ld_conf(void)
+CAMLexport char_os * caml_parse_ld_conf(const char_os * stdlib,
+                                        struct ext_table *table)
 {
   const char_os * const locations[3] = {
     caml_secure_getenv(T("OCAMLLIB")),
     caml_secure_getenv(T("CAMLLIB")),
-    OCAML_STDLIB_DIR};
+    stdlib};
   char_os * libroot, * ldconfname, * wconfig, * p, * q;
   char * config;
 #ifdef _WIN32
@@ -191,13 +194,40 @@ CAMLexport char_os * caml_parse_ld_conf(void)
     char_os *entry = entries.contents[i];
     length = strlen_os(entry) + 1;
     memcpy(p, entry, length * sizeof(char_os));
-    caml_ext_table_add(&caml_shared_libs_path, p);
+    caml_ext_table_add(table, p);
     p += length;
   }
   caml_ext_table_free(&entries, 1);
 
   return result;
 }
+
+/* Exposes caml_parse_ld_conf as a primitive for the bytecode compiler, saving
+   the duplication of the logic within the bytecode compiler. */
+CAMLprim value caml_dynlink_parse_ld_conf(value vstdlib)
+{
+  CAMLparam1(vstdlib);
+  CAMLlocal2(list, str);
+
+  char_os *stdlib = caml_stat_strdup_to_os(String_val(vstdlib));
+  struct ext_table table;
+  caml_ext_table_init(&table, 8);
+  char_os *tofree = caml_parse_ld_conf(stdlib, &table);
+  caml_stat_free(stdlib);
+
+  list = Val_emptylist;
+  for (int i = table.size - 1; i >= 0; i--) {
+    str = caml_copy_string_of_os(table.contents[i]);
+    list = caml_alloc_2(Tag_cons, str, list);
+  }
+
+  caml_ext_table_free(&table, 0);
+  caml_stat_free(tofree);
+
+  CAMLreturn(list);
+}
+
+#ifndef NATIVE_CODE
 
 /* Open the given shared library and add it to shared_libs.
    Abort on error. */
@@ -248,7 +278,7 @@ void caml_build_primitive_table(char_os * lib_path,
   if (lib_path != NULL)
     for (char_os *p = lib_path; *p != 0; p += strlen_os(p) + 1)
       caml_ext_table_add(&caml_shared_libs_path, p);
-  caml_parse_ld_conf();
+  caml_parse_ld_conf(OCAML_STDLIB_DIR, &caml_shared_libs_path);
   /* Open the shared libraries */
   caml_ext_table_init(&shared_libs, 8);
   if (libs != NULL)

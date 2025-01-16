@@ -138,63 +138,7 @@ let synchronize_primitive num symb =
     assert (actual_num = num)
   end
 
-(* Read the [ld.conf] file and return the corresponding list of directories *)
-
-let rtrim_cr s =
-  if s = "" then s
-  else
-    let len = String.length s in
-    let i = ref len in
-    while !i > 0 && s.[!i - 1] = '\r' do
-      decr i
-    done;
-    if !i <> len then
-      String.sub s 0 !i
-    else
-      s
-
-let ld_conf_contents dir =
-  let is_separator =
-    if Sys.win32 then
-      function '/' | '\\' -> true | _ -> false
-    else
-      Char.equal '/'
-  in
-  let translate line =
-    if line = "" then
-      ""
-    else
-      let len = String.length line in
-      if line.[0] = '.' then
-        if len = 1 then
-          dir
-        else if is_separator line.[1] then
-          dir ^ String.sub line 1 (len - 1)
-        else if line.[1] = '.' && (len = 2 || is_separator line.[2]) then
-          Filename.concat dir line
-        else
-          line
-      else
-        line
-  in
-  try
-    In_channel.with_open_bin (Filename.concat dir "ld.conf") @@ fun ic ->
-      let lines = String.split_on_char '\n' (In_channel.input_all ic) in
-      match List.rev lines with
-      | [] -> assert false (* String.split_on_char doesn't return [] *)
-      | [""] -> []
-      | last :: rev_rest ->
-          let f s = translate (rtrim_cr s) in
-          let last = translate last in
-          List.rev_map f rev_rest @ if last = "" then [] else [last]
-  with Sys_error _ -> []
-
-let ld_conf_contents () =
-  let dirs = [
-    Sys.getenv_opt "OCAMLLIB";
-    Sys.getenv_opt "CAMLLIB";
-    Some Config.standard_library_default] in
-  List.concat_map (Option.fold ~none:[] ~some:ld_conf_contents) dirs
+external ld_conf_contents : string -> string list = "caml_dynlink_parse_ld_conf"
 
 (* Split the CAML_LD_LIBRARY_PATH environment variable and return
    the corresponding list of directories.  *)
@@ -210,7 +154,7 @@ let ld_library_path_contents () =
 let init_compile nostdlib =
   search_path :=
     ld_library_path_contents() @
-    (if nostdlib then [] else ld_conf_contents())
+    (if nostdlib then [] else ld_conf_contents Config.standard_library_default)
 
 (* Initialization for linking in core (dynlink or toplevel) *)
 

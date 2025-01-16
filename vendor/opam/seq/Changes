@@ -364,6 +364,10 @@ Working version
 - #14198 Constraints on module unpacking are not ghost
   (Thomas Refis, review by Nicolás Ojeda Bär)
 
+- #14243: ocamlc now uses the same code as the runtime to parse ld.conf (via a
+  C primitive), eliminating some highly obscure corner cases.
+  (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
+
 - #14260: Refactor Lambda.structured_constant to avoid duplicate
   representations for string constants
   (Vincent Laviron, review by Nicolás Ojeda Bär and Gabriel Scherer)

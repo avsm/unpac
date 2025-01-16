@@ -352,51 +352,16 @@ let () =
       in
       if code = 0 then
         let lines =
-          (* Known issue: Misc.split_path_contents ignores empty strings where
-             caml_decompose_path does not. Mitigate it by detecting the
-             environment setting and simulating the line. *)
-          if test.caml_ld_library_path = Set []
-             || test.caml_ld_library_path = Empty then
+          (* Known issues:
+             - Misc.split_path_contents ignores empty strings where
+               caml_decompose_path does not
+             - Sys.getenv can't return empty environment variables on Windows,
+               but _wgetenv can
+             - Windows strips out the blank entries in the search path
+               (somewhat counterintuitively!) *)
+          if not Sys.win32 && (test.caml_ld_library_path = Set []
+                               || test.caml_ld_library_path = Empty) then
             "." :: lines
-          else
-            lines
-        in
-        (* Known issue: Windows strips out the blank entries in the search path
-           (somewhat counterintuitively!) *)
-        let lines =
-          if not Sys.win32 then
-            lines
-          else
-            List.drop_while (String.equal ".") lines
-        in
-        let lines =
-          (* Known issue: Dll.ld_conf_contents preserves NUL characters in lines
-             where caml_parse_ld_conf terminates processing. This is mitigated
-             in the test by putting a single line "hidden" after the line with
-             an embedded NUL. *)
-          let includes_nulls =
-            let includes_nulls = function
-            | Unset | Empty -> false
-            | Set l -> List.exists (Fun.flip String.contains '\000') l
-            in
-            includes_nulls test.ocamllib || includes_nulls test.camllib
-          in
-          if includes_nulls then
-            let strip_null s =
-              match String.index s '\000' with
-              | index ->
-                  String.sub s 0 index
-              | exception Not_found ->
-                  s
-            in
-            let lines' = List.map strip_null lines in
-            if lines <> lines' then
-              List.filter ((<>) "hidden") lines'
-            else
-              (* As with empty environment variables above, if this behaviour
-                 appears to have been fixed, poison the output of the test so
-                 that doesn't happen silently. *)
-              "poisoned" :: lines
           else
             lines
         in
