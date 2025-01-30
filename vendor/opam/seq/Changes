@@ -392,7 +392,9 @@ Working version
   (Samuel Hym, review by Antonin Décimo and Romain Calascibetta)
 
 - #14243: New configure option --with-additional-stublibsdir allows an
-  additional directory to be added to the start of ld.conf.
+  additional directory to be added to the start of ld.conf. Additionally, the
+  stublibs subdirectory is no longer created, nor added to ld.conf, when
+  building OCaml with --disable-shared.
   (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
 
 ### Bug fixes:

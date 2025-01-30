@@ -2969,12 +2969,15 @@ AC_CONFIG_COMMANDS([runtime/ld.conf],
   [rm -f runtime/ld.conf
   test x"$ocaml_additional_stublibs_dir" = 'x' || \
     echo "$ocaml_additional_stublibs_dir" > runtime/ld.conf
-  echo ".${default_separator}stublibs" >> runtime/ld.conf
+  if $supports_shared_libraries; then
+    echo ".${default_separator}stublibs" >> runtime/ld.conf
+  fi
   echo "." >> runtime/ld.conf],
   [ocaml_additional_stublibs_dir=\
 '$(echo "$ocaml_additional_stublibs_dir" | sed -e "s/'/'\"'\"'/g")'
   ocaml_libdir='$(echo "$ocaml_libdir" | sed -e "s/'/'\"'\"'/g")'
-  default_separator='$default_separator'])
+  default_separator='$default_separator'
+  supports_shared_libraries='$supports_shared_libraries'])
 
 # Just before config.status is generated, determine the final values for MKEXE,
 # MKDLL, MKMAINDLL and MKEXE_VIA_CC. The final variables controlling these are:
