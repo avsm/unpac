@@ -3786,12 +3786,47 @@ then :
   ac_tool_prefix=$target_alias-
 fi
 
+# $cygwin_build_env=true if the build is taking place in any kind of Cygwin-like
+# environment (which may include cross-compiling _from_ Cygwin)
+# All patterns end with * (cf. build-aux/config.sub)
+#
+# In Cygwin itself, the mingw-w64 compilers are cross-compilers
+# (host=x86_64-pc-cygwin; target=*-w64-mingw32) and $build when running from
+# within Cygwin is always *-pc-cygwin.
+#
+# In MSYS2, the mingw-w64 compilers are normal host compilers, which MSYS2 makes
+# available through different Environments (similar to the Microsoft Visual
+# Studio Tools Command Prompts; see https://www.msys2.org/docs/environments/).
+# It is possible to use MSYS2's "Cygwin" gcc (the equivalent of compiling native
+# Cygwin), in which case $build is *-*-cygwin (some older MSYS2 installations
+# may report the legacy *-*-msys*)
+# The mingw-w64 Environments manually set $build to *-w64-mingw32, but the
+# _native_ value inferred by config.guess (which uses uname -s) will be
+# *-pc-mingw32 (for the 32-bit _target_ environments, even though MSYS2 is a
+# 64-bit build environment) and *-pc-mingw64 (for the 64-bit _target_
+# environments).
+#
+# This leads to the four patterns below, all of which imply that the build is
+# taking place on a system where Cygwin's utilities (cygpath, etc.) can be
+# expected to be found and its semantics (CYGWIN=winsymlinks:native, etc.) be
+# expected to apply.
+#
+# Note that although build=x86_64-pc-mingw64 will be accepted here, it is highly
+# likely that that's a misconfigured environment, and the script will
+# subsequently fail if host has not been altered to x86_64-w64-mingw32.
+case $build in #(
+  *-*-cygwin*|*-*-msys*|*-*-mingw32*|*-*-mingw64*) :
+    cygwin_build_env=true ;; #(
+  *) :
+    cygwin_build_env=false ;;
+esac
+
 # Ensure that AC_CONFIG_LINKS will either create symlinks which are compatible
 # with native Windows (i.e. NTFS symlinks, not WSL or Cygwin-emulated ones) or
 # use its fallback mechanisms. Native Windows versions of ocamlc/ocamlopt cannot
 # interpret either WSL or Cygwin-emulated symlinks.
-case $host in #(
-  *-pc-windows|*-w64-mingw32*) :
+case $cygwin_build_env,$host in #(
+  true,*-pc-windows|true,*-w64-mingw32*) :
     ac_config_commands="$ac_config_commands native-symlinks"
  ;; #(
   *) :
@@ -15117,8 +15152,8 @@ esac
 ocamlsrcdir=$(unset CDPATH; cd -- "$srcdir" && printf %sX "$PWD") || fail
 ocamlsrcdir=${ocamlsrcdir%X}
 
-case $host in #(
-  *-w64-mingw32*|*-pc-windows) :
+case $cygwin_build_env,$host in #(
+  true,*-w64-mingw32*|true,*-pc-windows) :
 
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for a workable solution for ln -sf" >&5
 printf %s "checking for a workable solution for ln -sf... " >&6; }
@@ -16066,16 +16101,16 @@ rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
     if test x"$build" != x"$host"
 then :
 
-      case $build in #(
-  *-pc-msys|*-*-cygwin) :
-    flexlink_where="$(cmd /c "$flexlink" -where 2>/dev/null)"
-          if test -z "$flexlink_where"
+      if $cygwin_build_env
+then :
+  flexlink_where="$(cmd /c "$flexlink" -where 2>/dev/null)"
+        if test -z "$flexlink_where"
 then :
   as_fn_error $? "$flexlink is not executable from a native Win32 process" "$LINENO" 5
-fi ;; #(
-  *) :
-     ;;
-esac
+
+fi
+
+fi
 
 fi
 
@@ -24174,8 +24209,8 @@ then :
      ;;
 esac
 else $as_nop
-  case $build,$host in #(
-  *-*-cygwin,*-w64-mingw32*|*-*-cygwin,*-pc-windows) :
+  case $cygwin_build_env,$host in #(
+  true,*-w64-mingw32*|true,*-pc-windows) :
     prefix="$(LC_ALL=C.UTF-8 cygpath -m "$prefix")" ;; #(
   *) :
      ;;

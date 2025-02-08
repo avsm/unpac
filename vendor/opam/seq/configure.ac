@@ -330,12 +330,45 @@ AS_IF([test x"$target_alias" != x],
 AS_IF([test -n "$target_alias"],
   [ac_tool_prefix=$target_alias-])
 
+# $cygwin_build_env=true if the build is taking place in any kind of Cygwin-like
+# environment (which may include cross-compiling _from_ Cygwin)
+# All patterns end with * (cf. build-aux/config.sub)
+#
+# In Cygwin itself, the mingw-w64 compilers are cross-compilers
+# (host=x86_64-pc-cygwin; target=*-w64-mingw32) and $build when running from
+# within Cygwin is always *-pc-cygwin.
+#
+# In MSYS2, the mingw-w64 compilers are normal host compilers, which MSYS2 makes
+# available through different Environments (similar to the Microsoft Visual
+# Studio Tools Command Prompts; see https://www.msys2.org/docs/environments/).
+# It is possible to use MSYS2's "Cygwin" gcc (the equivalent of compiling native
+# Cygwin), in which case $build is *-*-cygwin (some older MSYS2 installations
+# may report the legacy *-*-msys*)
+# The mingw-w64 Environments manually set $build to *-w64-mingw32, but the
+# _native_ value inferred by config.guess (which uses uname -s) will be
+# *-pc-mingw32 (for the 32-bit _target_ environments, even though MSYS2 is a
+# 64-bit build environment) and *-pc-mingw64 (for the 64-bit _target_
+# environments).
+#
+# This leads to the four patterns below, all of which imply that the build is
+# taking place on a system where Cygwin's utilities (cygpath, etc.) can be
+# expected to be found and its semantics (CYGWIN=winsymlinks:native, etc.) be
+# expected to apply.
+#
+# Note that although build=x86_64-pc-mingw64 will be accepted here, it is highly
+# likely that that's a misconfigured environment, and the script will
+# subsequently fail if host has not been altered to x86_64-w64-mingw32.
+AS_CASE([$build],
+  [*-*-cygwin*|*-*-msys*|*-*-mingw32*|*-*-mingw64*],
+    [cygwin_build_env=true],
+  [cygwin_build_env=false])
+
 # Ensure that AC_CONFIG_LINKS will either create symlinks which are compatible
 # with native Windows (i.e. NTFS symlinks, not WSL or Cygwin-emulated ones) or
 # use its fallback mechanisms. Native Windows versions of ocamlc/ocamlopt cannot
 # interpret either WSL or Cygwin-emulated symlinks.
-AS_CASE([$host],
-  [*-pc-windows|*-w64-mingw32*],
+AS_CASE([$cygwin_build_env,$host],
+  [true,*-pc-windows|true,*-w64-mingw32*],
     [AC_CONFIG_COMMANDS([native-symlinks], [],
       [export CYGWIN="\$CYGWIN\${CYGWIN:+ }winsymlinks:nativestrict"
       export MSYS="\$MSYS\${MSYS:+ }winsymlinks:nativestrict"])])
@@ -836,8 +869,8 @@ AS_CASE([$ocaml_cc_vendor],
 ocamlsrcdir=$(unset CDPATH; cd -- "$srcdir" && printf %sX "$PWD") || fail
 ocamlsrcdir=${ocamlsrcdir%X}
 
-AS_CASE([$host],
-  [*-w64-mingw32*|*-pc-windows],
+AS_CASE([$cygwin_build_env,$host],
+  [true,*-w64-mingw32*|true,*-pc-windows],
     [OCAML_CHECK_LN_ON_WINDOWS
     ocamlsrcdir="$(LC_ALL=C.UTF-8 cygpath -w -- "$ocamlsrcdir")"],
   [ln='ln -sf'])
@@ -1158,12 +1191,13 @@ AS_IF([test x"$supports_shared_libraries" != 'xfalse'], [
     # ensure it can be executed from a native Windows process. The check
     # is only necessary when cross-compiling.
     AS_IF([test x"$build" != x"$host"],[
-      AS_CASE([$build],
-        [*-pc-msys|*-*-cygwin],
-          [flexlink_where="$(cmd /c "$flexlink" -where 2>/dev/null)"
-          AS_IF([test -z "$flexlink_where"],
-            [AC_MSG_ERROR(m4_normalize([$flexlink is not executable from a
-            native Win32 process]))])])
+      AS_IF([$cygwin_build_env],
+        [flexlink_where="$(cmd /c "$flexlink" -where 2>/dev/null)"
+        AS_IF([test -z "$flexlink_where"],
+          [AC_MSG_ERROR(m4_normalize([$flexlink is not executable from a
+          native Win32 process]))
+        ])
+      ])
     ])
   ])
 
@@ -2924,8 +2958,8 @@ AS_IF([test x"$prefix" = "xNONE"],
     [x86_64-w64-mingw32*], [prefix='C:/ocamlmgw64'],
     [i686-pc-windows], [prefix='C:/ocamlms'],
     [x86_64-pc-windows], [prefix='C:/ocamlms64'])],
-  [AS_CASE([$build,$host],
-    [*-*-cygwin,*-w64-mingw32*|*-*-cygwin,*-pc-windows],
+  [AS_CASE([$cygwin_build_env,$host],
+    [true,*-w64-mingw32*|true,*-pc-windows],
       [prefix="$(LC_ALL=C.UTF-8 cygpath -m "$prefix")"])])
 
 # Define a few macros that were defined in config/m-nt.h

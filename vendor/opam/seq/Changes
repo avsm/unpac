@@ -415,6 +415,13 @@ Working version
   building OCaml with --disable-shared.
   (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
 
+- #14244: Normalise `--prefix` when compiling on MSYS2 in the same way as is
+  already done on Cygwin. In particular, backslashes are converted to slashes
+  and MSYS2-style paths (e.g. resulting from `--prefix $PWD/install`) are
+  converted to Windows-style paths.
+  (David Allsopp, review by Jonah Beckford, Antonin Décimo, Damien Doligez and
+   Samuel Hym)
+
 ### Bug fixes:
 
 - #14036: Fix nontermination of cycle printing in recursive modules with
