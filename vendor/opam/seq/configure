@@ -805,6 +805,7 @@ QS
 TARGET_LIBDIR
 ocaml_libdir
 ocaml_bindir
+ocaml_prefix
 compute_deps
 build_libraries_manpages
 PACKLD
@@ -3526,6 +3527,7 @@ LINEAR_MAGIC_NUMBER=Caml1999L037
 
 
  # TODO: rename this variable
+
 
 
 
@@ -24183,11 +24185,6 @@ then :
   libdir="$libdir"/ocaml
 fi
 
-if test x"$TARGET_LIBDIR" = x
-then :
-  TARGET_LIBDIR="$libdir"
-fi
-
 if test x"$mandir" = x'${datarootdir}/man'
 then :
   mandir='${prefix}/man'
@@ -24208,14 +24205,62 @@ then :
   *) :
      ;;
 esac
-else $as_nop
-  case $cygwin_build_env,$host in #(
+fi
+
+# Normalise $prefix, if necessary, on Windows. There are 9 variables to be
+# considered:
+# - $prefix and $exec_prefix. These are autoconf variables containing the values
+#   specified for --prefix and --exec-prefix respectively, or NONE if these
+#   flags were not given on the command line. These two variables are written to
+#   Makefile.config and are in _build_ format. On native Windows, the values
+#   must be suitable to pass to _both_ native Windows processes and Cygwin/MSYS2
+#   commands. The values are ultimately converted to Windows paths using slashes
+#   (i.e. C:/foo)
+# - $bindir and $libdir. These similarly contain the values specified for
+#   --bindir and --libdir, or defaults relative to $exec_prefix otherwise.
+#   Unlike --prefix, values specified to configure for --bindir and --libdir are
+#   assumed to be suitable for both native Windows processes and Cygwin/MSYS2.
+#   These two variables ultimately end up in Makefile.config as $(BINDIR) and
+#   $(LIBDIR) and are used for installation commands only.
+# - $ocaml_prefix, $ocaml_bindir and $ocaml_libdir are the _expanded_ values of
+#   $prefix, $bindir and $libdir so that the values can be inserted into OCaml
+#   strings (typically in utils/config.generated.ml). On Windows, these preserve
+#   the backslashes present in the value passed to --prefix.
+# - $TARGET_BINDIR and $TARGET_LIBDIR. These are both precious environment
+#   variables (meaning their value is recorded by configure) but they default to
+#   $ocaml_bindir and $ocaml_libdir respectively.
+ocaml_bindir="$bindir"
+ocaml_libdir="$libdir"
+ocaml_prefix="$prefix"
+case $cygwin_build_env,$host in #(
   true,*-w64-mingw32*|true,*-pc-windows) :
-    prefix="$(LC_ALL=C.UTF-8 cygpath -m "$prefix")" ;; #(
+    prefix="$(LC_ALL=C.UTF-8 cygpath -m "$prefix")"
+    if test "x${ocaml_prefix%%/*}" != "x$ocaml_prefix"
+then :
+  # $prefix contained a slash - normalise it with cygpath. The rationale for
+      # this allows both `./configure --prefix $PWD/install` (which will be a
+      # Cygwin path) and also systems lazily using slashes instead of
+      # backslashes (i.e. C:/Backslashes/Scare/Us) to work.
+      ocaml_prefix="$prefix"
+else $as_nop
+  # $prefix was using backslashes - preserve these in the build, but
+      # continue to use slashes for the Makefile variables.
+      if test "x$bindir" = 'x${exec_prefix}/bin'
+then :
+  ocaml_bindir='${exec_prefix}\bin'
+else $as_nop
+  ocaml_bindir="$bindir"
+fi
+      if test "x$libdir" = 'x${exec_prefix}/lib/ocaml'
+then :
+  ocaml_libdir='${exec_prefix}\lib\ocaml'
+else $as_nop
+  ocaml_libdir="$libdir"
+fi
+fi ;; #(
   *) :
      ;;
 esac
-fi
 
 # Define a few macros that were defined in config/m-nt.h
 # but whose value is not guessed properly by configure
@@ -24399,6 +24444,7 @@ cclibs="$cclibs $mathlib $DLLIBS $PTHREAD_LIBS"
 
   saved_exec_prefix="$exec_prefix"
   saved_prefix="$prefix"
+  prefix="$ocaml_prefix"
   if test "x$prefix" = "xNONE"
 then :
   prefix="$ac_default_prefix"
@@ -24408,11 +24454,15 @@ then :
   exec_prefix="$prefix"
 fi
   eval "exec_prefix=\"$exec_prefix\""
-  eval "ocaml_bindir=\"$bindir\""
-  eval "ocaml_libdir=\"$libdir\""
+  eval "ocaml_bindir=\"$ocaml_bindir\""
+  eval "ocaml_libdir=\"$ocaml_libdir\""
   if test x"$TARGET_BINDIR" = 'x'
 then :
   TARGET_BINDIR="$ocaml_bindir"
+fi
+  if test x"$TARGET_LIBDIR" = 'x'
+then :
+  TARGET_LIBDIR="$ocaml_libdir"
 fi
   if test x"$target_launch_method" = 'x'
 then :

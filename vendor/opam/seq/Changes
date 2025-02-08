@@ -415,10 +415,11 @@ Working version
   building OCaml with --disable-shared.
   (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
 
-- #14244: Normalise `--prefix` when compiling on MSYS2 in the same way as is
-  already done on Cygwin. In particular, backslashes are converted to slashes
-  and MSYS2-style paths (e.g. resulting from `--prefix $PWD/install`) are
-  converted to Windows-style paths.
+- #14244: When targeting native Windows on Cygwin or MSYS2, preserve
+  backslashes in the supplied `--prefix` (in particular, backslashes instead of
+  slashes will then be displayed by `ocamlopt -config-var standard_library`).
+  If the supplied prefix contains a slash, then it is normalised, as
+  previously.
   (David Allsopp, review by Jonah Beckford, Antonin Décimo, Damien Doligez and
    Samuel Hym)
 

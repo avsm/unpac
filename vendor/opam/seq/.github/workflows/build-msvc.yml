@@ -136,7 +136,7 @@ jobs:
         env:
           CONFIG_ARGS: >-
             --cache-file=config.cache
-            --prefix "${{ matrix.cc != 'gcc' && '$PROGRAMFILES/Бактріан🐫' || '$(cygpath "$PROGRAMFILES/Бактріан🐫")'}}"
+            --prefix "${{ matrix.cc != 'gcc' && '$PROGRAMFILES\\Бактріан🐫' || '$(cygpath "$PROGRAMFILES/Бактріан🐫")'}}"
             ${{ matrix.cc != 'gcc' && format('--host={0}-pc-windows', matrix.arch) || '' }}
             ${{ matrix.cc != 'gcc' && format('CC={0}', matrix.cc) || '' }}
             --enable-ocamltest
