@@ -340,6 +340,11 @@ let read_runtime_launch_info file =
     let bindir_start = String.index buffer '\n' + 1 in
     let bindir_end = String.index_from buffer bindir_start '\000' in
     let bindir = String.sub buffer bindir_start (bindir_end - bindir_start) in
+    let bindir =
+      if bindir = Filename.current_dir_name then
+        Filename.dirname Sys.executable_name
+      else
+        bindir in
     let executable_offset = bindir_end + 2 in
     let launcher =
       let kind = String.sub buffer 0 (bindir_start - 1) in
