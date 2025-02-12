@@ -149,9 +149,7 @@ let () =
     && config.launcher_searches_for_ocamlrun
   in
   let reproducible =
-    relocatable && false
-    (* At present, the compiler build doesn't actually take advantage of this
-       configuration *)
+    relocatable
     && (not config.has_ocamlopt
         || not Toolchain.assembler_embeds_build_path
         || Config.as_has_debug_prefix_map && Config.architecture <> "riscv")

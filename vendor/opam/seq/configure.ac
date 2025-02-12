@@ -85,6 +85,9 @@ unix_library=""
 unix_directory=""
 diff_supports_color=false
 target_libdir_is_relative=false
+srcdir_abs=''
+srcdir_abs_real=''
+build_map_flags=''
 
 # Information about the package
 
@@ -271,6 +274,9 @@ AC_SUBST([TARGET_LIBDIR])
 AC_SUBST([QS])
 AC_SUBST([ar_supports_response_files])
 AC_SUBST([target_libdir_is_relative])
+AC_SUBST([srcdir_abs])
+AC_SUBST([srcdir_abs_real])
+AC_SUBST([build_map_flags])
 
 ## Generated files
 
@@ -883,14 +889,15 @@ AS_CASE([$ocaml_cc_vendor],
 # See https://lists.gnu.org/archive/html/autoconf/2019-07/msg00002.html
 # for the detailed explanation.
 
-ocamlsrcdir=$(unset CDPATH; cd -- "$srcdir" && printf %sX "$PWD") || fail
-ocamlsrcdir=${ocamlsrcdir%X}
+srcdir_abs=$(unset CDPATH; cd -- "$srcdir" && printf %sX "$PWD") || fail
+srcdir_abs=${srcdir_abs%X}
 
 AS_CASE([$cygwin_build_env,$host],
   [true,*-w64-mingw32*|true,*-pc-windows],
     [OCAML_CHECK_LN_ON_WINDOWS
-    ocamlsrcdir="$(LC_ALL=C.UTF-8 cygpath -w -- "$ocamlsrcdir")"],
-  [ln='ln -sf'])
+    ocamlsrcdir="$(LC_ALL=C.UTF-8 cygpath -w -- "$srcdir_abs")"],
+  [ln='ln -sf'
+  ocamlsrcdir="$srcdir_abs"])
 
 # Whether ar supports @FILE arguments
 
@@ -2483,6 +2490,20 @@ AS_CASE([$ocaml_cc_vendor,$target],
   [sunc*,sparc-sun-*], [cc_has_debug_prefix_map=false],
   [AX_CHECK_COMPILE_FLAG([-fdebug-prefix-map=old=new],
     [cc_has_debug_prefix_map=true], [cc_has_debug_prefix_map=false],
+    [$warn_error_flag])])
+
+## -ffile-prefix-map support by the C compiler - used in the build, not by
+## the compiler
+AS_IF([test x"$bindir_to_libdir" != 'x'],
+  [srcdir_abs_real="$(realpath "$srcdir_abs" 2>/dev/null)"
+  AS_IF([test x"$srcdir_abs_real" = "x$srcdir_abs"],
+    [srcdir_abs_real=''])
+  AX_CHECK_COMPILE_FLAG([-Wa,--debug-prefix-map=old=new],
+    [build_map_flags='-Wa,--debug-prefix-map='], [], [$warn_error_flag])
+  AX_CHECK_COMPILE_FLAG([-ffile-prefix-map=old=new],
+    [build_map_flags="$build_map_flags -ffile-prefix-map="],
+    [AS_IF([$cc_has_debug_prefix_map],
+      [build_map_flags="$build_map_flags -fdebug-prefix-map="])],
     [$warn_error_flag])])
 
 ## Does stat support nanosecond precision

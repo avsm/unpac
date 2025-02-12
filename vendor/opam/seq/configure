@@ -800,6 +800,9 @@ build_os
 build_vendor
 build_cpu
 build
+build_map_flags
+srcdir_abs_real
+srcdir_abs
 target_libdir_is_relative
 ar_supports_response_files
 QS
@@ -3379,6 +3382,9 @@ unix_library=""
 unix_directory=""
 diff_supports_color=false
 target_libdir_is_relative=false
+srcdir_abs=''
+srcdir_abs_real=''
+build_map_flags=''
 
 # Information about the package
 
@@ -3535,6 +3541,9 @@ LINEAR_MAGIC_NUMBER=Caml1999L037
 
 
  # TODO: rename this variable
+
+
+
 
 
 
@@ -15177,8 +15186,8 @@ esac
 # See https://lists.gnu.org/archive/html/autoconf/2019-07/msg00002.html
 # for the detailed explanation.
 
-ocamlsrcdir=$(unset CDPATH; cd -- "$srcdir" && printf %sX "$PWD") || fail
-ocamlsrcdir=${ocamlsrcdir%X}
+srcdir_abs=$(unset CDPATH; cd -- "$srcdir" && printf %sX "$PWD") || fail
+srcdir_abs=${srcdir_abs%X}
 
 case $cygwin_build_env,$host in #(
   true,*-w64-mingw32*|true,*-pc-windows) :
@@ -15195,9 +15204,10 @@ fi
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ln" >&5
 printf "%s\n" "$ln" >&6; }
 
-    ocamlsrcdir="$(LC_ALL=C.UTF-8 cygpath -w -- "$ocamlsrcdir")" ;; #(
+    ocamlsrcdir="$(LC_ALL=C.UTF-8 cygpath -w -- "$srcdir_abs")" ;; #(
   *) :
-    ln='ln -sf' ;;
+    ln='ln -sf'
+  ocamlsrcdir="$srcdir_abs" ;;
 esac
 
 # Whether ar supports @FILE arguments
@@ -21522,6 +21532,100 @@ else $as_nop
 fi
  ;;
 esac
+
+## -ffile-prefix-map support by the C compiler - used in the build, not by
+## the compiler
+if test x"$bindir_to_libdir" != 'x'
+then :
+  srcdir_abs_real="$(realpath "$srcdir_abs" 2>/dev/null)"
+  if test x"$srcdir_abs_real" = "x$srcdir_abs"
+then :
+  srcdir_abs_real=''
+fi
+  as_CACHEVAR=`printf "%s\n" "ax_cv_check_cflags_$warn_error_flag_-Wa,--debug-prefix-map=old=new" | $as_tr_sh`
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -Wa,--debug-prefix-map=old=new" >&5
+printf %s "checking whether the C compiler accepts -Wa,--debug-prefix-map=old=new... " >&6; }
+if eval test \${$as_CACHEVAR+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS $warn_error_flag -Wa,--debug-prefix-map=old=new"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main (void)
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"
+then :
+  eval "$as_CACHEVAR=yes"
+else $as_nop
+  eval "$as_CACHEVAR=no"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+eval ac_res=\$$as_CACHEVAR
+	       { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+printf "%s\n" "$ac_res" >&6; }
+if eval test \"x\$"$as_CACHEVAR"\" = x"yes"
+then :
+  build_map_flags='-Wa,--debug-prefix-map='
+else $as_nop
+  :
+fi
+
+  as_CACHEVAR=`printf "%s\n" "ax_cv_check_cflags_$warn_error_flag_-ffile-prefix-map=old=new" | $as_tr_sh`
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -ffile-prefix-map=old=new" >&5
+printf %s "checking whether the C compiler accepts -ffile-prefix-map=old=new... " >&6; }
+if eval test \${$as_CACHEVAR+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS $warn_error_flag -ffile-prefix-map=old=new"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main (void)
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"
+then :
+  eval "$as_CACHEVAR=yes"
+else $as_nop
+  eval "$as_CACHEVAR=no"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+eval ac_res=\$$as_CACHEVAR
+	       { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+printf "%s\n" "$ac_res" >&6; }
+if eval test \"x\$"$as_CACHEVAR"\" = x"yes"
+then :
+  build_map_flags="$build_map_flags -ffile-prefix-map="
+else $as_nop
+  if $cc_has_debug_prefix_map
+then :
+  build_map_flags="$build_map_flags -fdebug-prefix-map="
+fi
+fi
+
+fi
 
 ## Does stat support nanosecond precision
 
