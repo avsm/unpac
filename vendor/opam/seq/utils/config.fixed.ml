@@ -21,7 +21,6 @@
 let boot_cannot_call s = "/ The boot compiler should not call " ^ s
 
 let bindir = "/tmp"
-let standard_library_default = "/tmp"
 let ccomp_type = "n/a"
 let c_compiler = boot_cannot_call "the C compiler"
 let c_compiler_vendor = ""

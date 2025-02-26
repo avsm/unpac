@@ -48,7 +48,17 @@ let () =
     let compile ?(custom = false) () =
       if Sys.file_exists test_program then
         Harness.erase_file test_program;
-      let args = if custom then "-custom" :: args else args in
+      let args =
+        if custom then
+          "-custom" :: args
+        else
+          (* Hardening to ensure that Bytecode Dynlink is using the runtime's
+             search path, not compiler's (i.e. unix.cma should be located using
+             Config.standard_library_default but dllunixbyt.so should be located
+             using caml_runtime_standard_library_default) *)
+          "-set-runtime-default" :: "standard_library_default=/does-not-exist"
+          :: args
+      in
       (* In the Renamed phase for a bytecode-only build, ocamlc will be
          ocamlc.byte and will need to be called via ocamlrun *)
       let runtime =

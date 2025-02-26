@@ -20,8 +20,6 @@
 
 let bindir = {@QS@|@ocaml_bindir@|@QS@}
 
-let standard_library_default = {@QS@|@ocaml_libdir@|@QS@}
-
 let ccomp_type = {@QS@|@ccomp_type@|@QS@}
 let c_compiler = {@QS@|@CC@|@QS@}
 let c_compiler_vendor = {@QS@|@ocaml_cc_vendor@|@QS@}

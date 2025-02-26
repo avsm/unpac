@@ -176,6 +176,10 @@ ifeq "$(FUNCTION_SECTIONS)" "true"
 OPTCOMPFLAGS += -function-sections
 endif
 
+# Allow Makefile.cross to add flags to OC_COMMON_LINKFLAGS
+OC_CROSS_LINKFLAGS ?=
+OC_COMMON_LINKFLAGS += $(OC_CROSS_LINKFLAGS)
+
 # The rule to compile C files
 
 # This rule is similar to GNU make's implicit rule, except that it is more

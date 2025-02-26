@@ -142,7 +142,7 @@ let run_program env _config =
       if Environment.is_renamed env then
         stdlib_exists_when_renamed
       else
-        true in
+        false in
     let args = [string_of_bool stdlib_exists; prefix; libdir_suffix] in
     let argv0 =
       if argv0 = test_program then
@@ -562,6 +562,21 @@ let compile_test usr_bin_sh config env test test_program description =
         else
           options
       in
+      let options =
+        if Environment.is_renamed env then
+          options
+        else
+          let new_libdir =
+            Filename.concat (Environment.prefix env ^ ".new")
+                            (Environment.libdir_suffix env) in
+          let stdlib_default = "standard_library_default=" ^ new_libdir in
+          let options = "-set-runtime-default" :: stdlib_default :: options in
+          if tendered then
+            let libdir = Environment.libdir env in
+            "-dllpath" :: (Filename.concat libdir "stublibs") :: options
+          else
+            options
+      in
       let args =
         "-o" :: output ::
         "test_install_script.ml" :: options
@@ -618,9 +633,12 @@ let compile_test usr_bin_sh config env test test_program description =
           `None
         else
           let stdlib_exists_when_renamed =
-            (* Config.standard_library is an absolute path, and therefore will
-               always point to the Original location in the Renamed phase. *)
-            false
+            (* In the Original phase, -set-runtime-default is used to set
+               standard_library_default to the Renamed phase's location. When
+               the tests are recompiled in the Renamed phase, this is not done.
+               The effect is that if any test is being run in the Renamed phase,
+               Config.standard_library will be correct. *)
+            not (Environment.is_renamed env)
           in
           make_test_runner ~stdlib_exists_when_renamed ~may_segfault ~with_unix
                            ~tendered ~target_launcher_searches_for_ocamlrun
