@@ -58,10 +58,6 @@ struct ext_table caml_prim_name_table;
 /* The table of shared libraries currently opened */
 static struct ext_table shared_libs;
 
-/* The default location of the Standard Library as used by the runtime to find
-   ld.conf */
-const char_os *caml_runtime_standard_library_default = OCAML_STDLIB_DIR;
-
 /* The search path for shared libraries */
 struct ext_table caml_shared_libs_path;
 

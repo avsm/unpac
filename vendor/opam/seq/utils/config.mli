@@ -207,7 +207,24 @@ val target_os_type: string
 (** Operating system targeted by the native-code compiler. One of
 -  ["Unix"] (for all Unix versions, including Linux and macOS),
 -  ["Win32"] (for MS-Windows, OCaml compiled with MSVC++ or MinGW-w64),
--  ["Cygwin"] (for MS-Windows, OCaml compiled with Cygwin). *)
+-  ["Cygwin"] (for MS-Windows, OCaml compiled with Cygwin).
+
+    @since 5.4 *)
+
+val target_unix: bool
+(** True if [target_os_type = "Unix"]
+
+    @since 5.5 *)
+
+val target_win32: bool
+(** True if [target_os_type = "Win32"]
+
+    @since 5.5 *)
+
+val target_cygwin: bool
+(** True if [target_os_type = "Cygwin"]
+
+    @since 5.5 *)
 
 val asm: string
 (** The assembler (and flags) to use for assembling

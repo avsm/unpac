@@ -57,11 +57,16 @@ let lazy_tag = 246
 let max_young_wosize = 256
 let stack_threshold = 32 (* see runtime/caml/config.h *)
 let stack_safety_margin = 6
+let target_unix = (target_os_type = "Unix")
+let target_win32 = (target_os_type = "Win32")
+let target_cygwin = (target_os_type = "Cygwin")
 let default_executable_name =
-  match target_os_type with
-    "Unix" -> "a.out"
-  | "Win32" | "Cygwin" -> "camlprog.exe"
-  | _ -> "camlprog"
+  if target_unix then
+    "a.out"
+  else if target_win32 || target_cygwin then
+    "camlprog.exe"
+  else
+    "camlprog"
 type configuration_value =
   | String of string
   | Int of int

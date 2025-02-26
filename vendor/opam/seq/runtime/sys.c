@@ -736,6 +736,24 @@ CAMLprim value caml_sys_const_backend_type(value unit)
 {
   return Val_int(1); /* Bytecode backed */
 }
+
+/* The native code linker doesn't synthesise calls to this primitive, instead
+   putting the required string statically in caml_standard_library_nat if any of
+   the compilation units use %standard_library_default. The primitive is omitted
+   completely in libasmrun as there are no other existing instances in the
+   native runtime where OCAML_STDLIB_DIR ends up being embedded. */
+#ifndef NATIVE_CODE
+/* If this remains unset then caml_runtime_standard_library_default is used */
+char_os *caml_standard_library_default = NULL;
+
+CAMLprim value caml_sys_const_standard_library_default(value unit)
+{
+  return caml_copy_string_of_os(
+    caml_standard_library_default ? caml_standard_library_default
+                                  : caml_runtime_standard_library_default);
+}
+#endif
+
 CAMLprim value caml_sys_get_config(value unit)
 {
   CAMLparam0 ();   /* unit is unused */
