@@ -2470,7 +2470,6 @@ AC_CHECK_FUNC([pwrite], [AC_DEFINE([HAS_PWRITE], [1])])
 
 ## -fdebug-prefix-map support by the C compiler
 AS_CASE([$ocaml_cc_vendor,$target],
-  [*,*-w64-mingw32*], [cc_has_debug_prefix_map=false],
   [*,*-pc-windows], [cc_has_debug_prefix_map=false],
   [xlc*,powerpc-ibm-aix*], [cc_has_debug_prefix_map=false],
   [sunc*,sparc-sun-*], [cc_has_debug_prefix_map=false],
