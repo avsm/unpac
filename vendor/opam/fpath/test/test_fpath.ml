@@ -10,9 +10,9 @@ let windows = Sys.os_type = "Win32"
 let eq = Test.eq (module Fpath)
 let v = Fpath.v
 
-let of_string () =
+let of_string =
   Test.test "Fpath.{v,of_string}" @@ fun () ->
-  let eq = Test.eq (Test.Eq.result ~ok:(module Fpath) ~error:Test.Eq.true') in
+  let eq = Test.(eq (T.result' ~ok:(module Fpath) ~error:T.true')) in
   let ok s = Ok (v s) in
   let error = Error (`Msg "any") in
   eq (Fpath.of_string "/\x00") error ~__POS__;
@@ -70,12 +70,12 @@ let of_string () =
   end;
   ()
 
-let dir_sep () =
+let dir_sep =
   Test.test "Fpath.dir_sep" @@ fun () ->
   Test.string Fpath.dir_sep (if windows then "\\" else "/") ~__POS__;
   ()
 
-let is_seg () =
+let is_seg =
   Test.test "Fpath.is_seg" @@ fun () ->
   Test.bool (Fpath.is_seg "abc") true ~__POS__;
   Test.bool (Fpath.is_seg "ab/c") false ~__POS__;
@@ -83,7 +83,7 @@ let is_seg () =
   if windows then Test.bool (Fpath.is_seg "ab\\c") false ~__POS__;
   ()
 
-let add_seg () =
+let add_seg =
   Test.test "Fpath.add_seg" @@ fun () ->
   Test.invalid_arg ~__POS__  (fun () -> Fpath.add_seg (v "a/b/c") "a\x00o");
   Test.invalid_arg ~__POS__  (fun () -> Fpath.add_seg (v "a/b/c") "a/o");
@@ -105,7 +105,7 @@ let add_seg () =
   eq (Fpath.add_seg (v "..") "") (v "../") ~__POS__;
   ()
 
-let append () =
+let append =
   Test.test "Fpath.append" @@ fun () ->
   eq (Fpath.append (v "/a/b/") (v "e/f")) (v "/a/b/e/f") ~__POS__;
   eq (Fpath.append (v "/a/b") (v "e/f")) (v "/a/b/e/f") ~__POS__;
@@ -126,7 +126,7 @@ let append () =
   end;
   ()
 
-let split_volume () =
+let split_volume =
   Test.test "Fpath.split_volume" @@ fun () ->
   let eq_split ?__POS__:pos p vol q =
     Test.block ?__POS__:pos @@ fun () ->
@@ -165,9 +165,9 @@ let split_volume () =
   end;
   ()
 
-let segs () =
+let segs =
   Test.test "Fpath.segs" @@ fun () ->
-  let eq = Test.eq (Test.Eq.(list string)) in
+  let eq = Test.(eq T.(list string)) in
   eq (Fpath.segs @@ v "/a/b/") [""; "a"; "b"; ""] ~__POS__;
   eq (Fpath.segs @@ v "/a/b") [""; "a"; "b"] ~__POS__;
   eq (Fpath.segs @@ v "a/b/") ["a"; "b"; ""] ~__POS__;
@@ -213,7 +213,7 @@ let segs () =
   end;
   ()
 
-let is_dir_path () =
+let is_dir_path =
   Test.test "Fpath.is_dir_path" @@ fun () ->
   Test.bool (Fpath.is_dir_path (v ".")) true ~__POS__;
   Test.bool (Fpath.is_dir_path (v "..")) true ~__POS__;
@@ -232,7 +232,7 @@ let is_dir_path () =
   end;
   ()
 
-let is_file_path () =
+let is_file_path =
   Test.test "Fpath.is_file_path" @@ fun () ->
   Test.bool (Fpath.is_file_path (v ".")) false ~__POS__;
   Test.bool (Fpath.is_file_path (v "..")) false ~__POS__;
@@ -251,7 +251,7 @@ let is_file_path () =
   end;
   ()
 
-let to_dir_path () =
+let to_dir_path =
   Test.test "Fpath.to_dir_path" @@ fun () ->
   eq (Fpath.to_dir_path @@ v ".") (v "./") ~__POS__;
   eq (Fpath.to_dir_path @@ v "..") (v "../") ~__POS__;
@@ -276,7 +276,7 @@ let to_dir_path () =
   end;
   ()
 
-let filename () =
+let filename =
   Test.test "Fpath.filename" @@ fun () ->
   Test.string (Fpath.filename @@ v ".") "" ~__POS__;
   Test.string (Fpath.filename @@ v "./") "" ~__POS__;
@@ -312,7 +312,7 @@ let filename () =
   end;
   ()
 
-let split_base () =
+let split_base =
   Test.test "Fpath.split_base" @@ fun () ->
   let eq_split ?__POS__:pos p (d, b) =
     Test.block ?__POS__:pos @@ fun () ->
@@ -361,7 +361,7 @@ let split_base () =
   end;
   ()
 
-let base () =
+let base =
   Test.test "Fpath.base" @@ fun () ->
   eq (Fpath.base @@ v ".") (v ".") ~__POS__;
   eq (Fpath.base @@ v "./") (v "./") ~__POS__;
@@ -404,7 +404,7 @@ let base () =
   end;
   ()
 
-let basename () =
+let basename =
   Test.test "Fpath.basename" @@ fun () ->
   Test.string (Fpath.basename @@ v ".") "" ~__POS__;
   Test.string (Fpath.basename @@ v "..") "" ~__POS__;
@@ -436,7 +436,7 @@ let basename () =
   end;
   ()
 
-let parent () =
+let parent =
   Test.test "Fpath.parent" @@ fun () ->
   eq (Fpath.parent @@ v ".") (v "./../") ~__POS__;
   eq (Fpath.parent @@ v "..") (v "../../") ~__POS__;
@@ -478,7 +478,7 @@ let parent () =
   end;
   ()
 
-let rem_empty_seg () =
+let rem_empty_seg =
   Test.test "Fpath.rem_empty_seg" @@ fun () ->
   eq (Fpath.rem_empty_seg @@ v ".") (v ".") ~__POS__;
   eq (Fpath.rem_empty_seg @@ v "..") (v "..") ~__POS__;
@@ -513,7 +513,7 @@ let rem_empty_seg () =
   end;
   ()
 
-let normalize () =
+let normalize =
   Test.test "Fpath.normalize" @@ fun () ->
   eq (Fpath.normalize @@ v ".") (v "./") ~__POS__;
   eq (Fpath.normalize @@ v "..") (v "../") ~__POS__;
@@ -578,7 +578,7 @@ let normalize () =
   end;
   ()
 
-let is_prefix () =
+let is_prefix =
   Test.test "Fpath.is_prefix" @@ fun () ->
   Test.bool (Fpath.is_prefix (v "/a/b") (v "/a/b")) true ~__POS__;
   Test.bool (Fpath.is_prefix (v "/a/b") (v "/a/bc")) false ~__POS__;
@@ -604,9 +604,9 @@ let is_prefix () =
   end;
   ()
 
-let find_prefix () =
+let find_prefix =
   Test.test "Fpath.find_prefix" @@ fun () ->
-  let eq = Test.eq Test.Eq.(option (module Fpath)) in
+  let eq = Test.(eq T.(option (module Fpath))) in
   let find_prefix ?__POS__:pos p0 p1 r =
     Test.block ?__POS__:pos @@ fun () ->
     eq (Fpath.find_prefix p0 p1) r ~__POS__;
@@ -657,9 +657,9 @@ let find_prefix () =
   end;
   ()
 
-let rem_prefix () =
+let rem_prefix =
   Test.test "Fpath.rem_prefix" @@ fun () ->
-  let eq = Test.eq Test.Eq.(option (module Fpath)) in
+  let eq = Test.(eq T.(option (module Fpath))) in
   eq (Fpath.rem_prefix (v "a/b/") (v "a/b")) None ~__POS__;
   eq (Fpath.rem_prefix (v "a/b/") (v "a/b/")) None ~__POS__;
   eq (Fpath.rem_prefix (v "a/b") (v "a/b")) None ~__POS__;
@@ -684,9 +684,9 @@ let rem_prefix () =
   end;
   ()
 
-let relativize () =
+let relativize =
   Test.test "Fpath.relativize" @@ fun () ->
-  let eq_opt = Test.eq Test.Eq.(option (module Fpath)) in
+  let eq_opt = Test.(eq (T.option (module Fpath))) in
   let relativize ?__POS__:pos root p result =
     Test.block ?__POS__:pos @@ fun () ->
     match Fpath.relativize ~root p with
@@ -767,7 +767,7 @@ let relativize () =
   end;
   ()
 
-let is_rooted () =
+let is_rooted =
   Test.test "Fpath.is_rooted" @@ fun () ->
   Test.bool (Fpath.is_rooted ~root:(v "a/b") (v "a/b")) false ~__POS__;
   Test.bool (Fpath.is_rooted ~root:(v "a/b") (v "a/b/")) true ~__POS__;
@@ -787,7 +787,7 @@ let is_rooted () =
   Test.bool (Fpath.is_rooted ~root:(v "/") (v "/..")) true ~__POS__;
   ()
 
-let is_abs_rel () =
+let is_abs_rel =
   Test.test "Fpath.is_abs_rel" @@ fun () ->
   let is_abs ?__POS__:pos  bool p =
     Test.block ?__POS__:pos @@ fun () ->
@@ -822,7 +822,7 @@ let is_abs_rel () =
   end;
   ()
 
-let is_root () =
+let is_root =
   Test.test "Fpath.is_root" @@ fun () ->
   Test.bool (Fpath.is_root (v "/")) true ~__POS__;
   Test.bool (Fpath.is_root (v "/..")) false ~__POS__;
@@ -845,7 +845,7 @@ let is_root () =
   end;
   ()
 
-let is_current_dir () =
+let is_current_dir =
   Test.test "Fpath.is_current_dir" @@ fun () ->
   Test.bool (Fpath.is_current_dir (v ".")) true ~__POS__;
   Test.bool (Fpath.is_current_dir ~prefix:true (v ".")) true ~__POS__;
@@ -871,7 +871,7 @@ let is_current_dir () =
   end;
   ()
 
-let is_parent_dir () =
+let is_parent_dir =
   Test.test "Fpath.is_parent_dir" @@ fun () ->
   Test.bool (Fpath.is_parent_dir (v ".")) false ~__POS__;
   Test.bool (Fpath.is_parent_dir (v "./")) false ~__POS__;
@@ -895,7 +895,7 @@ let is_parent_dir () =
   end;
   ()
 
-let is_dotfile () =
+let is_dotfile =
   Test.test "Fpath.is_dotfile" @@ fun () ->
   Test.bool (Fpath.is_dotfile (v ".")) false ~__POS__;
   Test.bool (Fpath.is_dotfile (v "..")) false ~__POS__;
@@ -926,7 +926,7 @@ let is_dotfile () =
   end;
   ()
 
-let get_ext () =
+let get_ext =
   Test.test "Fpath.get_ext" @@ fun () ->
   let eq_ext ?__POS__:pos ?multi p e =
     Test.block ?__POS__:pos @@ fun () ->
@@ -995,7 +995,7 @@ let get_ext () =
   eq_ext ~multi:true "./.a.." ".." ~__POS__;
   ()
 
-let has_ext () =
+let has_ext =
   Test.test "Fpath.has_ext" @@ fun () ->
   let has_ext ?__POS__:pos e p bool =
     Test.block ?__POS__:pos @@ fun () ->
@@ -1052,7 +1052,7 @@ let has_ext () =
   has_ext "..a" ".." false ~__POS__;
   ()
 
-let exists_ext () =
+let exists_ext =
   Test.test "Fpath.exists_ext" @@ fun () ->
   let exists_ext ?__POS__:pos ?multi p bool =
     Test.block ?__POS__:pos @@ fun () ->
@@ -1080,7 +1080,7 @@ let exists_ext () =
   exists_ext "a/." false ~__POS__;
   ()
 
-let add_ext () =
+let add_ext =
   Test.test "Fpath.add_ext" @@ fun () ->
   Test.invalid_arg (fun () -> Fpath.add_ext "/" (v "a/b/c"));
   let eq_add_ext ?__POS__:pos ext p p' =
@@ -1106,7 +1106,7 @@ let add_ext () =
   eq_add_ext ".a" "/" "/" ~__POS__;
   ()
 
-let rem_ext () =
+let rem_ext =
   Test.test "Fpath.rem_ext" @@ fun () ->
   let eq_rem_ext ?__POS__:pos ?multi p p' =
     Test.block ?__POS__:pos @@ fun () ->
@@ -1137,7 +1137,7 @@ let rem_ext () =
   eq_rem_ext ~multi:true "/.tar" "/.tar" ~__POS__;
   ()
 
-let set_ext () =
+let set_ext =
   Test.test "Fpath.set_ext" @@ fun () ->
   Test.invalid_arg ~__POS__ (fun () -> (Fpath.set_ext "/") (v "a/b/c"));
   let eq_set_ext ?__POS__:pos ?multi ext p p' =
@@ -1158,7 +1158,7 @@ let set_ext () =
   eq_set_ext ~multi:true "" "f.tar.gz" "f" ~__POS__;
   ()
 
-let split_ext () =
+let split_ext =
   Test.test "Fpath.split_ext" @@ fun () ->
   let eq_split ?__POS__:pos ?multi p q ext =
     Test.block ?__POS__:pos @@ fun () ->
@@ -1184,42 +1184,5 @@ let split_ext () =
   eq_split ~multi:true "/.tar.gz/.." "/.tar.gz/.." "" ~__POS__;
   ()
 
-let main () =
-  Test.main @@ fun () ->
-  of_string ();
-  dir_sep ();
-  is_seg ();
-  add_seg ();
-  append ();
-  split_volume ();
-  segs ();
-  is_dir_path ();
-  is_file_path ();
-  to_dir_path ();
-  filename ();
-  split_base ();
-  base ();
-  basename ();
-  parent ();
-  rem_empty_seg ();
-  normalize ();
-  is_prefix ();
-  find_prefix ();
-  rem_prefix ();
-  relativize ();
-  is_rooted ();
-  is_abs_rel ();
-  is_root ();
-  is_current_dir ();
-  is_parent_dir ();
-  is_dotfile ();
-  get_ext ();
-  has_ext ();
-  exists_ext ();
-  add_ext ();
-  rem_ext ();
-  set_ext ();
-  split_ext ();
-  ()
-
+let main () = Test.main @@ fun () -> Test.autorun ()
 let () = if !Sys.interactive then () else exit (main ())
