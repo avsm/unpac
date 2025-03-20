@@ -82,6 +82,11 @@ Working version
   normalised on both Windows and Unix.
   (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
 
+- #14244: Executables linked with `ocamlc -custom` now always attempt to load
+  bytecode from the executable itself, rather than first trying `argv[0]`.
+  (David Allsopp, review by Jonah Beckford, Antonin Décimo, Damien Doligez and
+   Samuel Hym)
+
 - #12269, #12410, #13063: Fix unsafety, deadlocks, and/or leaks should
   rare errors happen during domain creation and thread
   creation/registration.

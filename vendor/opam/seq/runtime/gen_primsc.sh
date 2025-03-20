@@ -31,6 +31,7 @@ cat <<'EOF'
 #define CAML_INTERNALS
 #include "caml/mlvalues.h"
 #include "caml/prims.h"
+#include "caml/startup.h"
 
 EOF
 
@@ -61,3 +62,9 @@ echo
 echo 'const char * const caml_names_of_builtin_cprim[] = {'
 sed -e 's/.*/  "&",/' "$primitives"
 echo '  0 };'
+
+# ocamlrun is able to use any of the mechanisms to load the bytecode
+cat <<'EOF'
+
+const enum caml_byte_program_mode caml_byte_program_mode = STANDARD;
+EOF

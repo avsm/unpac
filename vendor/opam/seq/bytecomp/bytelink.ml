@@ -618,6 +618,8 @@ extern "C" {
 #include <caml/sys.h>
 #include <caml/misc.h>
 
+const enum caml_byte_program_mode caml_byte_program_mode = EMBEDDED;
+
 static int caml_code[] = {
 |};
        Symtable.init();
@@ -662,7 +664,6 @@ static char caml_sections[] = {
          output_string outchan {|
 int main_os(int argc, char_os **argv)
 {
-  caml_byte_program_mode = COMPLETE_EXE;
   caml_startup_code(caml_code, sizeof(caml_code),
                     caml_data, sizeof(caml_data),
                     caml_sections, sizeof(caml_sections),
@@ -804,8 +805,13 @@ let link objfiles output_name =
 extern "C" {
 #endif
 
+#define CAML_INTERNALS
 #define CAML_INTERNALS_NO_PRIM_DECLARATIONS
+
 #include <caml/mlvalues.h>
+#include <caml/startup.h>
+
+const enum caml_byte_program_mode caml_byte_program_mode = APPENDED;
 
 |};
          Symtable.output_primitive_table poc;
