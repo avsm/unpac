@@ -97,7 +97,8 @@ let print_info cmt =
     match cmt.cmt_interface_digest with
       None -> ()
     | Some digest ->
-      Printf.fprintf oc "interface digest: %s\n" (Digest.BLAKE128.to_hex digest);
+      Printf.fprintf oc "interface digest: %s\n"
+        (Digest.BLAKE128.to_hex digest);
   end;
   List.iter (fun (name, crco) ->
     let crc =

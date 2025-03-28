@@ -610,7 +610,11 @@ val reference_symbols: string list -> phrase
 
 (** Generate the caml_globals_map structure, as a marshalled string constant *)
 val globals_map:
-  (string * Digest.BLAKE128.t option * Digest.BLAKE128.t option * string list) list -> phrase
+  (string *
+   Digest.BLAKE128.t option *
+   Digest.BLAKE128.t option *
+   string list) list
+  -> phrase
 
 (** Generate the caml_frametable table, referencing the frametables
     from the given compilation units *)

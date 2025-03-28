@@ -61,7 +61,10 @@ module Bytecode = struct
   end
 
   type handle =
-    Stdlib.in_channel * filename * Digest.BLAKE128.t * Symtable.global_map option
+    Stdlib.in_channel *
+    filename *
+    Digest.BLAKE128.t *
+    Symtable.global_map option
 
   let default_crcs = ref []
   let default_global_map = ref Symtable.empty_global_map

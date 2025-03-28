@@ -47,7 +47,8 @@ module type S = sig
     -> f:('a
       -> compunit:string
       -> interface:Digest.BLAKE128.t option
-      -> implementation:(Digest.BLAKE128.t option * Dynlink_types.implem_state) option
+      -> implementation:
+           (Digest.BLAKE128.t option * Dynlink_types.implem_state) option
       -> defined_symbols:string list
       -> 'a)
     -> 'a
