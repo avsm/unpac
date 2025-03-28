@@ -55,10 +55,10 @@ type cmt_infos = {
   cmt_sourcefile : string option;
   cmt_builddir : string;
   cmt_loadpath : Load_path.paths;
-  cmt_source_digest : Digest.t option;
+  cmt_source_digest : Digest.BLAKE128.t option;
   cmt_initial_env : Env.t;
-  cmt_imports : (string * Digest.t option) list;
-  cmt_interface_digest : Digest.t option;
+  cmt_imports : (string * Digest.BLAKE128.t option) list;
+  cmt_interface_digest : Digest.BLAKE128.t option;
   cmt_use_summaries : bool;
   cmt_uid_to_decl : item_declaration Shape.Uid.Tbl.t;
   cmt_impl_shape : Shape.t option; (* None for mli *)
@@ -477,7 +477,7 @@ let save_cmt target binary_annots initial_env cmi shape =
          in
          let cmt_annots = clear_env binary_annots in
          let cmt_uid_to_decl = index_declarations cmt_annots in
-         let source_digest = Option.map Digest.file sourcefile in
+         let source_digest = Option.map Digest.BLAKE128.file sourcefile in
          let cmt_args =
            let cmt_args = Array.copy Sys.argv in
            cmt_args.(0) <- Location.rewrite_absolute_path Sys.argv.(0);

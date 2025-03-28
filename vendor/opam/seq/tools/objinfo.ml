@@ -38,7 +38,7 @@ module Magic_number = Misc.Magic_number
 let dummy_crc = String.make 32 '-'
 let null_crc = String.make 32 '0'
 
-let string_of_crc crc = if !no_crc then null_crc else Digest.to_hex crc
+let string_of_crc crc = if !no_crc then null_crc else Digest.BLAKE128.to_hex crc
 
 let print_name_crc (name, crco) =
   let crc =
@@ -296,7 +296,7 @@ let dump_byte ic =
        try
          if len > 0 then match section with
            | CRCS ->
-               let imported_units : (string * Digest.t option) list =
+               let imported_units : (string * Digest.BLAKE128.t option) list =
                  Bytesections.read_section_struct toc ic section in
                p_section "Imported units" imported_units
            | DLLS ->
@@ -377,7 +377,7 @@ let dump_obj_by_kind filename ic obj_kind =
        end
     | Cmx _config ->
        let ui = (input_value ic : unit_infos) in
-       let crc = Digest.input ic in
+       let crc = Digest.BLAKE128.input ic in
        close_in ic;
        print_cmx_infos (ui, crc)
     | Cmxa _config ->

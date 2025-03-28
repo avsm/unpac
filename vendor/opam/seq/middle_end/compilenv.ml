@@ -167,7 +167,7 @@ let read_unit_info filename =
       raise(Error(Not_a_unit_info filename))
     end;
     let ui = (input_value ic : unit_infos) in
-    let crc = Digest.input ic in
+    let crc = Digest.BLAKE128.input ic in
     close_in ic;
     (ui, crc)
   with End_of_file | Failure _ ->
@@ -358,8 +358,8 @@ let write_unit_info info filename =
   output_string oc cmx_magic_number;
   output_value oc info;
   flush oc;
-  let crc = Digest.file filename in
-  Digest.output oc crc;
+  let crc = Digest.BLAKE128.file filename in
+  Digest.BLAKE128.output oc crc;
   close_out oc
 
 let save_unit_info filename =
