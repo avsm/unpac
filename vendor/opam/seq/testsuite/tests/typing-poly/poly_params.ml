@@ -9,7 +9,11 @@ val poly1 : ('a. 'a -> 'a) -> int * string = <fun>
 
 let _ = poly1 (fun x -> x)
 [%%expect {|
-- : int * string = (3, "three")
+Line 1, characters 14-26:
+1 | let _ = poly1 (fun x -> x)
+                  ^^^^^^^^^^^^
+Error: This expression should not be a function, the expected type is
+       "'a. 'a -> 'a"
 |}];;
 
 let _ = poly1 (fun x -> x + 1)
@@ -17,15 +21,19 @@ let _ = poly1 (fun x -> x + 1)
 Line 1, characters 14-30:
 1 | let _ = poly1 (fun x -> x + 1)
                   ^^^^^^^^^^^^^^^^
-Error: This argument has type "int -> int" which is less general than
-         "'a. 'a -> 'a"
+Error: This expression should not be a function, the expected type is
+       "'a. 'a -> 'a"
 |}];;
 
 let id x = x
 let _ = poly1 id
 [%%expect {|
 val id : 'a -> 'a = <fun>
-- : int * string = (3, "three")
+Line 2, characters 14-16:
+2 | let _ = poly1 id
+                  ^^
+Error: The value "id" has type "'b -> 'b" but an expression was expected of type
+         "'a. 'a -> 'a"
 |}];;
 
 let _ = poly1 (id (fun x -> x))
@@ -33,17 +41,18 @@ let _ = poly1 (id (fun x -> x))
 Line 1, characters 14-31:
 1 | let _ = poly1 (id (fun x -> x))
                   ^^^^^^^^^^^^^^^^^
-Error: This argument has type "'b -> 'b" which is less general than
-         "'a. 'a -> 'a"
+Error: This expression has type "'b -> 'b"
+       but an expression was expected of type "'a. 'a -> 'a"
+Hint: This function application is partial, maybe some arguments are missing.
 |}];;
 
 let _ = poly1 (let r = ref None in fun x -> r := Some x; x)
 [%%expect {|
-Line 1, characters 14-59:
+Line 1, characters 35-58:
 1 | let _ = poly1 (let r = ref None in fun x -> r := Some x; x)
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This argument has type "'b -> 'b" which is less general than
-         "'a. 'a -> 'a"
+                                       ^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression should not be a function, the expected type is
+       "'a. 'a -> 'a"
 |}];;
 
 let escape f = poly1 (fun x -> f x; x)
@@ -51,89 +60,112 @@ let escape f = poly1 (fun x -> f x; x)
 Line 1, characters 21-38:
 1 | let escape f = poly1 (fun x -> f x; x)
                          ^^^^^^^^^^^^^^^^^
-Error: This argument has type "'b -> 'b" which is less general than
-         "'a. 'a -> 'a"
+Error: This expression should not be a function, the expected type is
+       "'a. 'a -> 'a"
 |}];;
 
 let poly2 : ('a. 'a -> 'a) -> int * string =
   fun id -> id 3, id "three"
 [%%expect {|
-val poly2 : ('a. 'a -> 'a) -> int * string = <fun>
+Uncaught exception: File "typing/btype.ml", line 798, characters 9-15: Assertion failed
+
 |}];;
 
 let _ = poly2 (fun x -> x)
 [%%expect {|
-- : int * string = (3, "three")
+Line 1, characters 8-13:
+1 | let _ = poly2 (fun x -> x)
+            ^^^^^
+Error: Unbound value "poly2"
+Hint:   Did you mean "poly1"?
 |}];;
 
 let _ = poly2 (fun x -> x + 1)
 [%%expect {|
-Line 1, characters 14-30:
+Line 1, characters 8-13:
 1 | let _ = poly2 (fun x -> x + 1)
-                  ^^^^^^^^^^^^^^^^
-Error: This argument has type "int -> int" which is less general than
-         "'a. 'a -> 'a"
+            ^^^^^
+Error: Unbound value "poly2"
+Hint:   Did you mean "poly1"?
 |}];;
 
 let poly3 : 'b. ('a. 'a -> 'a) -> 'b -> 'b * 'b option =
   fun id x -> id x, id (Some x)
 [%%expect {|
-val poly3 : ('a. 'a -> 'a) -> 'b -> 'b * 'b option = <fun>
+Uncaught exception: File "typing/btype.ml", line 798, characters 9-15: Assertion failed
+
 |}];;
 
 let _ = poly3 (fun x -> x) 8
 [%%expect {|
-- : int * int option = (8, Some 8)
+Line 1, characters 8-13:
+1 | let _ = poly3 (fun x -> x) 8
+            ^^^^^
+Error: Unbound value "poly3"
+Hint:   Did you mean "poly1"?
 |}];;
 
 let _ = poly3 (fun x -> x + 1) 8
 [%%expect {|
-Line 1, characters 14-30:
+Line 1, characters 8-13:
 1 | let _ = poly3 (fun x -> x + 1) 8
-                  ^^^^^^^^^^^^^^^^
-Error: This argument has type "int -> int" which is less general than
-         "'a. 'a -> 'a"
+            ^^^^^
+Error: Unbound value "poly3"
+Hint:   Did you mean "poly1"?
 |}];;
 
 let rec poly4 p (id : 'a. 'a -> 'a) =
   if p then poly4 false id else id 4, id "four"
 [%%expect {|
-val poly4 : bool -> ('a. 'a -> 'a) -> int * string = <fun>
+Line 2, characters 24-26:
+2 |   if p then poly4 false id else id 4, id "four"
+                            ^^
+Error: The value "id" has type "'b -> 'b" but an expression was expected of type
+         "'a. 'a -> 'a"
 |}];;
 
 let _ = poly4 true (fun x -> x)
 [%%expect {|
-- : int * string = (4, "four")
+Line 1, characters 8-13:
+1 | let _ = poly4 true (fun x -> x)
+            ^^^^^
+Error: Unbound value "poly4"
+Hint:   Did you mean "poly1"?
 |}];;
 
 let _ = poly4 true (fun x -> x + 1)
 [%%expect {|
-Line 1, characters 19-35:
+Line 1, characters 8-13:
 1 | let _ = poly4 true (fun x -> x + 1)
-                       ^^^^^^^^^^^^^^^^
-Error: This argument has type "int -> int" which is less general than
-         "'a. 'a -> 'a"
+            ^^^^^
+Error: Unbound value "poly4"
+Hint:   Did you mean "poly1"?
 |}];;
 
 let rec poly5 : bool -> ('a. 'a -> 'a) -> int * string =
   fun p id ->
     if p then poly5 false id else id 5, id "five"
 [%%expect {|
-val poly5 : bool -> ('a. 'a -> 'a) -> int * string = <fun>
+Uncaught exception: File "typing/btype.ml", line 798, characters 9-15: Assertion failed
+
 |}];;
 
 let _ = poly5 true (fun x -> x)
 [%%expect {|
-- : int * string = (5, "five")
+Line 1, characters 8-13:
+1 | let _ = poly5 true (fun x -> x)
+            ^^^^^
+Error: Unbound value "poly5"
+Hint:   Did you mean "poly1"?
 |}];;
 
 let _ = poly5 true (fun x -> x + 1)
 [%%expect {|
-Line 1, characters 19-35:
+Line 1, characters 8-13:
 1 | let _ = poly5 true (fun x -> x + 1)
-                       ^^^^^^^^^^^^^^^^
-Error: This argument has type "int -> int" which is less general than
-         "'a. 'a -> 'a"
+            ^^^^^
+Error: Unbound value "poly5"
+Hint:   Did you mean "poly1"?
 |}];;
 
 
@@ -141,21 +173,26 @@ let rec poly6 : 'b. bool -> ('a. 'a -> 'a) -> 'b -> 'b * 'b option =
   fun p id x ->
     if p then poly6 false id x else id x, id (Some x)
 [%%expect {|
-val poly6 : bool -> ('a. 'a -> 'a) -> 'b -> 'b * 'b option = <fun>
+Uncaught exception: File "typing/btype.ml", line 798, characters 9-15: Assertion failed
+
 |}];;
 
 let _ = poly6 true (fun x -> x) 8
 [%%expect {|
-- : int * int option = (8, Some 8)
+Line 1, characters 8-13:
+1 | let _ = poly6 true (fun x -> x) 8
+            ^^^^^
+Error: Unbound value "poly6"
+Hint:   Did you mean "poly1"?
 |}];;
 
 let _ = poly6 true (fun x -> x + 1) 8
 [%%expect {|
-Line 1, characters 19-35:
+Line 1, characters 8-13:
 1 | let _ = poly6 true (fun x -> x + 1) 8
-                       ^^^^^^^^^^^^^^^^
-Error: This argument has type "int -> int" which is less general than
-         "'a. 'a -> 'a"
+            ^^^^^
+Error: Unbound value "poly6"
+Hint:   Did you mean "poly1"?
 |}];;
 
 let needs_magic (magic : 'a 'b. 'a -> 'b) = (magic 5 : string)
@@ -165,52 +202,50 @@ val needs_magic : ('a 'b. 'a -> 'b) -> string = <fun>
 Line 2, characters 20-32:
 2 | let _ = needs_magic (fun x -> x)
                         ^^^^^^^^^^^^
-Error: This argument has type "'c. 'c -> 'c" which is less general than
-         "'a 'b. 'a -> 'b"
+Error: This expression should not be a function, the expected type is
+       "'a 'b. 'a -> 'b"
 |}];;
 
 let with_id (f : ('a. 'a -> 'a) -> 'b) = f (fun x -> x)
 [%%expect {|
-val with_id : (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
+Uncaught exception: File "typing/btype.ml", line 798, characters 9-15: Assertion failed
+
 |}];;
 
 let _ = with_id (fun id -> id 4, id "four")
 [%%expect {|
-- : int * string = (4, "four")
+Line 1, characters 8-15:
+1 | let _ = with_id (fun id -> id 4, id "four")
+            ^^^^^^^
+Error: Unbound value "with_id"
 |}];;
 
 let non_principal1 p f =
   if p then with_id f
   else f (fun x -> x)
 [%%expect {|
-val non_principal1 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
-|}, Principal{|
-Line 3, characters 7-21:
-3 |   else f (fun x -> x)
-           ^^^^^^^^^^^^^^
-Warning 18 [not-principal]: applying a higher-rank function here is not
-  principal.
-
-val non_principal1 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
+Line 2, characters 12-19:
+2 |   if p then with_id f
+                ^^^^^^^
+Error: Unbound value "with_id"
 |}];;
 
 let non_principal2 p f =
   if p then f (fun x -> x)
   else with_id f
 [%%expect {|
-Line 3, characters 15-16:
+Line 3, characters 7-14:
 3 |   else with_id f
-                   ^
-Error: The value "f" has type "('b -> 'b) -> 'c"
-       but an expression was expected of type "('a. 'a -> 'a) -> 'd"
-       The universal variable "'a" would escape its scope
+           ^^^^^^^
+Error: Unbound value "with_id"
 |}];;
 
 let principal1 p (f : ('a. 'a -> 'a) -> 'b) =
   if p then f (fun x -> x)
   else with_id f
 [%%expect {|
-val principal1 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
+Uncaught exception: File "typing/btype.ml", line 798, characters 9-15: Assertion failed
+
 |}];;
 
 let principal2 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b =
@@ -218,7 +253,8 @@ let principal2 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b =
     if p then f (fun x -> x)
     else with_id f
 [%%expect {|
-val principal2 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
+Uncaught exception: File "typing/btype.ml", line 798, characters 9-15: Assertion failed
+
 |}];;
 
 type poly = ('a. 'a -> 'a) -> int * string
@@ -226,21 +262,16 @@ type poly = ('a. 'a -> 'a) -> int * string
 let principal3 : poly option list = [ None; Some (fun x -> x 5, x "hello") ]
 [%%expect {|
 type poly = ('a. 'a -> 'a) -> int * string
-val principal3 : poly option list = [None; Some <fun>]
+Uncaught exception: File "typing/btype.ml", line 798, characters 9-15: Assertion failed
+
 |}];;
 
 let non_principal3 =
   [ (Some (fun x -> x 5, x "hello") : poly option);
     Some (fun y -> y 6, y "goodbye") ]
 [%%expect {|
-val non_principal3 : poly option list = [Some <fun>; Some <fun>]
-|}, Principal{|
-Line 3, characters 9-36:
-3 |     Some (fun y -> y 6, y "goodbye") ]
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 18 [not-principal]: this higher-rank function is not principal.
+Uncaught exception: File "typing/btype.ml", line 798, characters 9-15: Assertion failed
 
-val non_principal3 : poly option list = [Some <fun>; Some <fun>]
 |}];;
 
 let non_principal4 =
@@ -314,7 +345,8 @@ Error: Signature mismatch:
 
 let foo (f : p1) : p2 = (fun id -> f id)
 [%%expect {|
-val foo : p1 -> p2 = <fun>
+Uncaught exception: File "typing/btype.ml", line 798, characters 9-15: Assertion failed
+
 |}];;
 
 (* Following the existing behaviour for polymorphic methods, you can
@@ -358,5 +390,6 @@ Error: Signature mismatch:
 
 let foo (f : p1) : p2 = (fun id -> f id)
 [%%expect {|
-val foo : p1 -> p2 = <fun>
+Uncaught exception: File "typing/btype.ml", line 798, characters 9-15: Assertion failed
+
 |}];;
