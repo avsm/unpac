@@ -208,44 +208,47 @@ Error: This expression should not be a function, the expected type is
 
 let with_id (f : ('a. 'a -> 'a) -> 'b) = f (fun x -> x)
 [%%expect {|
-Uncaught exception: File "typing/btype.ml", line 798, characters 9-15: Assertion failed
-
+val with_id : (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
 |}];;
 
 let _ = with_id (fun id -> id 4, id "four")
 [%%expect {|
-Line 1, characters 8-15:
-1 | let _ = with_id (fun id -> id 4, id "four")
-            ^^^^^^^
-Error: Unbound value "with_id"
+Uncaught exception: File "typing/btype.ml", line 798, characters 9-15: Assertion failed
+
 |}];;
 
 let non_principal1 p f =
   if p then with_id f
   else f (fun x -> x)
 [%%expect {|
-Line 2, characters 12-19:
-2 |   if p then with_id f
-                ^^^^^^^
-Error: Unbound value "with_id"
+val non_principal1 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
+|}, Principal{|
+Line 3, characters 7-21:
+3 |   else f (fun x -> x)
+           ^^^^^^^^^^^^^^
+Warning 18 [not-principal]: applying a higher-rank function here is not
+  principal.
+
+val non_principal1 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
 |}];;
 
 let non_principal2 p f =
   if p then f (fun x -> x)
   else with_id f
 [%%expect {|
-Line 3, characters 7-14:
+Line 3, characters 15-16:
 3 |   else with_id f
-           ^^^^^^^
-Error: Unbound value "with_id"
+                   ^
+Error: The value "f" has type "('b -> 'b) -> 'c"
+       but an expression was expected of type "('a. 'a -> 'a) -> 'd"
+       The universal variable "'a" would escape its scope
 |}];;
 
 let principal1 p (f : ('a. 'a -> 'a) -> 'b) =
   if p then f (fun x -> x)
   else with_id f
 [%%expect {|
-Uncaught exception: File "typing/btype.ml", line 798, characters 9-15: Assertion failed
-
+val principal1 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
 |}];;
 
 let principal2 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b =
@@ -253,8 +256,7 @@ let principal2 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b =
     if p then f (fun x -> x)
     else with_id f
 [%%expect {|
-Uncaught exception: File "typing/btype.ml", line 798, characters 9-15: Assertion failed
-
+val principal2 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
 |}];;
 
 type poly = ('a. 'a -> 'a) -> int * string
