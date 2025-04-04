@@ -39,7 +39,7 @@ let linker_propagates_debug_information =
 
 let c_compiler_always_embeds_build_path =
   (* .obj files always contain the build path, regardless of flags *)
-  is_msvc
+  is_msvc && not is_clang
 
 let asmrun_assembled_with_cc =
   (* The MSVC port directly assembles amd64nt.asm; all other systems use the C
