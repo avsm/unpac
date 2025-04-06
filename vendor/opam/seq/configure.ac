@@ -217,6 +217,7 @@ AC_SUBST([unix_library])
 AC_SUBST([unix_directory])
 AC_SUBST([cc_has_debug_prefix_map])
 AC_SUBST([as_has_debug_prefix_map])
+AC_SUBST([as_is_cc])
 AC_SUBST([with_debugger]) # TODO: rename this variable
 AC_SUBST([build_ocamldebug])
 AC_SUBST([build_ocamltex])
@@ -1853,25 +1854,32 @@ AS_IF([test -n "$target_alias"],
 # to avoiding forking a C compiler process for each compilation by ocamlopt.
 # Both AS and ASPP can be overridden by the user.
 
-default_as="$CC -c"
-default_aspp="$CC -c"
+as_is_cc=true
+default_as=''
 
 AS_CASE([$as_target,$ocaml_cc_vendor],
   [*-*-linux*,gcc-*],
     [AS_CASE([$as_cpu],
       [x86_64|arm*|aarch64*|i[[3-6]]86|riscv*],
-        [default_as="${toolpref}as"])],
+        [default_as="${toolpref}as"
+        as_is_cc=false])],
   [*-*-cygwin,gcc-*],
-    [default_as="${toolpref}as"],
+    [default_as="${toolpref}as"
+    as_is_cc=false],
   [i686-pc-windows,*],
     [default_as="ml -nologo -coff -Cp -c -Fo"
-    default_aspp="$default_as"],
+    default_aspp="$default_as"
+    as_is_cc=false],
   [x86_64-pc-windows,*],
     [default_as="ml64 -nologo -Cp -c -Fo"
-    default_aspp="$default_as"],
+    default_aspp="$default_as"
+    as_is_cc=false],
   [*-*-darwin*,clang-*],
-    [default_as="$default_as -Wno-trigraphs"
+    [default_as="$CC -c -Wno-trigraphs"
     default_aspp="$default_as"])
+
+AS_IF([test -z "$default_as"],[default_as="$CC -c"])
+AS_IF([test -z "$default_aspp"],[default_aspp="$CC -c"])
 
 AS_IF([test "$with_pic"],
   [fpic=true
