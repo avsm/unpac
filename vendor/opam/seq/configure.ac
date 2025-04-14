@@ -394,6 +394,7 @@ AS_IF([test -n "$csc"],
 AC_ARG_VAR([AS], [which assembler to use])
 AC_ARG_VAR([ASPP], [which assembler (with preprocessor) to use])
 AC_ARG_VAR([PARTIALLD], [how to build partial (relocatable) object files])
+AC_ARG_VAR([RC], [which resource compiler to use])
 
 AC_ARG_VAR([FLEXLINKFLAGS],
   [Supplementary flags passed to flexlink (Windows targets)])
@@ -1108,7 +1109,11 @@ AS_IF([test x"$supports_shared_libraries" != 'xfalse'], [
         [AC_MSG_RESULT([no])],
         [AC_MSG_RESULT([$flexdll_source_dir$flexmsg])
         bootstrapping_flexdll=true
-        flexdll_dir=\"+flexdll\"])],
+        flexdll_dir=\"+flexdll\"
+        AS_CASE([$target], [*-pc-windows], [AC_CHECK_PROGS(RC, [rc])])
+        AS_IF([$cross_compiler],
+          [AC_CHECK_TARGET_TOOLS(RC, [windres])],
+          [AC_CHECK_TOOLS(RC, [windres])])])],
       [AS_IF([test x"$with_flexdll" != 'x'],
         [AC_MSG_RESULT([requested but not supported])
         AC_MSG_ERROR([exiting])])])])

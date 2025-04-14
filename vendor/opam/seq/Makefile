@@ -634,6 +634,9 @@ FLEXLINK_BUILD_ENV = \
   MSVCC_ROOT= \
   MSVC_DETECT=0 OCAML_CONFIG_FILE=../Makefile.config \
   CHAINS=$(FLEXDLL_CHAIN) ROOTDIR=..
+ifneq ($(RC),)
+FLEXLINK_BUILD_ENV += RC=$(RC)
+endif
 FLEXDLL_SOURCES = \
   $(addprefix $(FLEXDLL_SOURCE_DIR)/, flexdll.c flexdll_initer.c flexdll.h) \
   $(wildcard $(FLEXDLL_SOURCE_DIR)/*.ml*)

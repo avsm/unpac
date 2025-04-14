@@ -114,6 +114,9 @@ DIFF=@DIFF@
 # Which flags to pass to the diff tool
 DIFF_FLAGS=@DIFF_FLAGS@
 
+# The resource compiler (Windows targets)
+RC=@RC@
+
 # The rlwrap command (for the *runtop targets)
 RLWRAP=@rlwrap@
 
