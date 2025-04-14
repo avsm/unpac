@@ -782,6 +782,7 @@ COMPILER_NATIVE_CPPFLAGS
 COMPILER_NATIVE_CFLAGS
 COMPILER_BYTECODE_CPPFLAGS
 COMPILER_BYTECODE_CFLAGS
+FLEXLINKFLAGS
 PARTIALLD
 csc
 target_os
@@ -1059,6 +1060,7 @@ target_alias
 AS
 ASPP
 PARTIALLD
+FLEXLINKFLAGS
 COMPILER_BYTECODE_CFLAGS
 COMPILER_BYTECODE_CPPFLAGS
 COMPILER_NATIVE_CFLAGS
@@ -1776,6 +1778,8 @@ Some influential environment variables:
   AS          which assembler to use
   ASPP        which assembler (with preprocessor) to use
   PARTIALLD   how to build partial (relocatable) object files
+  FLEXLINKFLAGS
+              Supplementary flags passed to flexlink (Windows targets)
   COMPILER_BYTECODE_CFLAGS
               CFLAGS for compiling C files to be linked with bytecode
   COMPILER_BYTECODE_CPPFLAGS
@@ -3924,6 +3928,8 @@ esac
 fi
 
 # Environment variables that are taken into account
+
+
 
 
 
@@ -15434,6 +15440,12 @@ case $target in #(
   *) :
     flexdll_chain='' ;;
 esac
+if test -n "$FLEXLINKFLAGS"
+then :
+
+  flexlink_flags="${flexlink_flags:+$flexlink_flags }$FLEXLINKFLAGS"
+
+fi
 
 if test x"$supports_shared_libraries" != 'xfalse'
 then :

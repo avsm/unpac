@@ -395,6 +395,9 @@ AC_ARG_VAR([AS], [which assembler to use])
 AC_ARG_VAR([ASPP], [which assembler (with preprocessor) to use])
 AC_ARG_VAR([PARTIALLD], [how to build partial (relocatable) object files])
 
+AC_ARG_VAR([FLEXLINKFLAGS],
+  [Supplementary flags passed to flexlink (Windows targets)])
+
 AC_ARG_VAR([COMPILER_BYTECODE_CFLAGS],
   [CFLAGS for compiling C files to be linked with bytecode])
 AC_ARG_VAR([COMPILER_BYTECODE_CPPFLAGS],
@@ -1068,6 +1071,9 @@ AS_CASE([$target],
     [flexdll_chain='msvc64'
     flexlink_flags='-merge-manifest -stack 33554432'],
   [flexdll_chain=''])
+AS_IF([test -n "$FLEXLINKFLAGS"], [
+  flexlink_flags="${flexlink_flags:+$flexlink_flags }$FLEXLINKFLAGS"
+])
 
 AS_IF([test x"$supports_shared_libraries" != 'xfalse'], [
   AC_MSG_CHECKING([for flexdll sources])
