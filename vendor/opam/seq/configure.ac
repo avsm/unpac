@@ -395,6 +395,7 @@ AC_ARG_VAR([AS], [which assembler to use])
 AC_ARG_VAR([ASPP], [which assembler (with preprocessor) to use])
 AC_ARG_VAR([PARTIALLD], [how to build partial (relocatable) object files])
 AC_ARG_VAR([RC], [which resource compiler to use])
+AC_ARG_VAR([MANIFEST_TOOL], [which manifest generator to use])
 
 AC_ARG_VAR([FLEXLINKFLAGS],
   [Supplementary flags passed to flexlink (Windows targets)])
@@ -683,6 +684,9 @@ AS_IF(
         $already_installed_version)]))
       AC_MSG_ERROR([exiting])])
     cross_compiler=true])
+
+# Bypass libtool check for the manifest tool
+AC_CHECK_TOOLS(MANIFEST_TOOL, [mt], :)
 
 # Initialization of libtool
 # Allow the MSVC linker to be found even if ld isn't installed.
@@ -1072,6 +1076,9 @@ AS_CASE([$target],
     [flexdll_chain='msvc64'
     flexlink_flags='-merge-manifest -stack 33554432'],
   [flexdll_chain=''])
+
+AS_IF([test -n "$MANIFEST_TOOL"],
+  [flexlink_flags="${flexlink_flags:+$flexlink_flags }-use-mt $MANIFEST_TOOL"])
 
 AS_IF([test x"$supports_shared_libraries" != 'xfalse'], [
   AC_MSG_CHECKING([for flexdll sources])

@@ -187,6 +187,10 @@ BUILD_TRIPLET = @build@
 # Platform-dependent command to create symbolic links
 LN = @ln@
 
+# Tool to generate manifests for managed assemblies and unmanaged side-by-side
+# assemblies, for the Windows targets.
+MANIFEST_TOOL = @MANIFEST_TOOL@
+
 # Platform-dependent assembler files to use to build the runtime
 runtime_ASM_OBJECTS = $(addprefix runtime/,@runtime_asm_objects@)
 

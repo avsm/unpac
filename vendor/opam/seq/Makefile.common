@@ -247,7 +247,7 @@ OCAMLYACCFLAGS ?= --strict -v
 # executables
 if_file_exists = ( test ! -f $(1) || $(2) && rm -f $(1) )
 MERGEMANIFESTEXE = $(call if_file_exists, $(1).manifest, \
-  mt -nologo -outputresource:$(1) -manifest $(1).manifest)
+  $(MANIFEST_TOOL) -nologo -outputresource:$(1) -manifest $(1).manifest)
 
 # Macros and rules to compile OCaml programs and libraries
 
