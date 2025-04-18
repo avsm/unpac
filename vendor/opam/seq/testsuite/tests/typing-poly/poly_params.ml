@@ -371,3 +371,17 @@ Line 1, characters 9-24:
              ^^^^^^^^^^^^^^^
 Error: Class parameters cannot be polymorphic
 |}];;
+
+
+let poly1' ~(id : 'a. 'a -> 'a) = id 3, id "three"
+[%%expect {|
+val poly1' : id:('a. 'a -> 'a) -> int * string = <fun>
+|}];;
+
+let poly2' ?(id : 'a. 'a -> 'a) = id 3, id "three"
+[%%expect {|
+Line 1, characters 13-30:
+1 | let poly2' ?(id : 'a. 'a -> 'a) = id 3, id "three"
+                 ^^^^^^^^^^^^^^^^^
+Error: Optional parameters cannot be polymorphic
+|}];;
