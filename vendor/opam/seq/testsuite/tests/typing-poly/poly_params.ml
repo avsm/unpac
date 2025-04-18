@@ -360,3 +360,14 @@ let foo (f : p1) : p2 = (fun id -> f id)
 [%%expect {|
 val foo : p1 -> p2 = <fun>
 |}];;
+
+class c (f: 'a. 'a -> 'a) = object
+  method m = f 0
+  method n = f "a"
+end;;
+[%%expect {|
+Line 1, characters 9-24:
+1 | class c (f: 'a. 'a -> 'a) = object
+             ^^^^^^^^^^^^^^^
+Error: Class parameters cannot be polymorphic
+|}];;
