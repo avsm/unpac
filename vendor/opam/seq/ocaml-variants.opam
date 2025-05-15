@@ -57,7 +57,7 @@ depends: [
   "ocaml-option-bytecode-only" {arch != "arm64" & arch != "x86_64" & arch != "s390x" & arch != "riscv64" & arch != "ppc64"}
 
   # Support Packages
-  "flexdll" {>= "0.42" & os = "win32"}
+  "flexdll" {>= "0.44" & os = "win32"}
 ]
 conflict-class: "ocaml-core-compiler"
 flags: compiler
