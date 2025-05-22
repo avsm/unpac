@@ -356,6 +356,19 @@ val ar_supports_response_files: bool
 val tsan : bool
 (** Whether ThreadSanitizer instrumentation is enabled *)
 
+(** Launch mechanisms for bytecode executables
+
+    @since 5.5 *)
+type launch_method =
+| Executable
+    (** Use the executable launcher stub *)
+| Shebang of string option
+    (** Use a shebang-style launcher. Whenever possible, the interpreter will be
+        the runtime itself, but if the path to the runtime is not valid for a
+        shebang line, then a shell script is generated. When this is necessary,
+        the parameter in [Shebang (Some sh)] is the full path to [sh]; if the
+        parameter is [None], then the linker searches PATH for [sh]. *)
+
 val shebangscripts : bool
 (** Whether the target supports shebang scripts
 

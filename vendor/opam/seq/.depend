@@ -44,7 +44,8 @@ utils/clflags.cmx : \
     utils/clflags.cmi
 utils/clflags.cmi : \
     utils/profile.cmi \
-    utils/misc.cmi
+    utils/misc.cmi \
+    utils/config.cmi
 utils/compression.cmo : \
     utils/compression.cmi
 utils/compression.cmx : \

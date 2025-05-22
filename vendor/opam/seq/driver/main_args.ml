@@ -524,6 +524,14 @@ let mk_unsafe_string =
  in
  "-unsafe-string", Arg.Unit err, " (option not available)"
 
+let mk_launch_method f =
+  "-launch-method", Arg.String f,
+  "<method>  Specify the mechanism for the bytecode launcher:\n\
+  \          exe - use the executable launcher in runtime-launch-info\n\
+  \          sh - use a #!, using sh if the interpreter path cannot be used\n\
+  \          /path/interpreter - use #!, or the given sh-compatible \n\
+  \            interpreter if the interpreter path cannot be used"
+
 let mk_use_runtime f =
   "-use-runtime", Arg.String f,
   "<file>  Generate bytecode for the given runtime system"
@@ -942,6 +950,7 @@ module type Bytecomp_options = sig
   val _make_runtime : unit -> unit
   val _vmthread : unit -> unit
   val _use_runtime : string -> unit
+  val _launch_method : string -> unit
   val _output_complete_exe : unit -> unit
 
   val _dinstr : unit -> unit
@@ -1139,6 +1148,7 @@ struct
     mk_unsafe_string;
     mk_use_runtime F._use_runtime;
     mk_use_runtime_2 F._use_runtime;
+    mk_launch_method F._launch_method;
     mk_v F._v;
     mk_verbose F._verbose;
     mk_version F._version;
@@ -1990,6 +2000,16 @@ third-party libraries such as Lwt, but with a different API."
     let _output_obj () = output_c_object := true; custom_runtime := true
     let _use_prims s = use_prims := s
     let _use_runtime s = use_runtime := s
+    let _launch_method = function
+    | "exe" ->
+        launch_method := Some Config.Executable
+    | "sh" ->
+        launch_method := Some (Config.Shebang None)
+    | s when s <> "" && s.[0] = '/' ->
+        launch_method := Some (Config.Shebang (Some s))
+    | _ ->
+        Compenv.fatal
+          "-launch-method: expect sh, exe or an absolute path for <method>"
     let _v () = Compenv.print_version_and_library "compiler"
     let _vmthread () = Compenv.fatal vmthread_removed_message
   end

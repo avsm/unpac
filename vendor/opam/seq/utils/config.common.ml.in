@@ -64,6 +64,8 @@ let safe_string = true
 let default_safe_string = true
 let naked_pointers = false
 
+type launch_method = Executable | Shebang of string option
+
 let interface_suffix = ref ".mli"
 
 let max_tag = 243

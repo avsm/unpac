@@ -397,6 +397,16 @@ let write_header outchan =
     try read_runtime_launch_info (Load_path.find header)
     with Not_found -> raise (Error (File_not_found header))
   in
+  let runtime_info =
+    match !Clflags.launch_method with
+    | Some Executable ->
+        {runtime_info with launcher = Executable}
+    | Some (Shebang sh) ->
+        {runtime_info with launcher =
+          Shebang_bin_sh (Option.value ~default:"sh" sh)}
+    | None ->
+        runtime_info
+  in
   let runtime =
     if String.length !Clflags.use_runtime > 0 then
       (* Do not use BUILD_PATH_PREFIX_MAP mapping for this. *)
