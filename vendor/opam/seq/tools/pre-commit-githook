@@ -41,14 +41,14 @@ fi
 
 # Git's built-in mechanism for whitespace is neater than ours, so do it first.
 # The strange construction below creates a list of files which have either
-# typo.white-at-eol or typo.white-at-eof included in .gitattributes and by
-# prefixing the names with :! causes git diff-index to skip over them.
+# typo.prune, typo.white-at-eol or typo.white-at-eof included in .gitattributes
+# and by prefixing the names with :! causes git diff-index to skip over them.
 if [[ -n $(git diff-index --cached --name-only $against) ]] ; then
   # NB Technically, $FILES would include files with typo.white-at-eol=false, but
   #    check-typo will catch that nefarious corner case!
   FILES=$(git diff-index --cached --name-only $against \
           | xargs git check-attr --cached --all \
-          | sed -ne 's/\(.*\): typo\.white-at-eo[fl]:/:!\1/p')
+          | sed -ne 's/\(.*\): typo\.\(white-at-eo[fl]\|prune\):/:!\1/p')
   if ! git diff-index --check --cached $against -- $FILES ; then
     exit 1
   fi
