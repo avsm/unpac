@@ -166,6 +166,8 @@ module Memprof =
       tracker =
       c_start sampling_rate callstack_size tracker
 
+    external is_sampling : unit -> bool = "caml_memprof_is_sampling"
+
     external stop : unit -> unit = "caml_memprof_stop"
 
     external discard : t -> unit = "caml_memprof_discard"

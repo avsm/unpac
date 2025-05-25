@@ -522,8 +522,7 @@ module Memprof :
       ?callstack_size:int ->
       ('minor, 'major) tracker ->
       t
-    (** Start a profile with the given parameters. Raises an exception
-       if a profile is already sampling in the current domain.
+    (** Start a profile with the given parameters.
 
        Sampling begins immediately. The parameter [sampling_rate] is
        the sampling rate in samples per word (including headers).
@@ -566,7 +565,17 @@ module Memprof :
        by a different domain.
 
        Different domains may sample for different profiles
-       simultaneously.  *)
+       simultaneously.
+
+       If a profile is already sampling in the current domain, then
+       calling [start] replaces it with a new profile in this domain.
+       If the old profile was sampling in other domains, it continues
+       doing so. *)
+
+    val is_sampling : unit -> bool
+    (** Returns whether a profile is sampling in the current domain,
+        if any. Returns [None] if the current domain is not
+        sampling. *)
 
     val stop : unit -> unit
     (** Stop sampling for the current profile. Fails if no profile is

@@ -2216,7 +2216,7 @@ CAMLexport void caml_memprof_enter_thread(memprof_thread_t thread)
 CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
 {
   CAMLparam3(lv, szv, tracker);
-  CAMLlocal1(one_log1m_lambda_v);
+  CAMLlocal2(one_log1m_lambda_v, config);
 
   double lambda = Double_val(lv);
   intnat sz = Long_val(szv);
@@ -2224,19 +2224,6 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
   /* Checks that [lambda] is within range (and not NaN). */
   if (sz < 0 || !(lambda >= 0.0 && lambda <= 1.0))
     caml_invalid_argument("Gc.Memprof.start");
-
-  memprof_domain_t domain = Caml_state->memprof;
-  CAMLassert(domain);
-  CAMLassert(domain->current);
-
-  if (Sampling(thread_config(domain->current))) {
-    caml_failwith("Gc.Memprof.start: already started.");
-  }
-
-  /* Orphan any surviving tracking entries from a previous profile. */
-  if (!orphans_create(domain)) {
-    caml_raise_out_of_memory();
-  }
 
   double one_log1m_lambda = lambda == 1.0 ? 0.0 : 1.0/caml_log1p(-lambda);
   /* Buggy implementations of caml_log1p could produce a
@@ -2251,7 +2238,7 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
 
   one_log1m_lambda_v = caml_copy_double(one_log1m_lambda);
 
-  value config = caml_alloc_shr(CONFIG_FIELDS, 0);
+  config = caml_alloc_shr(CONFIG_FIELDS, 0);
   caml_initialize(&Field(config, CONFIG_FIELD_STATUS),
                   Val_int(CONFIG_STATUS_SAMPLING));
   caml_initialize(&Field(config, CONFIG_FIELD_LAMBDA), lv);
@@ -2262,6 +2249,17 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
     caml_initialize(&Field(config, i), Field(tracker,
                                              i - CONFIG_FIELD_FIRST_CALLBACK));
   }
+
+  memprof_domain_t domain = Caml_state->memprof;
+  CAMLassert(domain);
+  CAMLassert(domain->current);
+
+  /* Orphan any surviving tracking entries from a previous profile.
+     There should be no allocations after this. */
+  if (!orphans_create(domain)) {
+    caml_raise_out_of_memory();
+  }
+
   CAMLassert(domain->entries.size == 0);
 
   /* Set config pointers of the domain and all its threads */
@@ -2282,6 +2280,14 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
   set_action_pending_as_needed(domain);
 
   CAMLreturn(config);
+}
+
+CAMLprim value caml_memprof_is_sampling(value unit)
+{
+  memprof_domain_t domain = Caml_state->memprof;
+  CAMLassert(domain);
+  CAMLassert(domain->current);
+  return Val_bool(Sampling(thread_config(domain->current)));
 }
 
 CAMLprim value caml_memprof_stop(value unit)
