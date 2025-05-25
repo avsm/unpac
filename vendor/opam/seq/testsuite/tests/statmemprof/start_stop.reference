@@ -1,6 +1,12 @@
+is_sampling (): false.
+is_sampling (): true.
+is_sampling (): false.
+is_sampling (): false.
 Null test.
 Stop without starting fails with "Gc.Memprof.stop: no profile running."
-Start without stopping fails with "Gc.Memprof.start: already started."
+is_sampling (): true.
+Start without stopping.
+is_sampling (): false.
 Discard without stopping fails with "Gc.Memprof.discard: profile not stopped."
 Second discard fails with "Gc.Memprof.discard: profile already discarded."
 Double profile.
@@ -8,4 +14,5 @@ Double profile with single discard.
 Double profile, discarding both.
 Double profile, discarding both at end.
 Double profile, discarding in reverse order.
+is_sampling (): true.
 Discarding old profile while sampling.
