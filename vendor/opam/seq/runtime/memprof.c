@@ -2308,7 +2308,7 @@ CAMLprim value caml_memprof_stop(value unit)
   }
 
   value config = thread_config(thread);
-  if (config == CONFIG_NONE || Status(config) != CONFIG_STATUS_SAMPLING) {
+  if (!Sampling(config)) {
     caml_failwith("Gc.Memprof.stop: no profile running.");
   }
   Set_status(config, CONFIG_STATUS_STOPPED);
