@@ -549,10 +549,11 @@ module Memprof :
        have evolved between the allocation and the call to the
        callback.
 
-       If a new thread or domain is created when the current domain is
-       sampling for a profile, the child thread or domain joins that
-       profile (using the same [sampling_rate], [callstack_size], and
-       [tracker] callbacks).
+       All the threads belonging to a domain share the same profile
+       (using the same [sampling_rate], [callstack_size], and
+       [tracker] callbacks). In addition, if a new domain is spawned
+       by the current domain while sampling for a profile, then the
+       child domain likewise shares that profile with its parent.
 
        An allocation callback is always run by the thread which
        allocated the block. If the thread exits or the profile is
