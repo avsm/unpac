@@ -133,9 +133,6 @@ Working version
 
 ### Tools:
 
-- #12139: BUILD_PATH_PREFIX_MAP rewriting in debug-event locations.
-  (Richard L. Ford, review by Gabriel Scherer)
-
 * #13638: ocamlmklib exits with code 4 if passed an unrecognised option, as it
   does with an unrecognised file.
   (David Allsopp, review by Antonin Décimo and Sébastien Hinderer)
