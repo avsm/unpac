@@ -1169,7 +1169,7 @@ let solve_Ppat_constraint tps loc env sty expected_ty =
   let expected_ty' =
     match get_desc expected_ty' with
     | Tpoly (expected_ty', tl) ->
-        snd (instance_poly ~keep_names:true ~fixed:false tl expected_ty')
+        instance_poly ~keep_names:true tl expected_ty'
     | _ -> expected_ty'
   in
   (cty, ty, expected_ty')
@@ -3403,9 +3403,9 @@ let check_univars env kind exp ty_expected vars =
       match get_desc pty with
         Tpoly (body, tl) ->
           (* Enforce scoping for type_let:
-             since body is not generic,  instance_poly only makes
+             since body is not generic,  instance_poly_fixed only makes
              copies of nodes that have a Tunivar as descendant *)
-          let _, ty' = instance_poly ~fixed:true tl body in
+          let _, ty' = instance_poly_fixed tl body in
           let vars, exp_ty = instance_parameterized_type vars exp.exp_type in
           unify_exp_types exp.exp_loc env exp_ty ty';
           (exp_ty, vars)
@@ -4585,7 +4585,7 @@ and type_expect_
             if !Clflags.principal && get_level typ <> generic_level then
               Location.prerr_warning loc
                 (not_principal "this use of a polymorphic method");
-            snd (instance_poly ~fixed:false tl ty)
+            instance_poly tl ty
         | Tvar _ ->
             let ty' = newvar () in
             unify env (instance typ) (newty(Tpoly(ty',[])));
@@ -4747,7 +4747,7 @@ and type_expect_
               with_local_level_generalize begin fun () ->
                 let vars, ty'' =
                   with_local_level_generalize_structure_if_principal
-                    (fun () -> instance_poly ~fixed:true tl ty')
+                    (fun () -> instance_poly_fixed tl ty')
                 in
                 let exp = type_expect env sbody (mk_expected ty'') in
                 (exp, vars)
@@ -5231,7 +5231,7 @@ and split_function_ty env ty_expected ~arg_label ~has_poly ~first ~in_function =
       if vars = [] then ty
       else begin
         with_level ~level:generic_level
-          (fun () -> snd (instance_poly ~keep_names:true ~fixed:false vars ty))
+          (fun () -> instance_poly ~keep_names:true vars ty)
       end
     end
   in
@@ -5942,10 +5942,10 @@ and type_apply_arg env ~app_loc (lbl, arg) =
               in
               let vars, ty_arg' =
                 with_local_level_generalize_structure_if separate @@ fun () ->
-                  instance_poly ~fixed:false vars ty_arg'
+                  instance_poly_fixed vars ty_arg'
               in
               let (ty_arg0', vars0) = tpoly_get_poly ty_arg0 in
-              let vars0, ty_arg0' = instance_poly ~fixed:false vars0 ty_arg0' in
+              let vars0, ty_arg0' = instance_poly_fixed vars0 ty_arg0' in
               List.iter2 (fun ty ty' -> unify_var env ty ty') vars vars0;
               let arg =
                 type_argument env sarg ty_arg' ty_arg0'
@@ -6549,7 +6549,7 @@ and type_let ?check ?check_strict
                   match get_desc pat.pat_type with
                   | Tpoly (ty, tl) ->
                       {pat with pat_type =
-                       snd (instance_poly ~keep_names:true ~fixed:false tl ty)}
+                         instance_poly ~keep_names:true tl ty}
                   | _ -> pat
                 in
                 let bound_expr = vb_exp_constraint binding in
@@ -6602,7 +6602,7 @@ and type_let ?check ?check_strict
             | Tpoly (ty, tl) ->
                 let vars, ty' =
                   with_local_level_generalize_structure_if_principal
-                    (fun () -> instance_poly ~keep_names:true ~fixed:true tl ty)
+                    (fun () -> instance_poly_fixed ~keep_names:true tl ty)
                 in
                 let exp =
                   Builtin_attributes.warning_scope pvb_attributes (fun () ->
