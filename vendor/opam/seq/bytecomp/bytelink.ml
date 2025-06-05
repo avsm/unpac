@@ -293,13 +293,6 @@ type launch_method =
 | Shebang_runtime
 | Executable
 
-type runtime_launch_info = {
-  buffer : string;
-  bindir : string;
-  launcher : launch_method;
-  executable_offset : int
-}
-
 (* See https://www.in-ulm.de/~mascheck/various/shebang/#origin for a deep
    dive into shebangs.
    - Whitespace (space or horizontal tab) delimits the interpreter from an
@@ -311,55 +304,6 @@ type runtime_launch_info = {
 let invalid_for_shebang_line path =
   let invalid_char = function ' ' | '\t' | '\n' -> true | _ -> false in
   String.length path > 125 || String.exists invalid_char path
-
-(* The runtime-launch-info file consists of two "lines" followed by binary data.
-   The file is _always_ LF-formatted, even on Windows. The sequence of bytes up
-   to the first '\n' is interpreted:
-     - "sh" - use a shebang-style launcher. If sh is needed, determine its
-              location from [command -p -v sh]
-     - "exe" - use the executable launcher contained in this runtime-launch-info
-               file.
-     - "/" ^ path - use a shebang-style launcher. If sh is needed, path is the
-                    absolute location of sh. path must be valid for a shebang
-                    line.
-   The second "line" is interpreted as the next "\000\n"-terminated sequence and
-   is the directory containing the default runtimes (ocamlrun, ocamlrund, etc.).
-   The null terminator is used since '\n' is valid in a nefarious installation
-   prefix but Posix forbids filenames including the nul character.
-   The remainder of the file is then the executable launcher for bytecode
-   programs (see stdlib/header{,nt}.c). *)
-
-let read_runtime_launch_info file =
-  let buffer =
-    try
-      In_channel.with_open_bin file In_channel.input_all
-    with Sys_error msg -> raise (Error (Camlheader (msg, file)))
-  in
-  try
-    let bindir_start = String.index buffer '\n' + 1 in
-    let bindir_end = String.index_from buffer bindir_start '\000' in
-    let bindir = String.sub buffer bindir_start (bindir_end - bindir_start) in
-    let bindir =
-      if bindir = Filename.current_dir_name then
-        Filename.dirname Sys.executable_name
-      else
-        bindir in
-    let executable_offset = bindir_end + 2 in
-    let launcher =
-      let kind = String.sub buffer 0 (bindir_start - 1) in
-      if kind = "exe" then
-        Executable
-      else if kind <> "" && (kind.[0] = '/' || kind = "sh") then
-        Shebang_bin_sh kind
-      else
-        raise Not_found in
-    if String.length buffer < executable_offset
-       || buffer.[executable_offset - 1] <> '\n' then
-      raise Not_found
-    else
-      {bindir; launcher; buffer; executable_offset}
-  with Not_found ->
-    raise (Error (Camlheader ("corrupt header", file)))
 
 let find_bin_sh () =
   let output_file = Filename.temp_file "caml_bin_sh" "" in
@@ -392,21 +336,6 @@ let find_bin_sh () =
    called) *)
 
 let write_header outchan =
-  let runtime_info =
-    let header = "runtime-launch-info" in
-    try read_runtime_launch_info (Load_path.find header)
-    with Not_found -> raise (Error (File_not_found header))
-  in
-  let runtime_info =
-    match !Clflags.launch_method with
-    | Some Executable ->
-        {runtime_info with launcher = Executable}
-    | Some (Shebang sh) ->
-        {runtime_info with launcher =
-          Shebang_bin_sh (Option.value ~default:"sh" sh)}
-    | None ->
-        runtime_info
-  in
   let runtime =
     if String.length !Clflags.use_runtime > 0 then
       (* Do not use BUILD_PATH_PREFIX_MAP mapping for this. *)
@@ -422,32 +351,41 @@ let write_header outchan =
       if Sys.win32 then
         runtime
       else
-        Filename.concat runtime_info.bindir runtime
+        Filename.concat !Clflags.target_bindir runtime
   in
   (* Determine which method will be used for launching the executable:
      Executable: concatenate the bytecode image to the executable stub
      Shebang_runtime: #! line with the required runtime
      Shebang_bin_sh: #! for a shell script calling exec *)
   let launcher =
-    if runtime_info.launcher = Executable then
-      Executable
-    else
-      if invalid_for_shebang_line runtime then
-        match runtime_info.launcher with
-        | Shebang_bin_sh sh ->
-            let sh =
-              if sh = "sh" then
-                find_bin_sh ()
-              else
-                sh in
-            if sh = "" || invalid_for_shebang_line sh then
-              Executable
-            else
-              Shebang_bin_sh sh
-        | _ ->
+    match !Clflags.launch_method with
+    | Config.Executable ->
+        Executable
+    | Config.Shebang sh ->
+        if invalid_for_shebang_line runtime then
+          let sh =
+            match sh with
+            | Some sh -> sh
+            | None -> find_bin_sh ()
+          in
+          if sh = "" || invalid_for_shebang_line sh then
             Executable
+          else
+            Shebang_bin_sh sh
+        else
+          Shebang_runtime
+  in
+  let write_exe_launcher data =
+    (* Compatibility with previous header format - remove post-bootstrap *)
+    let data =
+      if data = "" || not (List.mem data.[0] ['/'; 'e'; 's']) then
+        data
       else
-        Shebang_runtime
+        let exe_start = String.index data '\000' + 2 in
+        let len = String.length data in
+        String.sub data exe_start (len - exe_start)
+    in
+    Out_channel.output_string outchan data
   in
   (* Write the header *)
   match launcher with
@@ -463,9 +401,16 @@ let write_header outchan =
       Bytesections.init_record outchan
   | Executable ->
       (* Use the executable stub launcher *)
-      let pos = runtime_info.executable_offset in
-      let len = String.length runtime_info.buffer - pos in
-      Out_channel.output_substring outchan runtime_info.buffer pos len;
+      let header =
+        let header = "runtime-launch-info" in
+        try Load_path.find header
+        with Not_found -> raise (Error (File_not_found header))
+      in
+      let data =
+        try In_channel.with_open_bin header In_channel.input_all
+        with Sys_error msg -> raise (Error (Camlheader (msg, header)))
+      in
+      write_exe_launcher data;
       (* The runtime name needs recording in RNTM *)
       let toc_writer = Bytesections.init_record outchan in
       Printf.fprintf outchan "%s\000" runtime;

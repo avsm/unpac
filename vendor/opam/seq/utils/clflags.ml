@@ -87,7 +87,10 @@ and noinit = ref false                  (* -noinit *)
 and open_modules = ref []               (* -open *)
 and use_prims = ref ""                  (* -use-prims ... *)
 and use_runtime = ref ""                (* -use-runtime ... *)
-and launch_method = ref None            (* -launch-method ... *)
+and target_bindir =                     (* -launch-method ... *)
+  ref Config.target_bindir
+and launch_method =
+  ref Config.launch_method
 and plugin = ref false                  (* -plugin ... *)
 and principal = ref false               (* -principal *)
 and real_paths = ref true               (* -short-paths *)

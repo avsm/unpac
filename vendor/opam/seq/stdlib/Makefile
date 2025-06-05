@@ -84,7 +84,10 @@ installopt-default:
 	  stdlib.cmxa stdlib.$(A) std_exit.$(O) *.cmx \
 	  "$(INSTALL_LIBDIR)"
 
-%-launch-info: %.info tmpheader.exe
+runtime-launch-info: runtime.info tmpheader.exe
+	@cat $^ > $@
+
+target_runtime-launch-info: tmpheader.exe
 	@cat $^ > $@
 
 # The mingw-w64 and MSVC versions of tmpheader.exe are linked with special flags

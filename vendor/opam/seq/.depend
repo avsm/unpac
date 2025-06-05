@@ -10769,7 +10769,6 @@ testsuite/tools/test_in_prefix.cmo : \
     driver/compmisc.cmi \
     testsuite/tools/cmdline.cmi \
     utils/clflags.cmi \
-    bytecomp/bytelink.cmi \
     testsuite/tools/test_in_prefix.cmi
 testsuite/tools/test_in_prefix.cmx : \
     otherlibs/unix/unix.cmx \
@@ -10787,7 +10786,6 @@ testsuite/tools/test_in_prefix.cmx : \
     driver/compmisc.cmx \
     testsuite/tools/cmdline.cmx \
     utils/clflags.cmx \
-    bytecomp/bytelink.cmx \
     testsuite/tools/test_in_prefix.cmi
 testsuite/tools/test_in_prefix.cmi :
 testsuite/tools/test_ld_conf.cmo : \

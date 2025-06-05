@@ -109,6 +109,8 @@ OC_DLL_LDFLAGS=@oc_dll_ldflags@
 
 MKEXE_VIA_CC=$(CC) @mkexe_via_cc_ldflags@ @mkexe_via_cc_extra_cmd@
 
+LAUNCH_METHOD = @launch_method@
+
 # How to build sak
 SAK_BUILD=@SAK_BUILD@
 # How to invoke sak

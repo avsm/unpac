@@ -21,6 +21,7 @@
 let boot_cannot_call s = "/ The boot compiler should not call " ^ s
 
 let bindir = "/tmp"
+let target_bindir = bindir
 let ccomp_type = "n/a"
 let c_compiler = boot_cannot_call "the C compiler"
 let c_compiler_vendor = ""
@@ -82,3 +83,4 @@ let systhread_supported = false
 let flexdll_dirs = []
 let ar_supports_response_files = true
 let shebangscripts = false
+let launch_method = "sh"

@@ -115,14 +115,10 @@ let () =
     in
     List.map add_dependencies libraries
   in
-  let runtime_launch_info =
-    let file = Filename.concat libdir "runtime-launch-info" in
-    Bytelink.read_runtime_launch_info file in
   let header_size =
-    let {Bytelink.buffer; executable_offset; _} = runtime_launch_info in
-    String.length buffer - executable_offset in
+    (Unix.stat (Filename.concat libdir "runtime-launch-info")).Unix.st_size in
   let bytecode_shebangs_by_default =
-    runtime_launch_info.launcher <> Bytelink.Executable in
+    Config.launch_method <> Config.Executable in
   let launcher_searches_for_ocamlrun = Sys.win32 in
   let target_launcher_searches_for_ocamlrun = Sys.win32 in
   let config =
