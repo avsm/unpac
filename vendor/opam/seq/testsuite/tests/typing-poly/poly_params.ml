@@ -385,3 +385,78 @@ Line 1, characters 13-30:
                  ^^^^^^^^^^^^^^^^^
 Error: The optional parameter "id" cannot have a polymorphic type.
 |}];;
+
+(* This test illustrate a new occurrence of the bug discussed in
+   https://github.com/ocaml/ocaml/pull/13984*)
+
+module type T = sig type 'a t = 'a list  end
+
+let rec f (x : (module T)) =
+  let (module LocalModule) = x in (assert false : ('a. 'a LocalModule.t) -> unit)
+
+[%%expect{|
+module type T = sig type 'a t = 'a list end
+Line 4, characters 58-69:
+4 |   let (module LocalModule) = x in (assert false : ('a. 'a LocalModule.t) -> unit)
+                                                              ^^^^^^^^^^^
+Error: Unbound module "LocalModule"
+|}]
+
+(* The following test requires full translation in the [approx_type] function if
+   the annotation is partial. *)
+let rec f () = g () Fun.id
+and g () : ('a. 'a -> 'a) -> unit = fun _ -> () ;;
+
+[%%expect{|
+val f : unit -> unit = <fun>
+val g : unit -> ('a. 'a -> 'a) -> unit = <fun>
+|}]
+
+let rec f () = g () Fun.id
+and g : unit -> ('a. 'a -> 'a) -> unit = fun () _ -> () ;;
+
+[%%expect{|
+val f : unit -> unit = <fun>
+val g : unit -> ('a. 'a -> 'a) -> unit = <fun>
+|}]
+
+
+(* Attempts at breaking type_pattern_approx *)
+let rec f ([] : 'a. 'a list) = ()
+
+[%%expect{|
+val f : ('a. 'a list) -> unit = <fun>
+|}]
+
+let rec f () : ('a. 'a list) -> unit = fun [] -> ()
+
+[%%expect{|
+Line 1, characters 43-45:
+1 | let rec f () : ('a. 'a list) -> unit = fun [] -> ()
+                                               ^^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "_::_"
+
+val f : unit -> ('a. 'a list) -> unit = <fun>
+|}]
+
+
+(* New expert trick: use 'a. to trigger "exact approximation" *)
+let rec f () = g (module Map.Make(Int)) and g (m : (module Map.S)) = ();;
+
+[%%expect{|
+Line 1, characters 17-39:
+1 | let rec f () = g (module Map.Make(Int)) and g (m : (module Map.S)) = ();;
+                     ^^^^^^^^^^^^^^^^^^^^^^
+Error: The signature for this packaged module couldn't be inferred.
+|}]
+
+let rec f () = g (module Map.Make(Int)) and g (m : 'a. (module Map.S)) = ();;
+
+[%%expect{|
+val f : unit -> unit = <fun>
+val g : (module Map.S) -> unit = <fun>
+|}]
+
+
+
