@@ -211,7 +211,7 @@ type error =
   | Missing_tuple_label of string option * type_expr
   | Repeated_tuple_exp_label of string
   | Repeated_tuple_pat_label of string
-  | Optional_poly_param
+  | Optional_poly_param of string
 
 
 let not_principal fmt =
@@ -447,6 +447,16 @@ let has_poly_constraint spat =
       | _ -> false
     end
   | _ -> false
+
+let check_poly_constraint spat env arg_label =
+  let has_poly = has_poly_constraint spat in
+  if has_poly then begin
+    match arg_label with
+    | Nolabel | Labelled _ -> ()
+    | Optional l ->
+        raise(Error(spat.ppat_loc, env, Optional_poly_param l))
+  end;
+  has_poly
 
 (* Typing of patterns *)
 
@@ -3252,11 +3262,7 @@ let type_approx_fun_one_param
   let has_poly =
     match spato with
     | None -> false
-    | Some spat ->
-        let has_poly = has_poly_constraint spat in
-        if has_poly && is_optional label then
-          raise(Error(spat.ppat_loc, env, Optional_poly_param));
-        has_poly
+    | Some spat -> check_poly_constraint spat env label
   in
   let { ty_arg; ty_ret } =
     try filter_arrow env ty_expected label ~force_tpoly:(not has_poly)
@@ -5280,9 +5286,7 @@ and type_function
   | { pparam_desc = Pparam_val (arg_label, default_arg, pat); pparam_loc }
       :: rest
     ->
-      let has_poly = has_poly_constraint pat in
-      if has_poly && is_optional arg_label then
-        raise(Error(pat.ppat_loc, env, Optional_poly_param));
+      let has_poly = check_poly_constraint pat env arg_label in
       let { filtered_arrow = { ty_arg; ty_ret }; ty_arg_mono } =
         split_function_ty env ty_expected ~arg_label ~first ~in_function
           ~has_poly
@@ -7671,9 +7675,11 @@ let report_error ~loc env = function
       Location.errorf ~loc
         "@[This tuple pattern has two labels named %a@]"
         Style.inline_code l
-  | Optional_poly_param ->
+  | Optional_poly_param l ->
       Location.errorf ~loc
-        "Optional parameters cannot be polymorphic"
+        "@[The optional parameter %a \
+         cannot have a polymorphic type.@]"
+        Style.inline_code l
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

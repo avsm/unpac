@@ -252,7 +252,7 @@ type error =
   | Missing_tuple_label of string option * type_expr
   | Repeated_tuple_exp_label of string
   | Repeated_tuple_pat_label of string
-  | Optional_poly_param
+  | Optional_poly_param of string
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

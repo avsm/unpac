@@ -93,7 +93,7 @@ type error =
   | Opened_object of Path.t option
   | Not_an_object of type_expr
   | Repeated_tuple_label of string
-  | Polymorphic_optional_param
+  | Polymorphic_optional_param of string
 
 exception Error of Location.t * Env.t * error
 

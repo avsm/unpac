@@ -46,7 +46,7 @@ type error =
   | Opened_object of Path.t option
   | Not_an_object of type_expr
   | Repeated_tuple_label of string
-  | Polymorphic_optional_param
+  | Polymorphic_optional_param of string
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -461,13 +461,14 @@ and transl_type_aux env ~row_context ~aliased ~policy styp =
       if Btype.is_Tpoly arg_ty then arg_ty else newmono arg_ty
     in
     let arg_ty =
-      if not (Btype.is_optional l) then arg_ty
-      else begin
-        if not (Btype.tpoly_is_mono arg_ty) then
-          raise (Error (st1.ptyp_loc, env, Polymorphic_optional_param));
-        newmono
-          (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
-      end
+      match l with
+      | Nolabel | Labelled _ -> arg_ty
+      | Optional l -> begin
+          if not (Btype.tpoly_is_mono arg_ty) then
+            raise (Error (st1.ptyp_loc, env, Polymorphic_optional_param l));
+          newmono
+            (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
+        end
     in
     let ty = newty (Tarrow(l, arg_ty, ret_cty.ctyp_type, commu_ok)) in
     ctyp (Ttyp_arrow (l, arg_cty, ret_cty)) ty
@@ -1015,8 +1016,9 @@ let report_error_doc loc env = function
   | Repeated_tuple_label l ->
       Location.errorf ~loc "@[This tuple type has two labels named %a@]"
         Style.inline_code l
-  | Polymorphic_optional_param ->
-      Location.errorf ~loc "@[Optional parameters cannot be polymorphic@]"
+  | Polymorphic_optional_param l ->
+      Location.errorf ~loc "@[Optional parameter %a cannot be polymorphic@]"
+        Style.inline_code l
 
 let () =
   Location.register_error_of_exn

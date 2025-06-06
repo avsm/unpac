@@ -383,5 +383,5 @@ let poly2' ?(id : 'a. 'a -> 'a) = id 3, id "three"
 Line 1, characters 13-30:
 1 | let poly2' ?(id : 'a. 'a -> 'a) = id 3, id "three"
                  ^^^^^^^^^^^^^^^^^
-Error: Optional parameters cannot be polymorphic
+Error: The optional parameter "id" cannot have a polymorphic type.
 |}];;
