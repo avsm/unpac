@@ -908,8 +908,7 @@ and class_field_second_pass cl_num sign met_env field =
       Warnings.with_state warning_state
         (fun () ->
            let ty = Btype.method_type label.txt sign in
-           let self_type = sign.Types.csig_self in
-           let self_param_type = Btype.newgenty (Tpoly(self_type, [])) in
+           let self_param_type = Btype.newgenmono sign.Types.csig_self in
            let meth_type =
              mk_expected
                (Btype.newgenty (Tarrow(Nolabel, self_param_type, ty, commu_ok)))

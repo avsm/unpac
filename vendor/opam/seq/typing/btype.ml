@@ -155,6 +155,7 @@ let newty2 ~level desc =
   newty3 ~level ~scope:Ident.lowest_scope desc
 
 let newgenty desc      = newty2 ~level:generic_level desc
+let newgenmono desc    = newgenty (Tpoly(desc, []))
 let newgenvar ?name () = newgenty (Tvar name)
 let newgenstub ~scope  = newty3 ~level:generic_level ~scope (Tvar None)
 
