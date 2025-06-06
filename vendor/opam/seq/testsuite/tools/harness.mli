@@ -39,8 +39,11 @@ module Import : sig
 
   (** Test harness phases. *)
   type phase =
-  | Original (* Compiler installed in its original configured prefix. *)
-  | Renamed  (* Compiler moved to a different prefix from its configuration. *)
+  | Original  (* Compiler installed in its original configured prefix. *)
+  | Execution (* Executing programs built by the compiler installed in its
+                 original prefix after the compiler has been moved to a
+                 different prefix. *)
+  | Renamed   (* Compiler moved to a different prefix from its configuration. *)
 
   (* Tooling modes. *)
   type mode =

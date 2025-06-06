@@ -364,17 +364,46 @@ let make_test_runner ~stdlib_exists_when_renamed ~may_segfault ~with_unix
     tendered && not target_launcher_searches_for_ocamlrun
     && (config.has_relative_libdir = None || not (Environment.is_renamed env))
   in
-  let rec run env =
+  let rec run ~re_executing env =
     let runs =
       test_runs usr_bin_sh test_program_path test_program
                 config env ~via_ocamlrun in
     let execute ({argv0; prefix_path_with_cwd}, outcome) =
       let expected_executable_name, expected_exit_code, expected_argv0 =
         match outcome with
-        | Fail code -> "", code, ""
-        | Success {executable_name; argv0} -> executable_name, 0, argv0
+        | Fail code ->
+            "", code, ""
+        | Success {executable_name; argv0} ->
+            (* Systems which don't have caml_executable_name get particularly
+               fiddly here, because they can fail for multiple reasons in this
+               test! Any tendered executable which was expected to succeed is
+               set to fail here, since the shim for CAML_LD_LIBRARY_PATH will
+               not be applied. *)
+            if tendered && with_unix && Harness.no_caml_executable_name
+               (* Passing the executable directly to ocamlrun will fail if
+                  ocamlrun isn't configured with a relative libdir *)
+               && (not via_ocamlrun || config.has_relative_libdir = None)
+               && (re_executing || Environment.is_renamed env
+                                   && config.has_relative_libdir = None) then
+              "", 134, ""
+            else
+              executable_name, 0, argv0
       in
-      let stubs = tendered && with_unix && config.has_relative_libdir = None in
+      let stubs =
+        tendered && with_unix
+        (* The programs compiled before the prefix is renamed are intentionally
+           run without the runtime in PATH in order to test the bytecode
+           launcher's searching in the image directory before PATH. A side
+           effect of this is that ld.conf then can't be found, because the
+           runtime copied to the testsuite directory doesn't have ld.conf in the
+           correct place. The shim is skipped for systems which don't have
+           caml_executable_name because otherwise we'd have a test which fails
+           in the Original phase and succeeds in the Execution phase, which is a
+           special case too far! *)
+        && (not Harness.no_caml_executable_name
+            && (config.has_relative_libdir = None
+                || not via_ocamlrun && re_executing))
+      in
       run_program
         env config ~runtime:via_ocamlrun ~stubs
         test_program_path ~prefix_path_with_cwd expected_executable_name
@@ -386,14 +415,14 @@ let make_test_runner ~stdlib_exists_when_renamed ~may_segfault ~with_unix
     if Environment.is_renamed env then
       (Harness.erase_file test_program_path; `None)
     else
-      `Some run
+      `Some (run ~re_executing:true)
   in
-  `Some run
+  `Some (run ~re_executing:false)
 
 (* Describe the various ways in which executables can be produced by our two
    compilers... *)
 type linkage =
-| Default_ocamlc of launch_mode
+| Default_ocamlc of launch_mode * Config.search_method
 | Default_ocamlopt
 | Custom_runtime of runtime_mode
 | Output_obj of compiler * runtime_mode
@@ -462,20 +491,26 @@ let compile_test usr_bin_sh config env test test_program description =
           0
       in
       match test with
-      | Default_ocamlc Header_exe ->
+      | Default_ocamlc(launch_method, search_method) ->
           let args =
-            if config.bytecode_shebangs_by_default then
-              ["-launch-method"; "exe"]
-            else
-              [] in
-          f ~tendered:true args
-      | Default_ocamlc Header_shebang ->
-          let args =
-            if config.bytecode_shebangs_by_default then
-              []
-            else
-              ["-launch-method"; "sh"] in
-          f ~tendered:true args
+            match launch_method with
+            | Header_exe when config.bytecode_shebangs_by_default ->
+                ["-launch-method"; "exe"]
+            | Header_shebang when not config.bytecode_shebangs_by_default ->
+                ["-launch-method"; "sh"]
+            | _ ->
+                [] in
+          let target_launcher_searches_for_ocamlrun =
+            (search_method <> Config.Disable)
+          in
+          let param =
+            match search_method with
+            | Disable -> "disable"
+            | Fallback -> "fallback"
+            | Enable -> "enable"
+          in
+          let args = "-runtime-search" :: param :: args in
+          f ~target_launcher_searches_for_ocamlrun ~tendered:true args
       | Default_ocamlopt ->
           f ~mode:Native []
       | Custom_runtime Static ->
@@ -700,8 +735,12 @@ let run ~sh config env =
                 pp_path ocamlc_where pp_path ocamlopt_where;
   let compile_test = compile_test sh config env in
   let tests = [
-    compile_test (Default_ocamlc Header_exe)
-      "byt_default_exe" "with tender";
+    compile_test (Default_ocamlc(Header_exe, Disable))
+      "byt_default_exe_disable" "with absolute tender";
+    compile_test (Default_ocamlc(Header_exe, Fallback))
+      "byt_default_exe_fallback" "with fallback tender";
+    compile_test (Default_ocamlc(Header_exe, Enable))
+      "byt_default_exe_enable" "with relocatable tender";
     compile_test (Custom_runtime Static)
       "custom_static" "-custom static runtime";
     compile_test (Custom_runtime Shared)
@@ -731,8 +770,13 @@ let run ~sh config env =
   ] in
   let tests =
     if Config.shebangscripts then
-      (compile_test (Default_ocamlc Header_shebang) "byt_default_sh" "with #!")
-        :: tests
+      (compile_test (Default_ocamlc(Header_shebang, Disable))
+        "byt_default_sh_disable" "with absolute #!") ::
+      (compile_test (Default_ocamlc(Header_shebang, Fallback))
+        "byt_default_sh_fallback" "with fallback #!") ::
+      (compile_test (Default_ocamlc(Header_shebang, Enable))
+        "byt_default_sh_enable" "with relocatable #!") ::
+      tests
     else
       tests in
   Printf.printf "Running programs\n%!";

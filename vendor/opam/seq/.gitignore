@@ -272,6 +272,7 @@ META
 /testsuite/_retries
 
 /testsuite/tools/codegen
+/testsuite/tools/poisonedruntime
 /testsuite/tools/expect
 /testsuite/tools/lexcmm.ml
 /testsuite/tools/parsecmm.ml

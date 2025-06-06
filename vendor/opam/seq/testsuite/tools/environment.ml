@@ -46,7 +46,7 @@ let libdir_suffix {libdir_suffix; _} = libdir_suffix
 
 (* Derived properties *)
 
-let is_renamed {phase; _} = (phase = Renamed)
+let is_renamed {phase; _} = (phase <> Original)
 
 let bindir {prefix; bindir_suffix; _} =
   Filename.concat prefix bindir_suffix
@@ -180,7 +180,7 @@ let make pp_path ~verbose ~test_root ~test_root_logical
     let value =
       String.sub binding (equals + 1) (String.length binding - equals - 1)
     in
-    if is_path_env name then
+    if phase <> Execution && is_path_env name then
       if Sys.win32 then
         if String.index_opt bindir ';' <> None then
           Printf.sprintf "%s=\"%s\";%s" name bindir value
@@ -226,7 +226,7 @@ let string_of_process_status = function
    highlighted. If argv0 is specified, then the original program executable is
    also shown. *)
 let display_execution level status pid ~runtime program argv0 args
-                      ({pp_path; verbose; serial; _} as env) =
+                      ({pp_path; verbose; serial; phase; _} as env) =
   let pp_program style program f = function
   | Some argv0 ->
       Format.fprintf f "@{<%s>%s (from %a)@}"
@@ -269,9 +269,11 @@ let display_execution level status pid ~runtime program argv0 args
   if serial <> !last_environment then begin
     last_environment := serial;
     Format.printf "\
-      @{<inline_code>> @}@{<loc>Environment@}\n\
-      @{<inline_code>> @}  @{<loc>PATH=%a:$PATH@}\n"
-      pp_path (bindir env);
+      @{<inline_code>> @}@{<loc>Environment@}\n";
+    if phase <> Execution then
+      Format.printf "\
+        @{<inline_code>> @}  @{<loc>PATH=%a:$PATH@}\n"
+        pp_path (bindir env);
     if not Sys.win32 then
       Format.printf "\
         @{<inline_code>> @}  @{<loc>%s=%a:$%s@}\n"
@@ -428,9 +430,9 @@ let run_process ?(runtime = false) ?(stubs = false) ?(stdlib = false)
       (* The tests are easier to write with the assumption that shims are
          simply ignored in the Original phase (otherwise they all begin
          [Env.is_renamed env && (* ... *)] *)
-      let runtime = runtime && phase = Renamed in
+      let runtime = runtime && phase <> Original in
       let env =
-        if phase = Renamed && (stubs || stdlib) then
+        if phase <> Original && (stubs || stdlib) then
           apply_shims ~stubs ~stdlib env
         else
           env
@@ -449,7 +451,7 @@ let run_process ?(runtime = false) ?(stubs = false) ?(stdlib = false)
        fails without each shim in turn. The final entry in the strategy must be
        the request itself. *)
     let test_without cond shim strategy =
-      if phase = Renamed && cond then
+      if phase <> Original && cond then
         shim env :: strategy
       else
         strategy

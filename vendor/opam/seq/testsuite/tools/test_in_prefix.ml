@@ -68,6 +68,10 @@ let run_tests ~sh config env =
   TestBytecodeBinaries.run config env;
   TestLinkModes.run ~sh config env
 
+let rename_exe_in_test_root env from_base to_base =
+  Sys.rename (Environment.in_test_root env (Harness.exe from_base))
+             (Environment.in_test_root env (Harness.exe to_base))
+
 let () =
   let ~config, ~pwd, ~prefix, ~bindir:_, ~bindir_suffix, ~libdir,
       ~libdir_suffix, ~summarise_only, ~verbose =
@@ -215,11 +219,21 @@ let () =
                                          pp_path prefix;
     Sys.rename new_prefix prefix);
   let env =
-    make_env ~phase:Renamed ~prefix:new_prefix ~bindir_suffix ~libdir_suffix in
+    make_env ~phase:Execution ~prefix:new_prefix ~bindir_suffix ~libdir_suffix
+  in
   (* 3. Re-run the test programs compiled with the normal prefix *)
   Printf.printf "Re-running test programs\n%!";
-  List.iter
-    (function `Some f -> assert (f env = `None) | `None -> ()) programs;
+  (* Verify that the searching runtimes are searching the directory containing
+     the program itself first. *)
+  let runtime = "ocamlrun" in
+  rename_exe_in_test_root env ("test-" ^ runtime) runtime;
+  Fun.protect
+    ~finally:(fun () -> rename_exe_in_test_root env runtime ("test-" ^ runtime))
+    (fun () ->
+      List.iter
+        (function `Some f -> assert (f env = `None) | `None -> ()) programs);
+  let env =
+    make_env ~phase:Renamed ~prefix:new_prefix ~bindir_suffix ~libdir_suffix in
   (* 4. Finally re-run the main test battery in the new prefix *)
   Compmisc.init_path ~standard_library:libdir ();
   let programs = run_tests env in

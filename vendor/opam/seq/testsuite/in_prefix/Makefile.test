@@ -38,8 +38,16 @@ else
 VERBOSE_FLAG =
 endif
 
-test-in-prefix: $(DRIVER) ../tools/main_in_c.$(O)
+export PATH := $(SRCDIR_ABS)/testsuite/in_prefix/poisoned-runtime:$(PATH)
+
+test-in-prefix: $(DRIVER) ../tools/main_in_c.$(O) ../tools/poisonedruntime$(EXE)
+	@rm -f ocamlrun*
+	@$(LN) $(ROOTDIR)/runtime/ocamlrun$(EXE) test-ocamlrun$(EXE)
+	@$(MKDIR) poisoned-runtime
+	@cd poisoned-runtime && $(LN) ../../tools/poisonedruntime$(EXE) ocamlrun$(EXE)
 	@$< $(DRIVER_ARGS)
+	@rm -rf poisoned-runtime
+	@rm -f test-ocamlrun$(EXE)
 
 SCRUB_ENV = \
   CAML_LD_LIBRARY_PATH OCAMLLIB CAMLLIB OCAMLPARAM OCAMLRUNPARAM CAMLRUNPARAM
