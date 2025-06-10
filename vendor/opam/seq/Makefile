@@ -661,7 +661,8 @@ flexlink.byte$(EXE): $(FLEXDLL_SOURCES)
 	rm -f $(FLEXDLL_SOURCE_DIR)/flexlink.exe
 	$(MAKE) -C $(FLEXDLL_SOURCE_DIR) $(FLEXLINK_BUILD_ENV) \
 	  OCAMLRUN='$$(ROOTDIR)/boot/ocamlrun$(EXE)' NATDYNLINK=false \
-	  OCAMLOPT='$(value BOOT_OCAMLC) $(USE_RUNTIME_PRIMS) $(USE_STDLIB)' \
+	  OCAMLOPT=$(call QUOTE_SINGLE,$(value BOOT_OCAMLC) $(USE_RUNTIME_PRIMS) \
+	                                                    $(USE_STDLIB)) \
 	  flexlink.exe support
 	cp $(FLEXDLL_SOURCE_DIR)/flexlink.exe $@
 	cp $(addprefix $(FLEXDLL_SOURCE_DIR)/, $(FLEXDLL_OBJECTS)) $(ROOTDIR)
@@ -1409,14 +1410,14 @@ runtime/caml/jumptbl.h : runtime/caml/instruct.h
 $(SAK): runtime/sak.c runtime/caml/misc.h runtime/caml/config.h
 	$(V_MKEXE)$(call SAK_BUILD,$@,$<)
 
-C_LITERAL = $(shell $(SAK) $(ENCODE_C_LITERAL) '$(1)')
+C_LITERAL = $(shell $(SAK) $(ENCODE_C_LITERAL) $(call QUOTE_SINGLE,$(1)))
 
 runtime/build_config.h: $(ROOTDIR)/Makefile.config \
                         $(ROOTDIR)/Makefile.build_config $(SAK)
 	$(V_GEN){ \
 	  echo '/* This file is generated from $(ROOTDIR)/Makefile.config */'; \
 	  printf '#define OCAML_STDLIB_DIR %s\n' \
-	         '$(call C_LITERAL,$(TARGET_LIBDIR))'; \
+	         $(call QUOTE_SINGLE,$(call C_LITERAL,$(TARGET_LIBDIR))); \
 	  echo '#define HOST "$(HOST)"'; \
 	} > $@
 
