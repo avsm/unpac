@@ -80,10 +80,6 @@ module Import : sig
     libraries: string list list;
       (** Sorted list of basenames of libraries to test.
           Derived from {v [$(OTHERLIBRARIES)] v} - {v Makefile.config v} *)
-    zinc_bootstrapped: bool;
-      (** True if boot/ocamlc has been bootstrapped (temporary, to allow the
-          tests to pass on the bootstrap commit before they're updated following
-          the bootstrap) *)
   }
 end
 

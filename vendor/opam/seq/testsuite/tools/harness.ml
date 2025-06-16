@@ -37,8 +37,7 @@ module Import = struct
     target_launcher_searches_for_ocamlrun: bool;
     bytecode_shebangs_by_default: bool;
     filename_mangling: bool;
-    libraries: string list list;
-    zinc_bootstrapped: bool
+    libraries: string list list
   }
 end
 

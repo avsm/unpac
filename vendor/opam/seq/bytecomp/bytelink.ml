@@ -425,9 +425,6 @@ let write_header outchan =
     let zinc_runtime_id, offset =
       if String.length data < 2 then
         raise (Error (Camlheader ("corrupt header", header)))
-      (* Compatibility with previous header format - remove post-bootstrap *)
-      else if List.mem data.[0] ['/'; 'e'; 's'] then
-        None, String.index data '\000' + 2
       else if data.[0] = '\000' then
         None, 1
       else

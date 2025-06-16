@@ -347,43 +347,6 @@ endef # _OCAML_PROGRAM_BASE
 BYTECODE_LAUNCHER_FLAGS = \
   -launch-method $(call QUOTE_SINGLE,$(LAUNCH_METHOD) $(BINDIR))
 
-# Historically, the native Windows ports are assumed to be finding ocamlrun
-# using a PATH search. Since boot/ocamlc has no notion of the target, Windows
-# requires -runtime-search to be passed explicitly.
-ifeq "$(UNIX_OR_WIN32)" "win32"
-BYTECODE_LAUNCHER_FLAGS += -runtime-search enable
-endif
-
-# $(BOOTSTRAPPED) will be non-empty after the compiler has been bootstrapped, as
-# the -launch-method string will appear in it.
-BOOTSTRAPPED := \
-  $(shell grep -Fq 'launch-method' $(ROOTDIR)/boot/ocamlc && echo Bootstrapped)
-
-# Prior to bootstrapping, boot/ocamlc gets the correct host values from
-# boot/runtime-launch-info and doesn't yet recognise -launch-method. After
-# bootstrapping, both compilers must be passed -launch-method.
-ifeq "$(BOOTSTRAPPED)" ""
-ROOT_LINK_FLAGS := $(BYTECODE_LAUNCHER_FLAGS)
-BYTECODE_LAUNCHER_FLAGS :=
-endif
-
-ifeq "$(SUFFIXING)-$(UNIX_OR_WIN32)" "true-win32"
-# Historically, the native Windows ports are assumed to be finding ocamlrun
-# using a PATH search. -use-runtime ocamlrun-$(ZINC_RUNTIME_ID) won't work here
-# as ocamlc will convert it to an absolute path. Instead, we (ab)use
-# -runtime-variant to append the -$(ZINC_RUNTIME_ID) to the default ocamlrun.
-BYTECODE_LAUNCHER_FLAGS += -runtime-variant -$(ZINC_RUNTIME_ID)
-# boot/ocamlc is built with suffixing disabled, so this works both before and
-# after bootstrapping, however this would cause $(ROOTDIR)/ocamlc to add the
-# suffix twice. Thwart this by further (ab)using -runtime-variant.
-ROOT_LINK_FLAGS += -runtime-variant ''
-else ifeq "$(SUFFIXING)" "true"
-# boot/ocamlc is built with suffixing disabled or not yet bootstrapped, so
-# either way pass the suffixed runtime name explicitly with -use-runtime.
-BYTECODE_LAUNCHER_FLAGS += \
-  -use-runtime $(call QUOTE_SINGLE,$(BINDIR)/ocamlrun-$(ZINC_RUNTIME_ID))
-endif
-
 MAYBE_ADD_BYTECODE_LAUNCHER_FLAGS = \
   $(if $(filter -custom, $(1)),,\
     -use-prims $(ROOTDIR)/runtime/primitives $(BYTECODE_LAUNCHER_FLAGS))

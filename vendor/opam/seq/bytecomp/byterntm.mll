@@ -55,14 +55,6 @@ rule analyze = parse
           let dir = dir ^ String.make 1 sep in
           cut_runtime_id (Disable dir) runtime }
 
-(* Legacy RNTM (remove after bootstrap) *)
-  | (([^ '\000']* ['/' '\\']) as dir)
-    ([^ '\\' '/' '\000']+ as runtime) '\000' eof
-      { if dir = "" then
-          Some (runtime, None, Enable)
-        else
-          Some (runtime, None, Disable dir) }
-
 (* Shell script launcher (if it matches, this always matches more than the above
    regexp) *)
   | "#!" [^ ' ' '\n']+ "/sh\n" (("exec '" | "r='") as next)

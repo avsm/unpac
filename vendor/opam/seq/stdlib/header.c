@@ -349,15 +349,6 @@ NORETURN void search_and_exec_runtime(char_os *rntm, uint32_t rntm_bsz,
 
   /* The first character of rntm is NUL for Enable mode */
   if (*rntm != 0) {
-    /* boot/ocamlc writes a NUL-terminated string to RNTM. In this case,
-       rntm_bindir_end points to that NUL (which will have been included in the
-       length of RNTM recorded in the bytecode image) and immediately following
-       it is the extra NUL character required by this function.
-       Interpret this as Disable. For Windows, where the RNTM written by
-       boot/ocamlc will have just been "ocamlrun\0", this maintains the required
-       Enable behaviour! This can be removed after a bootstrap. */
-    if (rntm_bindir_end + 1 == rntm_end)
-      rntm_bindir_end++;
     /* For Disable mode, there is no NUL in RNTM, so rntm_bindir_end points to
        the terminator pointed to by rntm_end. For Fallback, there is a NUL in
        the middle of the RNTM "string", which rntm_bindir_end points at. Change
