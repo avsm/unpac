@@ -247,7 +247,7 @@ CAMLexport int caml_channel_binary_mode(struct channel *channel)
    end of the flush, or false if some data remains in the buffer.
  */
 
-static int flush_partial(struct channel *channel, bool exn_if_closed)
+static bool flush_partial(struct channel *channel, bool exn_if_closed)
 {
   int towrite, written;
  again:
@@ -838,7 +838,7 @@ CAMLprim value caml_ml_flush(value vchannel)
   struct channel * channel = Channel(vchannel);
 
   caml_channel_lock(channel);
-  while (! flush_partial(channel, false)) /*nothing*/;
+  while (! flush_partial(channel, false)) continue;
   caml_channel_unlock(channel);
   CAMLreturn (Val_unit);
 }
