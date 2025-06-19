@@ -310,6 +310,7 @@ val filter_arrow_mono: Env.t -> type_expr -> arg_label -> filtered_arrow
         (* A special case of unification. Composition of [filter_arrow]
            with [filter_mono] on the argument type. Raises
            [Filter_arrow_mono_failed] instead of [Unify] *)
+val is_really_poly : Env.t -> type_expr -> bool
 val filter_method: Env.t -> string -> type_expr -> type_expr
         (* A special case of unification (with {m : 'a; 'b}).  Raises
            [Filter_method_failed] instead of [Unify]. *)

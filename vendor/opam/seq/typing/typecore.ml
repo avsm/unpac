@@ -5213,14 +5213,7 @@ and split_function_ty env ty_expected ~arg_label ~has_poly ~first ~in_function =
   in
   if not has_poly && not (tpoly_is_mono ty_arg) && !Clflags.principal
       && get_level ty_arg < Btype.generic_level then begin
-    let snap = Btype.snapshot () in
-    let really_poly =
-      try
-        unify env (newmono (newvar ())) ty_arg;
-        false
-      with Unify _ -> true
-    in
-    Btype.backtrack snap;
+    let really_poly = Ctype.is_really_poly env ty_arg in
     if really_poly then
       Location.prerr_warning loc (not_principal "this higher-rank function");
   end;
@@ -5923,14 +5916,7 @@ and type_apply_arg env ~app_loc (lbl, arg) =
         end else begin
           if !Clflags.principal
              && get_level ty_arg < Btype.generic_level then begin
-            let snap = Btype.snapshot () in
-            let really_poly =
-              try
-                unify env (newmono (newvar ())) ty_arg;
-                false
-              with Unify _ -> true
-            in
-            Btype.backtrack snap;
+            let really_poly = Ctype.is_really_poly env ty_arg in
             if really_poly then
               Location.prerr_warning app_loc
                 (not_principal "applying a higher-rank function here");

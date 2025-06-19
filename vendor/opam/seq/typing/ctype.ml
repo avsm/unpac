@@ -3482,6 +3482,17 @@ let filter_arrow_mono env t l =
       | exception Filter_mono_failed -> raise Filter_arrow_mono_failed
       | ty_arg -> { farr with ty_arg}
 
+let is_really_poly env ty =
+  let snap = Btype.snapshot () in
+  let really_poly =
+    try
+      unify env (newmono (newvar ())) ty;
+      false
+    with Unify _ -> true
+  in
+  Btype.backtrack snap;
+  really_poly
+
 type filter_method_failure =
   | Unification_error of unification_error
   | Not_a_method
