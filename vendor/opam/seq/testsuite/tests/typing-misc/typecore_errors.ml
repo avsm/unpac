@@ -477,5 +477,8 @@ Line 5, characters 8-35:
 5 | let f = (g: u -> unit :> v -> unit)
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "u -> unit" is not a subtype of "v -> unit"
+       Type "v" = "v0 -> unit" is not a subtype of "u" = "u0 -> unit"
+       Type "u0" = "int * int -> unit" is not a subtype of
+         "v0" = "float * float -> unit"
        Type "float" is not a subtype of "int"
 |}]
