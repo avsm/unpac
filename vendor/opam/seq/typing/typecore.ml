@@ -4018,9 +4018,6 @@ and type_expect_
         type_function env params body_constraint body ty_expected ~in_function
           ~first:true
       in
-      let params =
-        List.map (fun { param; has_poly = _ } -> param) result_params
-      in
       (* Require that the n-ary function is known to have at least n arrows
          in the type. This prevents GADT equations introduced by the parameters
          from hiding arrows from the resulting type.
@@ -4059,7 +4056,7 @@ and type_expect_
                         have been caught when the function was typechecked."
                 in
                 let syntactic_arity =
-                  List.length params +
+                  List.length result_params +
                     (match body with
                       | Tfunction_body _ -> 0
                       | Tfunction_cases _ -> 1)
@@ -4086,6 +4083,9 @@ and type_expect_
               ignore
                 (filter_ty_ret_exn ret_ty Nolabel ~force_tpoly:true : type_expr)
       end;
+      let params =
+        List.map (fun { param; has_poly = _ } -> param) result_params
+      in
       re
         { exp_desc = Texp_function (params, body);
           exp_loc = loc;
