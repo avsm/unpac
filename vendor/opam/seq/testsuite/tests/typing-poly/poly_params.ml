@@ -372,6 +372,15 @@ Line 1, characters 9-24:
 Error: Class parameters cannot be polymorphic
 |}];;
 
+class c' (f: 'a. int -> int) = object
+  method m = f 0
+end;;
+[%%expect {|
+Line 1, characters 10-27:
+1 | class c' (f: 'a. int -> int) = object
+              ^^^^^^^^^^^^^^^^^
+Error: Class parameters cannot be polymorphic
+|}];;
 
 let poly1' ~(id : 'a. 'a -> 'a) = id 3, id "three"
 [%%expect {|
@@ -383,6 +392,14 @@ let poly2' ?(id : 'a. 'a -> 'a) = id 3, id "three"
 Line 1, characters 13-30:
 1 | let poly2' ?(id : 'a. 'a -> 'a) = id 3, id "three"
                  ^^^^^^^^^^^^^^^^^
+Error: The optional parameter "id" cannot have a polymorphic type.
+|}];;
+
+let poly3' ?(id : 'a. int -> int) = id 3
+[%%expect {|
+Line 1, characters 13-32:
+1 | let poly3' ?(id : 'a. int -> int) = id 3
+                 ^^^^^^^^^^^^^^^^^^^
 Error: The optional parameter "id" cannot have a polymorphic type.
 |}];;
 
