@@ -487,3 +487,34 @@ let () = accept_poly_poly_var poly_poly_var
 val poly_poly_var : [< `A | `B ] -> unit = <fun>
 val accept_poly_poly_var : ('a. ([< `A | `B ] as 'a) -> unit) -> unit = <fun>
 |}]
+
+
+let (let*) x (id : 'a. 'a -> 'a) = id x, id 1
+[%%expect {|
+val ( let* ) : 'b -> ('a. 'a -> 'a) -> 'b * int = <fun>
+|}]
+
+let (let*) (x : 'a. 'a option) (id : 'a. 'a -> 'a) = id x, id 1
+[%%expect {|
+val ( let* ) : ('a. 'a option) -> ('a. 'a -> 'a) -> 'b option * int = <fun>
+|}]
+
+let y =
+  let* x = 3. in
+  x
+[%%expect {|
+Line 2, characters 2-6:
+2 |   let* x = 3. in
+      ^^^^
+Error: The operator "let*" has type
+         "('a. 'a option) -> ('a. 'a -> 'a) -> 'b option * int"
+       but it was expected to have type "'c -> ('d -> 'e) -> 'f"
+       The universal variable "'a" would escape its scope
+|}]
+
+let f ((g, x) : 'a. ('a -> int) * 'a) =
+  g 3, g "three"
+
+[%%expect{|
+val f : ('a. ('a -> int) * 'a) -> int * int = <fun>
+|}]
