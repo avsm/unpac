@@ -142,7 +142,7 @@ let reloc_pat ~loc x =
 let reloc_exp ~loc x =
   { x with pexp_loc = make_loc loc;
            pexp_loc_stack = push_loc x.pexp_loc x.pexp_loc_stack }
-let _reloc_typ ~loc x =
+let reloc_typ ~loc x =
   { x with ptyp_loc = make_loc loc;
            ptyp_loc_stack = push_loc x.ptyp_loc x.ptyp_loc_stack }
 
@@ -3749,11 +3749,8 @@ function_type:
       { Nolabel }
 ;
 %inline param_type:
-  | mktyp(
-    LPAREN vars = typevar_list DOT ty = core_type RPAREN
-      { Ptyp_poly(vars, ty) }
-    )
-    { $1 }
+  | LPAREN poly_type RPAREN
+    { reloc_typ ~loc:$sloc $2 }
   | ty = tuple_type
     { ty }
 ;
