@@ -67,19 +67,6 @@ let in_libdir env path =
 let in_test_root {test_root; _} path =
   Filename.concat test_root path
 
-(* Reverse the quoting of single quotes done by Filename.quote on Unix (which is
-   used for the runtime name when embedded in sh-scripts. Any single quote
-   characters are transformed to "'\\''". If the string is split on the single
-   quote characters, the sequence ["\\"; ""] is a single quote character in the
-   unescaped version. *)
-let dequote s =
-  let[@tail_mod_cons] rec loop = function
-  | "\\" :: "" :: rest -> "'" :: loop rest
-  | chunk :: rest -> chunk :: loop rest
-  | [] -> []
-  in
-  String.concat "" (loop (String.split_on_char '\'' s))
-
 (* [classify_executable file] determines if [file] is :
    - Tendered bytecode with an executable header
    - Scripted bytecode invoking ocamlrun with a #! header
@@ -91,49 +78,18 @@ let classify_executable file =
   try
     In_channel.with_open_bin file (fun ic ->
       let start = really_input_string ic 2 in
-      let is_RNTM = function
-      | Bytesections.{name = Name.RNTM; _} -> true
-      | _ -> false
-      in
+      let toc = Bytesections.read_toc ic in
+      let sections = Bytesections.all toc in
       let is_DLLS = function
       | Bytesections.{name = Name.DLLS; len} when len > 0 -> true
       | _ -> false
       in
-      let toc = Bytesections.read_toc ic in
-      let sections = Bytesections.all toc in
-      if start = "#!" then
-        let runtime =
-          seek_in ic 2;
-          let shebang = String.trim (input_line ic) in
-          if Filename.basename shebang = "sh" then
-            let exec_line = input_line ic in
-            if String.starts_with ~prefix:"exec '" exec_line
-               && String.ends_with ~suffix:"' \"$0\" \"$@\"" exec_line then
-              (* When the path to the runtime can't be directly used in a
-                 shebang, the shell is used instead, the next line is then:
-                   exec '<runtime>' "$0" "$@" *)
-              dequote (String.sub exec_line 6 (String.length exec_line - 17))
-            else
-              Harness.fail_because "%s contains an unexpected exec line: %S"
-                                   file exec_line
-          else
-            shebang
-        in
-        Tendered {header = Header_shebang;
-                  dlls = List.exists is_DLLS sections;
-                  runtime}
-      else if List.exists is_RNTM sections then
-        let rntm =
-          Bytesections.read_section_string toc ic Bytesections.Name.RNTM in
-        let len = String.length rntm in
-        if len = 0 || rntm.[len - 1] <> '\000' then
-          Harness.fail_because "%s contains corrupt RNTM: %S" file rntm;
-        let runtime = String.sub rntm 0 (len - 1) in
-        Tendered {header = Header_exe;
-                  dlls = List.exists is_DLLS sections;
-                  runtime}
-      else
-        Custom)
+      let tendered runtime =
+        let header = if start = "#!" then Header_shebang else Header_exe in
+        let dlls = List.exists is_DLLS sections in
+        Tendered {header; dlls; runtime}
+      in
+      Option.fold ~none:Custom ~some:tendered (Byterntm.read_runtime toc ic))
   with End_of_file | Bytesections.Bad_magic_number ->
     Vanilla
 

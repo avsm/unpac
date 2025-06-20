@@ -2476,6 +2476,14 @@ bytecomp/bytepackager.cmi : \
     utils/format_doc.cmi \
     typing/env.cmi \
     file_formats/cmo_format.cmi
+bytecomp/byterntm.cmo : \
+    bytecomp/bytesections.cmi \
+    bytecomp/byterntm.cmi
+bytecomp/byterntm.cmx : \
+    bytecomp/bytesections.cmx \
+    bytecomp/byterntm.cmi
+bytecomp/byterntm.cmi : \
+    bytecomp/bytesections.cmi
 bytecomp/bytesections.cmo : \
     utils/config.cmi \
     bytecomp/bytesections.cmi
@@ -8064,6 +8072,7 @@ tools/objinfo.cmo : \
     file_formats/cmo_format.cmi \
     file_formats/cmi_format.cmi \
     bytecomp/bytesections.cmi \
+    bytecomp/byterntm.cmi \
     utils/binutils.cmi \
     tools/objinfo.cmi
 tools/objinfo.cmx : \
@@ -8087,6 +8096,7 @@ tools/objinfo.cmx : \
     file_formats/cmo_format.cmi \
     file_formats/cmi_format.cmx \
     bytecomp/bytesections.cmx \
+    bytecomp/byterntm.cmx \
     utils/binutils.cmx \
     tools/objinfo.cmi
 tools/objinfo.cmi :
@@ -10544,6 +10554,7 @@ testsuite/tools/environment.cmo : \
     file_formats/cmt_format.cmi \
     file_formats/cmo_format.cmi \
     bytecomp/bytesections.cmi \
+    bytecomp/byterntm.cmi \
     testsuite/tools/environment.cmi
 testsuite/tools/environment.cmx : \
     otherlibs/unix/unix.cmx \
@@ -10554,6 +10565,7 @@ testsuite/tools/environment.cmx : \
     file_formats/cmt_format.cmx \
     file_formats/cmo_format.cmi \
     bytecomp/bytesections.cmx \
+    bytecomp/byterntm.cmx \
     testsuite/tools/environment.cmi
 testsuite/tools/environment.cmi : \
     testsuite/tools/harness.cmi

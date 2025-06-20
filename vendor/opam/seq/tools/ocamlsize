@@ -20,7 +20,7 @@ foreach $f (@ARGV) {
     read(FILE, $header, 2);
     if ($header eq '#!') {
       $path = <FILE>;
-      if ($path = '/bin/sh') {
+      if ($path =~ m/\/sh$/) {
         # exec form of the shebang header
         $path = <FILE>;
         if ($path =~ s/^exec '(.*)' "\$0" "\$@\"$/$1/ > 0) {

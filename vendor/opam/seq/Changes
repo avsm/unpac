@@ -263,6 +263,10 @@ Working version
 - #14239: Fix `#show_constructor` when printing non-GADT type parameters
   (Takafumi Saikawa, Jacques Garrigue, review by Gabriel Scherer)
 
+- #14245: ocamlobjinfo now displays the runtime invoked by a bytecode
+  executable (either from the RNTM section or by analysing the shebang lines)
+  (David Allsopp, review by Damien Doligez and Samuel Hym)
+
 ### Manual and documentation:
 
 - #14397: Improve documentation of type-directed disambiguation of array

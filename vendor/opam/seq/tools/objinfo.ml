@@ -292,9 +292,12 @@ let p_list title print = function
       p_title title;
       List.iter print l
 
+let p_runtime =
+  printf "Runtime:\n\t%s\n"
+
 let dump_byte ic =
   let toc = Bytesections.read_toc ic in
-  let all = Bytesections.all toc in
+  Option.iter p_runtime (Byterntm.read_runtime toc ic);
   List.iter
     (fun {Bytesections.name = section; len; _} ->
        try
@@ -329,7 +332,7 @@ let dump_byte ic =
            | _ -> ()
        with _ -> ()
     )
-    all
+    (Bytesections.all toc)
 
 let find_dyn_offset filename =
   match Binutils.read filename with
