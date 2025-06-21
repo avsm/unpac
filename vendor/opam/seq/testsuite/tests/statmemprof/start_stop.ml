@@ -8,18 +8,17 @@ module MP = Gc.Memprof
 
 let prof () = MP.start  ~sampling_rate:1. MP.null_tracker
 
-let is_sampling () =
-  Printf.printf "is_sampling (): %b.\n" (MP.is_sampling ())
+let check_sampling b = assert(MP.is_sampling () = b)
 
 (* Null test: start/stop/discard *)
 let _ =
-  is_sampling ();
+  check_sampling false;
   let profile = prof () in
-  is_sampling ();
+  check_sampling true;
   MP.stop ();
-  is_sampling ();
+  check_sampling false;
   MP.discard profile;
-  is_sampling ();
+  check_sampling false;
   print_endline "Null test."
 
 (* Stop without starting *)
@@ -34,13 +33,13 @@ let _ =
     Fun.protect ~finally:MP.stop (fun () ->
       ignore (prof ());
       ignore (prof ());
-      is_sampling ()
+      check_sampling true
     ) ;
     print_endline "Start without stopping."
   with
     Failure s -> Printf.printf "Start without stopping fails with \"%s\"\n" s
 
-let () = is_sampling ()
+let () = check_sampling false
 
 (* Discard without stopping. *)
 let _ =
@@ -113,7 +112,7 @@ let _ =
   MP.stop ();
   let prof2 = prof () in
   MP.discard prof1;
-  is_sampling ();
+  check_sampling true;
   MP.stop ();
   MP.discard prof2;
   print_endline "Discarding old profile while sampling."
