@@ -743,8 +743,11 @@ module Merge = struct
 
       - [md'] is the module type of the module at [path], used for equivalence
       checks
+
+      - [~approx] is used to disable equivalence checking when merging inside
+      recursive module definitions
   *)
-  let merge_module ~destructive env loc sg lid
+  let merge_module ?(approx=false) ~destructive env loc sg lid
       (md': Types.module_declaration) path remove_aliases =
     let aliasable = Env.is_aliasable path env in
     let patch item s sig_env sg_for_env ~ghosts =
@@ -754,9 +757,9 @@ module Merge = struct
           let real_path = Pident id in
           if destructive then
             (* Inclusion check with the strengthened definition *)
-            let _ =
-              Includemod.strengthened_module_decl ~loc ~mark:true
-                ~aliasable sig_env md' path md in
+            let _ = if (not approx) then
+               ignore (Includemod.strengthened_module_decl ~loc ~mark:true
+                         ~aliasable sig_env md' path md) in
             return ~ghosts ~replace_by:None real_path
           else
             let mty = md'.md_type in
@@ -765,8 +768,9 @@ module Merge = struct
             let newmd =
               Mtype.strengthen_decl ~aliasable:false sig_env md'' path in
             (* Inclusion check with the original signature *)
-            let _ = Includemod.modtypes ~mark:true ~loc sig_env
-                newmd.md_type md.md_type in
+            let _ = if (not approx) then
+               ignore (Includemod.modtypes ~mark:true ~loc sig_env
+                         newmd.md_type md.md_type) in
             return ~ghosts
               ~replace_by:(Some(Sig_module(id, pres, newmd, rs, priv)))
               real_path
@@ -1086,15 +1090,20 @@ and approx_constraint env body constr =
       let _,_,sg = Merge.merge_modtype ~approx:true ~destructive
           env smty.pmty_loc body id approx_smty in
       sg
-  (* module substitutions are ignored, but checked for cyclicity *)
-  | Pwith_module (_, lid') ->
+  (* module substitutions are approximated and merged, checking for cyclicity *)
+  | Pwith_module (id, lid)
+  | Pwith_modsubst (id, lid) ->
+      let destructive =
+        (match constr with | Pwith_modsubst _ -> true | _ -> false) in
       (* Lookup the module to make sure that it is not recursive.
          (GPR#1626) *)
-      ignore (Env.lookup_module_path ~use:false ~load:false
-                ~loc:lid'.loc lid'.txt env) ; body
-  | Pwith_modsubst (_, lid') ->
-      ignore (Env.lookup_module_path ~use:false ~load:false
-                ~loc:lid'.loc lid'.txt env) ; body
+      let path, approx_md =
+        Env.lookup_module ~use:false ~loc:lid.loc lid.txt env in
+      let _,_,sg =
+        Merge.merge_module ~approx:true ~destructive env
+          lid.loc body id approx_md path false in
+      sg
+
 
 let approx_modtype env smty =
   Warnings.without_warnings
