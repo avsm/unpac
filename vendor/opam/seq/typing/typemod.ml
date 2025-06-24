@@ -557,13 +557,14 @@ module Merge = struct
   (* After the item has been patched, post processing does the actual
      destructive substitution and checks wellformedness of the resulting
      signature *)
-  let post_process ~destructive loc lid env paths sg
+  let post_process ~approx ~destructive loc lid env paths sg
       ?(invalid_alias=None) replace =
     let sg =
       if destructive then
         (* Check that the substitution will not make the signature ill-formed *)
-        let () = check_usage_after_substitution ~loc ~lid env paths
-        ~invalid_alias sg in
+        let () = if not approx then
+                   check_usage_after_substitution ~loc ~lid env paths
+                     ~invalid_alias sg in
         (* Actually remove the identifiers *)
         let sub = Subst.change_locs Subst.identity loc in
         let sub = List.fold_left replace sub paths in
@@ -571,8 +572,9 @@ module Merge = struct
       else sg
     in
     (* check that the resulting signature is still wellformed *)
-    let () = check_well_formed_module env loc "this instantiated signature"
-        (Mty_signature sg) in
+    let () = if not approx then
+               check_well_formed_module env loc "this instantiated signature"
+                 (Mty_signature sg) in
     sg
 
   (* Main recursive knot to handle deep merges *)
@@ -736,8 +738,41 @@ module Merge = struct
       else
         fun s _ -> s
     in
-    let sg = post_process ~destructive loc lid env paths sg replace in
+    let sg =
+      post_process ~approx:false ~destructive loc lid env paths sg replace in
     (tdecl, (path, lid, sg))
+
+  (** Approximated type constraint [sg with type lid = _]
+
+      This function is separated from [merge_type] as its logic is much more
+      restricted (it does not need the right-hand side declaration).
+
+      - For destructive constraints, the field is removed to prevent incorrect
+      shadowing in the approximated signature.
+
+      - For non-destructive constraints, the normal merging infrastructure is
+      still used with an no-op identity patch. It is done to catch ill-formed
+      constraints on non-existing fields early, during the approximation phase
+      (rather than during signature typechecking) *)
+  let merge_type_approx ~destructive env loc sg lid =
+    let patch item s _sig_env _sg_for_env ~ghosts =
+      match item with
+      | Sig_type(id, _, _, _) when Ident.name id = s ->
+         let item_opt =
+           if destructive then None
+           else
+             (* An identity patch is applied *)
+             Some (item)
+         in
+         return ~ghosts ~replace_by:item_opt (Pident id)
+      | _ -> None
+    in
+    (* Merging *)
+    let _, paths, _, sg = merge ~patch ~destructive env sg loc lid in
+    (* Post processing *)
+    let replace = fun s _path -> s in
+    post_process ~approx:true ~destructive loc lid env paths sg replace
+
 
   (** Module constraint [sg with module lid = path]
 
@@ -780,7 +815,8 @@ module Merge = struct
     let replace s p = Subst.Unsafe.add_module_path p path s in
     let invalid_alias = if (not aliasable) then (Some path) else None in
     let sg =
-      post_process ~destructive loc lid env paths sg replace ~invalid_alias in
+      post_process ~approx ~destructive ~invalid_alias
+        loc lid env paths sg replace  in
     real_path, lid, sg
 
   (** Module type constraint [sg with module type lid = mty]
@@ -817,7 +853,7 @@ module Merge = struct
     in
     let path,paths,_,sg = merge ~patch ~destructive env sg loc lid in
     let replace s p = Subst.Unsafe.add_modtype_path p mty s in
-    let sg = post_process ~destructive loc lid env paths sg replace in
+    let sg = post_process ~approx ~destructive loc lid env paths sg replace in
     path, lid, sg
 
   (** Type constraints inside a first class module type [(module sg with type
@@ -1077,24 +1113,30 @@ and approx_modtype_info env sinfo =
  }
 
 and approx_constraint env body constr =
+  (* constraints are first approximated then merged, disabling all equivalence
+     and wellformedness checks. Only ill-formed constraints where the field does
+     not exists are caught at approximation phase, other errors (non-equivalent
+     constraints) will be caught when typechecking the signatures (with the
+     approximation in the environment). *)
+  let destructive = match constr with
+    | Pwith_typesubst _
+    | Pwith_modtypesubst _
+    | Pwith_modsubst _ -> true
+    | _ -> false
+  in
   match constr with
-  (* type substitutions are ignored *)
-  | Pwith_type _
-  | Pwith_typesubst _ -> body
-  (* module type substitutions are approximated then merged *)
+  | Pwith_type (l, decl)
+  | Pwith_typesubst (l, decl) ->
+     Merge.merge_type_approx ~destructive env decl.ptype_loc body l
+
   | Pwith_modtype (id, smty)
   | Pwith_modtypesubst (id, smty) ->
-      let destructive =
-        (match constr with | Pwith_modtypesubst _ -> true | _ -> false) in
       let approx_smty = approx_modtype env smty in
       let _,_,sg = Merge.merge_modtype ~approx:true ~destructive
           env smty.pmty_loc body id approx_smty in
       sg
-  (* module substitutions are approximated and merged, checking for cyclicity *)
   | Pwith_module (id, lid)
   | Pwith_modsubst (id, lid) ->
-      let destructive =
-        (match constr with | Pwith_modsubst _ -> true | _ -> false) in
       (* Lookup the module to make sure that it is not recursive.
          (GPR#1626) *)
       let path, approx_md =
