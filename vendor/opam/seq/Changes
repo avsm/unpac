@@ -78,6 +78,20 @@ Working version
   explaining that `X1` would keep an invalid alias to `F(X)`
   (Clement Blaudeau, review by Florian Angeletti)
 
+* #14100: Do not ignore type-constraints and module-constraints when building
+  the approximated signature of recursive modules. Ignoring those constraints
+  resulted in incorrect (wrong set of fields, wrong shadowing between fields)
+  approximated signatures, failing to typecheck, as in:
+  ```ocaml
+  module X0 : sig type t end
+  module rec X : ((sig module A : sig end end) with module A := X0)
+  and Y : sig type t = X.A.t end (* Unbound type constructor X.A.t *)
+  ```
+  Now, type and module constraints are properly merged during approximation
+  (still disabling any wellformedness check).
+  (Clement Blaudeau, review by ???)
+
+
 ### Other libraries:
 
 * #14046: On Windows, `Unix.kill pid Sys.sigkill` causes the receiving process
