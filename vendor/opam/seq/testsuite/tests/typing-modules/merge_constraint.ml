@@ -925,3 +925,27 @@ Error: In this "with" constraint, the new definition of "t"
          type 'a t
        They have different arities.
 |}]
+
+(** Type constraints on module types inside recursive signatures should be
+    properly typed. Here, if the [type t := int] constraint is ignored, the
+    functor application becomes invalid. As paths with functor application can
+    appear in signatures, its crucial that the approximation phase get [T]
+    right, it would be too late in the typechecking phase *)
+module Empty = struct end
+module rec X: sig
+  module type T = sig type t end with type t := int
+  module F(A:T): sig type t end
+end = struct
+  module type T = sig end
+  module F(A:T) = struct type t end
+end
+and Y: sig type t = X.F(Empty).t end = struct
+   type t = X.F(Empty).t
+end
+
+[%%expect{|
+module Empty : sig end
+module rec X :
+  sig module type T = sig end module F : (A : T) -> sig type t end end
+and Y : sig type t = X.F(Empty).t end
+|}]
