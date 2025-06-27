@@ -770,7 +770,7 @@ module type Module_Abstract_Shallow_Destructive =
 
 
 (* Approximating a signature with a module constraint should merge the module
-   (abstract, shallow, non destructive case) *)
+   (abstract, deep, non destructive case) *)
 module type Module_Abstract_Deep = sig
   module X0 : sig type t end
   module rec X : (sig
@@ -929,7 +929,7 @@ Error: In this "with" constraint, the new definition of "t"
 (** Type constraints on module types inside recursive signatures should be
     properly typed. Here, if the [type t := int] constraint is ignored, the
     functor application becomes invalid. As paths with functor application can
-    appear in signatures, its crucial that the approximation phase get [T]
+    appear in signatures, it is crucial that the approximation phase get [T]
     right, it would be too late in the typechecking phase *)
 module Empty = struct end
 module rec X: sig
@@ -948,4 +948,33 @@ module Empty : sig end
 module rec X :
   sig module type T = sig end module F : (A : T) -> sig type t end end
 and Y : sig type t = X.F(Empty).t end
+|}]
+
+
+(** Type constraints and ghost items **)
+
+(* Ghosts types (introduced by class definitions) should not be affected by type
+   constraints (normal mode) *)
+module type NoGhostTypeConstraintNormal = sig
+    class v : object end
+  end with type v = int
+[%%expect{|
+Lines 5-7, characters 42-23:
+5 | ..........................................sig
+6 |     class v : object end
+7 |   end with type v = int
+Error: The signature constrained by "with" has no component named "v"
+|}]
+
+(* Ghosts types (introduced by class definitions) should not be affected by type
+   constraints (approx mode) *)
+module type NoGhostTypeConstraintApprox = sig
+         module rec X : sig class v : object end
+                        end with type v = int
+       end
+[%%expect{|
+Line 3, characters 33-45:
+3 |                         end with type v = int
+                                     ^^^^^^^^^^^^
+Error: The signature constrained by "with" has no component named "v"
 |}]

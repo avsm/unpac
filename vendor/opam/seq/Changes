@@ -87,9 +87,11 @@ Working version
   module rec X : ((sig module A : sig end end) with module A := X0)
   and Y : sig type t = X.A.t end (* Unbound type constructor X.A.t *)
   ```
-  Now, type and module constraints are properly merged during approximation
-  (still disabling any wellformedness check).
-  (Clement Blaudeau, review by ???)
+
+  Now, type and module constraints are properly merged during approximation ,
+  reusing the infrastructure for normal merging of constraints, but disabling
+  any wellformedness check.
+  (Clement Blaudeau, review by Florian Angeletti)
 
 
 ### Other libraries:

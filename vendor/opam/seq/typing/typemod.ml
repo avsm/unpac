@@ -893,6 +893,19 @@ module Merge = struct
   let () =
     Typetexp.check_package_with_type_constraints :=
       check_package_with_type_constraints
+
+  (* Helper for handling constraints on signatures: destructive constraints,
+     written with ":=", actually remove the field from the signature, whereas
+     non-destructive constraints just update the field. *)
+  let is_destructive constr =
+    match constr with
+    | Pwith_typesubst _
+      | Pwith_modtypesubst _
+      | Pwith_modsubst _ -> true
+    | Pwith_module _
+      | Pwith_type _
+      | Pwith_modtype _ -> false
+
 end
 
 (* Add recursion flags on declarations arising from a mutually recursive
@@ -1118,12 +1131,7 @@ and approx_constraint env body constr =
      not exists are caught at approximation phase, other errors (non-equivalent
      constraints) will be caught when typechecking the signatures (with the
      approximation in the environment). *)
-  let destructive = match constr with
-    | Pwith_typesubst _
-    | Pwith_modtypesubst _
-    | Pwith_modsubst _ -> true
-    | _ -> false
-  in
+  let destructive = Merge.is_destructive constr in
   match constr with
   | Pwith_type (l, decl)
   | Pwith_typesubst (l, decl) ->
@@ -1532,10 +1540,7 @@ and transl_modtype_aux env smty =
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
 and transl_with ~loc env remove_aliases (rev_tcstrs, sg) constr =
-  let destructive = match constr with
-    | Pwith_typesubst _ | Pwith_modsubst _ | Pwith_modtypesubst _ -> true
-    | _ -> false
-  in
+  let destructive = Merge.is_destructive constr in
   let constr, (path, lid, sg) = match constr with
     | Pwith_type (l, decl)
     | Pwith_typesubst (l, decl) ->
