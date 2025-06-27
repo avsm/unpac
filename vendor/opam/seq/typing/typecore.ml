@@ -3424,22 +3424,20 @@ let check_univars env kind exp ty_expected vars =
           (* Enforce scoping for type_let:
              since body is not generic,  instance_poly_fixed only makes
              copies of nodes that have a Tunivar as descendant *)
-          let _, ty' = instance_poly_fixed tl body in
+          let _, ty' = instance_poly_fixed ~keep_names:true tl body in
           let vars, exp_ty = instance_parameterized_type vars exp.exp_type in
           unify_exp_types exp.exp_loc env exp_ty ty';
           (exp_ty, vars)
       | _ -> assert false
     end
   in
-  let ty, complete = polyfy env exp_ty vars in
-  if not complete then
+  let ty, errs = polyfy env exp_ty vars in
+  if errs <> [] then
     let ty_expected = instance ty_expected in
-    raise (Error(exp.exp_loc,
-                 env,
-                 Less_general(kind,
-                              Errortrace.unification_error
-                                ~trace:[Ctype.expanded_diff env
-                                          ~got:ty ~expected:ty_expected])))
+    let diff = Ctype.expanded_diff env ~got:ty ~expected:ty_expected in
+    let explanation = Errortrace.Univar (Quantification_mismatch errs) in
+    let err = Errortrace.unification_error ~trace:[diff;explanation] in
+    raise (Error(exp.exp_loc, env, Less_general(kind,err)))
 
 (* [check_statement] implements the [non-unit-statement] check.
 
