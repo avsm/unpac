@@ -197,6 +197,11 @@ Working version
   external
   (Keryan Didier, review by Vincent Laviron and Gabriel Scherer)
 
+- #13586, #14093: Fix closing an out_channel during flush
+  (Stephen Dolan, report by Jan Midtgaard, investigation by Nick Roberts,
+   review by Antonin Décimo and Miod Vallat)
+
+
 OCaml 5.4.0
 ---------------
 
