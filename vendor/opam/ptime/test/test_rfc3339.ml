@@ -89,7 +89,7 @@ let test_parse =
       in
       let pp ppf (t, tz, count) =
         Fmt.pf ppf "(%a, %a, %d)"
-          Ptime.dump t (Fmt.Lit.option Fmt.int) tz count
+          Ptime.dump t (Fmt.OCaml.option Fmt.int) tz count
       in
       Test.T.make ~equal ~pp ()
     in
