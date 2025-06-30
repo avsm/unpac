@@ -1135,7 +1135,6 @@ struct domain_startup_params {
   enum domain_status status; /* in+out:
                                 parent and child synchronize on this value. */
   struct domain_ml_values* ml_values; /* in */
-  dom_internal* newdom; /* out */
   uintnat unique_id; /* out */
 };
 
@@ -1327,7 +1326,6 @@ static void* domain_thread_func(void* v)
     domain_self->tid = pthread_self();
 
   /* this domain is now part of the STW participant set */
-  p->newdom = domain_self;
 
   /* handshake with the parent domain */
   caml_plat_lock_blocking(&p->parent->interruptor.lock);
