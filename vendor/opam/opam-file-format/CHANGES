@@ -1,3 +1,7 @@
+2.2.0 [03 July 2025]
+--------------------
+* No change since 2.2.0~alpha1
+
 2.2.0~alpha1 [06 December 2024]
 -------------------------------
 * Remove the optional GNU Make build system in favour of Dune [#51 @kit-ty-kate]
