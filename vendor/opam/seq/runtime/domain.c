@@ -1309,6 +1309,27 @@ static void sync_result(value term_sync, value res)
   CAMLreturn0;
 }
 
+static void terminate_domain(struct domain_ml_values *ml_values,
+                             caml_result res)
+{
+  /* Allocate the result value. */
+  value v = make_finished(res);
+  sync_result(ml_values->term_sync, v);
+  /* This domain currently holds a lock for [mut], which is kept alive
+     by a global root inside ml_values. */
+  sync_mutex mut = Mutex_val(*Term_mutex(ml_values->term_sync));
+  /* Join all systhreads on this domain and release the runtime state. */
+  caml_domain_terminate(false);
+  /* This domain currently holds [mut], and has signaled all the
+     waiting domains to be woken up. We unlock [mut] to release the
+     joining domains. The unlock is done after [caml_domain_terminate] to
+     ensure that this domain has released all of its runtime state.
+     We call [caml_mutex_unlock] directly instead of
+     [caml_ml_mutex_unlock] because the domain no longer exists at
+     this point. */
+  caml_mutex_unlock(mut);
+}
+
 static void* domain_thread_func(void* v)
 {
   struct domain_startup_params* p = v;
@@ -1353,22 +1374,8 @@ static void* domain_thread_func(void* v)
        see the [note about callbacks and GC] in callback.c */
     value unrooted_callback = ml_values->callback;
     caml_modify_generational_global_root(&ml_values->callback, Val_unit);
-    value res =
-      make_finished(caml_callback_res(unrooted_callback, Val_unit));
-    sync_result(ml_values->term_sync, res);
-
-    sync_mutex mut = Mutex_val(*Term_mutex(ml_values->term_sync));
-    caml_domain_terminate(false);
-
-    /* This domain currently holds [mut], and has signaled all the
-       waiting domains to be woken up. We unlock [mut] to release the
-       joining domains. The unlock is done after [caml_domain_terminate] to
-       ensure that this domain has released all of its runtime state.
-       We call [caml_mutex_unlock] directly instead of
-       [caml_ml_mutex_unlock] because the domain no longer exists at
-       this point. */
-    caml_mutex_unlock(mut);
-
+    caml_result res = caml_callback_res(unrooted_callback, Val_unit);
+    terminate_domain(ml_values, res);
     /* [ml_values] must be freed after unlocking [mut]. This ensures
        that [term_sync] is only removed from the root set after [mut]
        is unlocked. Otherwise, there is a risk of [mut] being
