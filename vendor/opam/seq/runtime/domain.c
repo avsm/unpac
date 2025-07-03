@@ -1106,8 +1106,8 @@ struct domain_ml_values {
 
 /* stdlib/domain.ml */
 #define Term_state(sync) (&Field(sync, 0))
-#define Term_mutex(sync) (&Field(sync, 1))
-#define Term_condition(sync) (&Field(sync, 2))
+#define Term_mutex(sync) (Mutex_val(Field(sync, 1)))
+#define Term_condition(sync) (Condition_val(Field(sync, 2)))
 
 static void init_domain_ml_values(struct domain_ml_values* ml_values,
                                   value callback, value term_sync)
@@ -1312,14 +1312,13 @@ static void sync_result(value term_sync, value res)
 {
   CAMLparam2(term_sync, res);
 
-  /* FIXME: We should only call functions that do not raise
-     exceptions, because this would be bad for us at this point. */
+  /* We only call functions that do not raise exceptions, because this
+     would be bad for us at this point. */
 
-  /* Synchronize with joining domains. We call [caml_ml_mutex_lock]
-     because the systhreads are still running on this domain. We
-     assume this does not fail the exception it would raise at this
-     point would be bad for us. */
-  caml_ml_mutex_lock(*Term_mutex(term_sync));
+  /* Synchronize with joining domains. To avoid deadlocks, we must not
+     block. In particular, systhreads are still running on this
+     domain. */
+  caml_plat_lock_non_blocking(Term_mutex(term_sync));
 
   /* Store result */
   volatile value *state = Term_state(term_sync);
@@ -1327,7 +1326,7 @@ static void sync_result(value term_sync, value res)
   caml_modify(state, res);
 
   /* Signal all the waiting domains to be woken up */
-  caml_ml_condition_broadcast(*Term_condition(term_sync));
+  caml_plat_broadcast(Term_condition(term_sync));
 
   /* The mutex is unlocked after the domain is destroyed; we must
      release the local roots before this happens. */
@@ -1342,17 +1341,16 @@ static void terminate_domain(struct domain_ml_values *ml_values,
   sync_result(ml_values->term_sync, v);
   /* This domain currently holds a lock for [mut], which is kept alive
      by a global root inside ml_values. */
-  sync_mutex mut = Mutex_val(*Term_mutex(ml_values->term_sync));
+  caml_plat_mutex *mut = Term_mutex(ml_values->term_sync);
   /* Join all systhreads on this domain and release the runtime state. */
   caml_domain_terminate(false);
-  /* This domain currently holds [mut], and has signaled all the
-     waiting domains to be woken up. We unlock [mut] to release the
-     joining domains. The unlock is done after [caml_domain_terminate] to
-     ensure that this domain has released all of its runtime state.
-     We call [caml_mutex_unlock] directly instead of
-     [caml_ml_mutex_unlock] because the domain no longer exists at
-     this point. */
-  caml_mutex_unlock(mut);
+  /* This domain has signaled all the waiting domains to be woken up.
+     We unlock [mut] to release the joining domains. The unlock is
+     done after [caml_domain_terminate] to ensure that this domain has
+     released all of its runtime state. The domain no longer exists at
+     this point but we can use [caml_plat_unlock]. */
+  caml_plat_unlock(mut);
+  caml_plat_assert_all_locks_unlocked();
 }
 
 static void* domain_thread_func(void* v)
