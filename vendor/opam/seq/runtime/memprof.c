@@ -2250,6 +2250,9 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
                                              i - CONFIG_FIELD_FIRST_CALLBACK));
   }
 
+  /* Final attempt to run allocation callbacks in this thread. */
+  (void) caml_get_value_or_raise(caml_memprof_run_callbacks_res());
+
   memprof_domain_t domain = Caml_state->memprof;
   CAMLassert(domain);
   CAMLassert(domain->current);
@@ -2292,21 +2295,13 @@ CAMLprim value caml_memprof_is_sampling(value unit)
 
 CAMLprim value caml_memprof_stop(value unit)
 {
+  /* Final attempt to run allocation callbacks in this thread. */
+  (void) caml_get_value_or_raise(caml_memprof_run_callbacks_res());
+
   memprof_domain_t domain = Caml_state->memprof;
   CAMLassert(domain);
   memprof_thread_t thread = domain->current;
   CAMLassert(thread);
-
-  /* Final attempt to run allocation callbacks; don't use
-   * caml_memprof_run_callbacks_res as we only really need allocation
-   * callbacks now. */
-  if (!thread->suspended) {
-    update_suspended(domain, true);
-    caml_result res = entries_run_callbacks_res(thread, &thread->entries);
-    update_suspended(domain, false);
-    (void) caml_get_value_or_raise(res);
-  }
-
   value config = thread_config(thread);
   if (!Sampling(config)) {
     caml_failwith("Gc.Memprof.stop: no profile running.");
