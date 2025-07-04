@@ -563,8 +563,8 @@ module Merge = struct
       - [~approx] disables wellformedness checks for approximation mode (first
       phase of typing the signatures of recursive modules)
 
-      - [~invalid_alias] optional path, set when a module constraint is made
-      with a non-aliasable path to prevent the introduction of invalid
+      - [~invalid_alias] optional path, set when the right-hand side of a module
+      constraint is a non-aliasable path to prevent the introduction of invalid
       aliases *)
   let post_process ~approx ~replace ?(invalid_alias=None)
         loc lid env paths sg =
