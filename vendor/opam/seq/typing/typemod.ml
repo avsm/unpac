@@ -566,8 +566,7 @@ module Merge = struct
       - [~invalid_alias] optional path, set when the right-hand side of a module
       constraint is a non-aliasable path to prevent the introduction of invalid
       aliases *)
-  let post_process ~approx ~replace ?(invalid_alias=None)
-        loc lid env paths sg =
+  let post_process ~approx ~replace ?(invalid_alias=None) loc lid env paths sg =
     let sg =
       match replace with
       | None -> sg (* non-destructive substitution *)
@@ -726,19 +725,10 @@ module Merge = struct
     in
     (* Merging *)
     let path, paths, tdecl, sg = merge ~patch ~destructive env sg loc lid in
-
-    (* Destructive substitutions on types with constrained parameters where the
-       type is not replaced by an alias with the same constraints are disallowed
-       (the constraints would be lost). *)
-    let params = tdecl.typ_type.type_params in
-    if type_decl_is_alias sdecl = None
-       && destructive
-       && params_are_constrained params then
-      raise(Error(loc, env, With_cannot_remove_constrained_type));
-
     (* Post processing *)
     let replace =
-      if destructive then
+      if not destructive then None
+      else
         match type_decl_is_alias sdecl with
         | Some lid ->
             (* if the type is an alias of [lid], replace by the definition *)
@@ -748,12 +738,16 @@ module Merge = struct
             in
             Some(fun s path -> Subst.Unsafe.add_type_path path replacement s)
         | None ->
-            (* if the type is not an alias, try to inline it *)
-            let body = Option.get tdecl.typ_type.type_manifest in
-            Some(fun s path ->
-              Subst.Unsafe.add_type_function path ~params ~body s)
-      else
-        None
+           (* if the type is not an alias, try to inline it *)
+           let params = tdecl.typ_type.type_params in
+           if params_are_constrained params then
+             (* Destructive substitutions on types with constrained parameters
+                where the type is not replaced by an alias with the same
+                constraints are disallowed (the constraints would be lost). *)
+             raise(Error(loc, env, With_cannot_remove_constrained_type));
+           let body = Option.get tdecl.typ_type.type_manifest in
+           Some(fun s path ->
+               Subst.Unsafe.add_type_function path ~params ~body s)
     in
     let sg =
       post_process ~approx:false ~replace loc lid env paths sg in
@@ -789,8 +783,7 @@ module Merge = struct
     (* Post processing *)
     (* There is no need to replace the constrained type, as all type fields are
        made abstract anyway (so it should not appear anywhere) *)
-    let replace = None in
-    post_process ~approx:true ~replace loc lid env paths sg
+    post_process ~approx:true ~replace:None loc lid env paths sg
 
 
   (** Module constraint [sg with module lid = path]
@@ -832,8 +825,8 @@ module Merge = struct
     in
     let real_path,paths,_,sg = merge ~patch ~destructive env sg loc lid in
     let replace =
-      if destructive then Some(fun s p -> Subst.Unsafe.add_module_path p path s)
-      else None
+      if not destructive then None
+      else Some(fun s p -> Subst.Unsafe.add_module_path p path s)
     in
     let invalid_alias = if (not aliasable) then (Some path) else None in
     let sg = post_process ~approx ~replace ~invalid_alias
@@ -874,8 +867,8 @@ module Merge = struct
     in
     let path,paths,_,sg = merge ~patch ~destructive env sg loc lid in
     let replace =
-      if destructive then Some(fun s p -> Subst.Unsafe.add_modtype_path p mty s)
-      else None
+      if not destructive then None
+      else Some(fun s p -> Subst.Unsafe.add_modtype_path p mty s)
     in
     let sg = post_process ~approx ~replace loc lid env paths sg in
     path, lid, sg
