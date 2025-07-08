@@ -782,7 +782,8 @@ module Merge = struct
     let _, paths, _, sg = merge ~patch ~destructive env sg loc lid in
     (* Post processing *)
     (* There is no need to replace the constrained type, as all type fields are
-       made abstract anyway (so it should not appear anywhere) *)
+       made abstract anyway (so it should not appear anywhere). Also the approx
+       flag disable any wellformedness checks. *)
     post_process ~approx:true ~replace:None loc lid env paths sg
 
 
