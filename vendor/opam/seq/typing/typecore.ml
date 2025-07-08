@@ -815,9 +815,14 @@ let rec build_as_type (env : Env.t) p =
 
 and build_as_type_extra env p = function
   | [] -> build_as_type_aux env p
-  | ((Tpat_type _ | Tpat_open _ | Tpat_unpack), _, _) :: rest ->
+  | ((Tpat_type _ | Tpat_open _ | Tpat_unpack None), _, _) :: rest ->
       build_as_type_extra env p rest
   | (Tpat_constraint {ctyp_type = ty; _}, _, _) :: rest ->
+      build_as_type_extra_inner env p ty rest
+  | (Tpat_unpack (Some ptyp), _, _) :: rest ->
+      build_as_type_extra_inner env p (newgenty (Tpackage ptyp.tpt_type)) rest
+
+and build_as_type_extra_inner env p ty rest =
       (* If the type constraint is ground, then this is the best type
          we can return, so just return an instance (cf. #12313) *)
       if closed_type_expr ty then instance ty else
@@ -1883,14 +1888,28 @@ and type_pat_aux
         pat_type = ty;
         pat_attributes = sp.ppat_attributes;
         pat_env = !!penv }
-  | Ppat_unpack name ->
+  | Ppat_unpack (name, optyp) ->
+      let optyp, wrap, expected_ty =
+        match optyp with
+        | Some ptyp ->
+          let sty = Ast_helper.Typ.package ~loc ptyp in
+          let cty, ty, expected_ty =
+            solve_Ppat_constraint tps loc !!penv sty expected_ty in
+          let optyp = match cty.ctyp_desc with
+            | Ttyp_package pack -> Some pack
+            | _ -> assert false (* Should not happen *)
+          in
+          let wrap p = { p with pat_type = ty } in
+          optyp, wrap, expected_ty
+        | None -> None, (fun pat -> pat), expected_ty
+      in
       let t = instance expected_ty in
-      begin match name.txt with
+      wrap begin match name.txt with
       | None ->
           rvp {
             pat_desc = Tpat_any;
             pat_loc = sp.ppat_loc;
-            pat_extra=[Tpat_unpack, name.loc, sp.ppat_attributes];
+            pat_extra = [Tpat_unpack optyp, name.loc, sp.ppat_attributes];
             pat_type = t;
             pat_attributes = [];
             pat_env = !!penv }
@@ -1905,7 +1924,7 @@ and type_pat_aux
           rvp {
             pat_desc = Tpat_var (id, v, uid);
             pat_loc = sp.ppat_loc;
-            pat_extra=[Tpat_unpack, loc, sp.ppat_attributes];
+            pat_extra = [Tpat_unpack optyp, loc, sp.ppat_attributes];
             pat_type = t;
             pat_attributes = [];
             pat_env = !!penv }
