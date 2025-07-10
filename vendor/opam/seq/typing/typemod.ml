@@ -554,27 +554,36 @@ module Merge = struct
         let error = With_cannot_remove_packed_modtype(p,mty) in
         raise (Error(loc,initial_env,error))
 
-  (* After the item has been patched, post processing does the actual
-     destructive substitution and checks wellformedness of the resulting
-     signature *)
-  let post_process ~approx ~destructive loc lid env paths sg
-      ?(invalid_alias=None) replace =
+  (** Called after an item has been patched (i.e. rewrote or removed).
+
+      - [~replace] is an optional substitution, used for destructive constraints
+      to replace all occurrences of the destructed item by its new
+      definition. Non-destructive constraint leave this argument to [None]
+
+      - [~approx] disables wellformedness checks for approximation mode (first
+      phase of typing the signatures of recursive modules)
+
+      - [~invalid_alias] optional path, set when the right-hand side of a module
+      constraint is a non-aliasable path to prevent the introduction of invalid
+      aliases *)
+  let post_process ~approx ~replace ?(invalid_alias=None) loc lid env paths sg =
     let sg =
-      if destructive then
-        (* Check that the substitution will not make the signature ill-formed *)
-        let () = if not approx then
-                   check_usage_after_substitution ~loc ~lid env paths
-                     ~invalid_alias sg in
-        (* Actually remove the identifiers *)
-        let sub = Subst.change_locs Subst.identity loc in
-        let sub = List.fold_left replace sub paths in
-        unsafe_signature_subst env loc sg sub
-      else sg
+      match replace with
+      | None -> sg (* non-destructive substitution *)
+      | Some replace ->
+         (* Check that the substitution would not make the signature
+            ill-formed *)
+         if not approx then
+           check_usage_after_substitution ~loc ~lid env paths ~invalid_alias sg;
+         (* Actually remove the identifiers *)
+         let sub = Subst.change_locs Subst.identity loc in
+         let sub = List.fold_left replace sub paths in
+         unsafe_signature_subst env loc sg sub
     in
     (* check that the resulting signature is still wellformed *)
-    let () = if not approx then
-               check_well_formed_module env loc "this instantiated signature"
-                 (Mty_signature sg) in
+    if not approx then
+      check_well_formed_module env loc "this instantiated signature"
+        (Mty_signature sg);
     sg
 
   (* Main recursive knot to handle deep merges *)
@@ -718,7 +727,8 @@ module Merge = struct
     let path, paths, tdecl, sg = merge ~patch ~destructive env sg loc lid in
     (* Post processing *)
     let replace =
-      if destructive then
+      if not destructive then None
+      else
         match type_decl_is_alias sdecl with
         | Some lid ->
             (* if the type is an alias of [lid], replace by the definition *)
@@ -726,20 +736,21 @@ module Merge = struct
               try Env.find_type_by_name lid.txt env
               with Not_found -> assert false
             in
-            fun s path -> Subst.Unsafe.add_type_path path replacement s
+            Some(fun s path -> Subst.Unsafe.add_type_path path replacement s)
         | None ->
-            (* if the type is not an alias, try to inline it *)
-            let body = Option.get tdecl.typ_type.type_manifest in
-            let params = tdecl.typ_type.type_params in
-            if params_are_constrained params then
-              raise(Error(loc, env, With_cannot_remove_constrained_type));
-            fun s path ->
-              Subst.Unsafe.add_type_function path ~params ~body s
-      else
-        fun s _ -> s
+           (* if the type is not an alias, try to inline it *)
+           let params = tdecl.typ_type.type_params in
+           if params_are_constrained params then
+             (* Destructive substitutions on types with constrained parameters
+                where the type is not replaced by an alias with the same
+                constraints are disallowed (the constraints would be lost). *)
+             raise(Error(loc, env, With_cannot_remove_constrained_type));
+           let body = Option.get tdecl.typ_type.type_manifest in
+           Some(fun s path ->
+               Subst.Unsafe.add_type_function path ~params ~body s)
     in
     let sg =
-      post_process ~approx:false ~destructive loc lid env paths sg replace in
+      post_process ~approx:false ~replace loc lid env paths sg in
     (tdecl, (path, lid, sg))
 
   (** Approximated type constraint [sg with type lid = _]
@@ -770,8 +781,10 @@ module Merge = struct
     (* Merging *)
     let _, paths, _, sg = merge ~patch ~destructive env sg loc lid in
     (* Post processing *)
-    let replace = fun s _path -> s in
-    post_process ~approx:true ~destructive loc lid env paths sg replace
+    (* There is no need to replace the constrained type, as all type fields are
+       made abstract anyway (so it should not appear anywhere). Also the approx
+       flag disable any wellformedness checks. *)
+    post_process ~approx:true ~replace:None loc lid env paths sg
 
 
   (** Module constraint [sg with module lid = path]
@@ -812,11 +825,13 @@ module Merge = struct
       | _ -> None
     in
     let real_path,paths,_,sg = merge ~patch ~destructive env sg loc lid in
-    let replace s p = Subst.Unsafe.add_module_path p path s in
+    let replace =
+      if not destructive then None
+      else Some(fun s p -> Subst.Unsafe.add_module_path p path s)
+    in
     let invalid_alias = if (not aliasable) then (Some path) else None in
-    let sg =
-      post_process ~approx ~destructive ~invalid_alias
-        loc lid env paths sg replace  in
+    let sg = post_process ~approx ~replace ~invalid_alias
+               loc lid env paths sg in
     real_path, lid, sg
 
   (** Module type constraint [sg with module type lid = mty]
@@ -852,8 +867,11 @@ module Merge = struct
       | _ -> None
     in
     let path,paths,_,sg = merge ~patch ~destructive env sg loc lid in
-    let replace s p = Subst.Unsafe.add_modtype_path p mty s in
-    let sg = post_process ~approx ~destructive loc lid env paths sg replace in
+    let replace =
+      if not destructive then None
+      else Some(fun s p -> Subst.Unsafe.add_modtype_path p mty s)
+    in
+    let sg = post_process ~approx ~replace loc lid env paths sg in
     path, lid, sg
 
   (** Type constraints inside a first class module type [(module sg with type
