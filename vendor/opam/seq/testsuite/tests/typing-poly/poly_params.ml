@@ -369,7 +369,7 @@ end;;
 Line 1, characters 9-24:
 1 | class c (f: 'a. 'a -> 'a) = object
              ^^^^^^^^^^^^^^^
-Error: Class parameters cannot be polymorphic
+Error: Class parameters cannot be polymorphic.
 |}];;
 
 class c' (f: 'a. int -> int) = object
@@ -379,7 +379,7 @@ end;;
 Line 1, characters 10-27:
 1 | class c' (f: 'a. int -> int) = object
               ^^^^^^^^^^^^^^^^^
-Error: Class parameters cannot be polymorphic
+Error: Class parameters cannot be polymorphic.
 |}];;
 
 let poly1' ~(id : 'a. 'a -> 'a) = id 3, id "three"

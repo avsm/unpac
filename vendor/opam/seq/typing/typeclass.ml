@@ -2213,7 +2213,7 @@ let report_error_doc env ppf =
       (Style.as_inline_code Printtyp.type_scheme) sign.csig_self
   | Polymorphic_class_parameter ->
       fprintf ppf
-        "Class parameters cannot be polymorphic"
+        "Class parameters cannot be polymorphic."
 
 let report_error_doc env ppf err =
   Printtyp.wrap_printing_env ~error:true
