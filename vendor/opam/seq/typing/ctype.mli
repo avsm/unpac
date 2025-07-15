@@ -302,10 +302,6 @@ val filter_arrow: Env.t -> type_expr -> arg_label -> force_tpoly:bool ->
            [force_poly] is false then the usual invariant that the
            argument type be a [Tpoly] node is not enforced. Raises
            [Filter_arrow_failed] instead of [Unify].  *)
-val filter_mono: type_expr -> type_expr
-        (* A special case of unification (with Tpoly('a, [])). Can
-           only be called on [Tpoly] nodes. Raises [Filter_mono_failed]
-           instead of [Unify] *)
 val filter_arrow_mono: Env.t -> type_expr -> arg_label -> filtered_arrow
         (* A special case of unification. Composition of [filter_arrow]
            with [filter_mono] on the argument type. Raises
@@ -348,7 +344,6 @@ type filter_arrow_failure =
 
 exception Filter_arrow_failed of filter_arrow_failure
 
-exception Filter_mono_failed
 exception Filter_arrow_mono_failed
 
 type filter_method_failure =

@@ -196,6 +196,12 @@ let tpoly_get_mono ty =
   | Tpoly(ty, []) -> ty
   | _ -> assert false
 
+let tpoly_get_mono_opt ty =
+  match get_desc ty with
+  | Tpoly(ty, []) -> Some ty
+  | Tpoly _ -> None
+  | _ -> assert false
+
 
 (**** Representative of a type ****)
 

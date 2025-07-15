@@ -102,10 +102,11 @@ val is_Tpoly: type_expr -> bool
    invariant that the type of record fields are Tpoly *)
 val is_poly_Tpoly: type_expr -> bool
 
-(* These three functions can only be called on [Tpoly] nodes. *)
+(* These four functions can only be called on [Tpoly] nodes. *)
 val tpoly_is_mono : type_expr -> bool
 val tpoly_get_mono : type_expr -> type_expr
 val tpoly_get_poly : type_expr -> type_expr * type_expr list
+val tpoly_get_mono_opt : type_expr -> type_expr option
 
 (**** polymorphic variants ****)
 
