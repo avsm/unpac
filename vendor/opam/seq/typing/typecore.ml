@@ -4040,7 +4040,11 @@ and type_expect_
                   | Not_a_function ->
                       let tarrow =
                         (newty
-                          (Tarrow (arg_label, newvar (), newvar (), commu_ok)));
+                          (Tarrow
+                            (arg_label,
+                             newmono (newvar ()),
+                             newvar (),
+                             commu_ok)));
                       in
                       (* We go to some trouble to try to generate a unification
                         error to help the error printing code's heuristic to
