@@ -2815,15 +2815,15 @@ type untyped_apply_arg =
   | Unknown_arg of
       {
         sarg : Parsetree.expression;
-        ty_arg_mono : type_expr;
+        ty_arg : type_expr;
       }
     (* [arg] is an [Unknown_arg] in:
        [f arg] when [f] is not known (either a type variable,
        or the [commu_ok] case where a function type is known
        but not principally).
 
-       [ty_arg_mono] is the expected type of the argument, usually just
-       a fresh type variable. *)
+       [ty_arg is the expected type of the argument, usually just a fresh type
+       variable. *)
   | Eliminated_optional_arg of
       {
         ty_arg : type_expr;
@@ -2880,7 +2880,7 @@ let collect_unknown_apply_args env funct ty_fun0 rev_args sargs =
     match sargs with
     | [] -> ty_fun, List.rev rev_args
     | (lbl, sarg) :: rest ->
-        let (ty_arg_mono, ty_res) =
+        let (ty_arg, ty_res) =
           let ty_fun = expand_head env ty_fun in
           match get_desc ty_fun with
           | Tvar _ ->
@@ -2916,7 +2916,7 @@ let collect_unknown_apply_args env funct ty_fun0 rev_args sargs =
                     previous_arg_loc = previous_arg_loc rev_args ~funct;
                     extra_arg_loc = sarg.pexp_loc; }))
         in
-        let arg = Unknown_arg { sarg; ty_arg_mono } in
+        let arg = Unknown_arg { sarg; ty_arg } in
         loop ty_res ((lbl, Arg arg) :: rev_args) rest
   in
   loop ty_fun0 rev_args sargs
@@ -3264,8 +3264,8 @@ let type_approx_fun_one_param
     | None -> false
     | Some spat -> check_poly_constraint spat env label
   in
-  let { ty_arg; ty_ret } =
-    try filter_arrow env ty_expected label ~force_tpoly:(not has_poly)
+  let { ty_param; ty_ret } =
+    try filter_arrow env ty_expected label ~param_hole:has_poly
     with Filter_arrow_failed err ->
       let loc_fun, ty_fun = in_function in
       let err =
@@ -3277,24 +3277,24 @@ let type_approx_fun_one_param
     match spato with
     | None -> ()
     | Some spat ->
-        let ty_arg =
+        let ty_param =
           match label, default with
-          | (Nolabel | Labelled _), _ -> ty_arg
+          | (Nolabel | Labelled _), _ -> ty_param
           | Optional _, None ->
             let var = newmono (type_option (newvar ())) in
-            unify_pat_types spat.ppat_loc env ty_arg var;
-            ty_arg
+            unify_pat_types spat.ppat_loc env ty_param var;
+            ty_param
           | Optional _, Some _ ->
             let ty_opt_param = newvar () in
             let ty_pat_param = newmono (type_option ty_opt_param) in
-            unify_pat_types spat.ppat_loc env ty_arg ty_pat_param;
+            unify_pat_types spat.ppat_loc env ty_param ty_pat_param;
             newmono ty_opt_param
         in
-        let ty_arg =
-          if has_poly || not (Btype.tpoly_is_mono ty_arg) then ty_arg
-          else Btype.tpoly_get_mono  ty_arg
+        let ty_param =
+          if has_poly || not (Btype.tpoly_is_mono ty_param) then ty_param
+          else Btype.tpoly_get_mono  ty_param
         in
-        type_pattern_approx env spat ty_arg;
+        type_pattern_approx env spat ty_param;
   end;
   ty_ret
 
@@ -4030,8 +4030,8 @@ and type_expect_
       | No_gadt -> ()
       | Contains_gadt ->
           (* Assert that [ty] is a function, and return its return type. *)
-          let filter_ty_ret_exn ty arg_label ~force_tpoly =
-            match filter_arrow env ty arg_label ~force_tpoly with
+          let filter_ty_ret_exn ty arg_label ~param_hole =
+            match filter_arrow env ty arg_label ~param_hole with
             | { ty_ret; _ } -> ty_ret
             | exception (Filter_arrow_failed error) ->
                 let trace =
@@ -4076,8 +4076,8 @@ and type_expect_
           in
           let ret_ty =
             List.fold_left (fun ret_ty { param; has_poly } ->
-                filter_ty_ret_exn ret_ty param.fp_arg_label
-                  ~force_tpoly:(not has_poly))
+                filter_ty_ret_exn ret_ty param.fp_arg_label ~param_hole:has_poly
+              )
               exp_type
               result_params
           in
@@ -4085,7 +4085,7 @@ and type_expect_
           | Tfunction_body _ -> ()
           | Tfunction_cases _ ->
               ignore
-                (filter_ty_ret_exn ret_ty Nolabel ~force_tpoly:true : type_expr)
+                (filter_ty_ret_exn ret_ty Nolabel ~param_hole:false : type_expr)
       end;
       let params =
         List.map (fun { param; has_poly = _ } -> param) result_params
@@ -5199,15 +5199,11 @@ and type_binding_op_ident env s =
 and split_function_ty env ty_expected ~arg_label ~has_poly ~first ~in_function =
   let { ty = ty_fun; explanation }, loc = in_function in
   let separate = !Clflags.principal || Env.has_local_constraints env in
-  let { ty_arg; ty_ret = _ } as filtered_arrow =
+  let { ty_param; ty_ret = _ } as filtered_arrow =
     with_local_level_generalize_structure_if separate begin fun () ->
-      let force_tpoly =
-        (* If [has_poly] is true then we rely on the later call to
-          type_pat to enforce the invariant that the parameter type
-          be a [Tpoly] node *)
-        not has_poly
-      in
-      try filter_arrow env (instance ty_expected) arg_label ~force_tpoly
+      (* If [has_poly] is true then we rely on the later call to type_pat to
+         enforce the invariant that the parameter type be a [Tpoly] node *)
+      try filter_arrow env (instance ty_expected) arg_label ~param_hole:has_poly
       with Filter_arrow_failed err ->
       let err =
         error_of_filter_arrow_failure ~explanation ty_fun err ~first
@@ -5216,14 +5212,14 @@ and split_function_ty env ty_expected ~arg_label ~has_poly ~first ~in_function =
     end
   in
   if !Clflags.principal
-      && not has_poly && not (tpoly_is_mono ty_arg)
-      && get_level ty_arg < Btype.generic_level
-      && Ctype.is_really_poly env ty_arg
+      && not has_poly && not (tpoly_is_mono ty_param)
+      && get_level ty_param < Btype.generic_level
+      && Ctype.is_really_poly env ty_param
    then Location.prerr_warning loc (not_principal "this higher-rank function");
   let ty_param =
-    if has_poly then ty_arg
+    if has_poly then ty_param
     else begin
-      let ty, vars = tpoly_get_poly ty_arg in
+      let ty, vars = tpoly_get_poly ty_param in
       if vars = [] then ty
       else begin
         with_level ~level:generic_level
@@ -5283,7 +5279,7 @@ and type_function
       :: rest
     ->
       let has_poly = check_poly_constraint pat env arg_label in
-      let { filtered_arrow = { ty_arg; ty_ret }; ty_arg_mono } =
+      let { filtered_arrow = { ty_param; ty_ret }; ty_arg_mono } =
         split_function_ty env ty_expected ~arg_label ~first ~in_function
           ~has_poly
       in
@@ -5343,7 +5339,7 @@ and type_function
            | ([] | _ :: _ :: _), _ -> assert false
       in
       let exp_type =
-        instance (newgenty (Tarrow (arg_label, ty_arg, ty_ret, commu_ok)))
+        instance (newgenty (Tarrow (arg_label, ty_param, ty_ret, commu_ok)))
       in
       (* This is quadratic, as it operates over the entire tail of the
          type for each new parameter. Now that functions are n-ary, we
@@ -5899,8 +5895,8 @@ and type_argument ?explanation ?recarg env sarg ty_expected' ty_expected =
 
 and type_apply_arg env ~app_loc (lbl, arg) =
   match arg with
-  | Arg (Unknown_arg { sarg; ty_arg_mono }) ->
-      let arg = type_expect env sarg (mk_expected ty_arg_mono) in
+  | Arg (Unknown_arg { sarg; ty_arg }) ->
+      let arg = type_expect env sarg (mk_expected ty_arg) in
       if is_optional lbl then
         unify_exp ~sexp:sarg env arg (type_option(newvar()));
       (lbl, Arg arg)
@@ -5958,12 +5954,12 @@ and type_apply_arg env ~app_loc (lbl, arg) =
 and type_application env app_loc funct sargs =
   let exception Filter_arrow_mono_failed in
   let filter_arrow_mono env t l =
-    match filter_arrow env t l ~force_tpoly:true with
+    match filter_arrow env t l ~param_hole:false with
     | exception Filter_arrow_failed _ -> raise Filter_arrow_mono_failed
-    | {ty_arg; _} as farr  ->
-        match tpoly_get_mono_opt ty_arg with
+    | {ty_param; _} as farr  ->
+        match tpoly_get_mono_opt ty_param with
         | None -> raise Filter_arrow_mono_failed
-        | Some ty_arg -> { farr with ty_arg}
+        | Some ty_param -> { farr with ty_param }
   in
   let is_ignore funct =
     is_prim ~name:"%ignore" funct &&
@@ -5973,11 +5969,11 @@ and type_application env app_loc funct sargs =
   match sargs with
   | (* Special case for ignore: avoid discarding warning *)
     [Nolabel, sarg] when is_ignore funct ->
-      let { ty_arg; ty_ret } =
+      let { ty_param; ty_ret } =
         with_local_level_generalize_structure_if_principal (fun () ->
           filter_arrow_mono env (instance funct.exp_type) Nolabel)
       in
-      let exp = type_expect env sarg (mk_expected ty_arg) in
+      let exp = type_expect env sarg (mk_expected ty_param) in
       check_partial_application ~statement:false exp;
       ([Nolabel, Arg exp], ty_ret)
   | _ ->
@@ -6476,7 +6472,7 @@ and type_cases
 and type_function_cases_expect
       env ty_expected loc cases attrs ~first ~in_function =
   Builtin_attributes.warning_scope attrs begin fun () ->
-    let { filtered_arrow = { ty_arg; ty_ret }; ty_arg_mono } =
+    let { filtered_arrow = { ty_param; ty_ret }; ty_arg_mono } =
       split_function_ty env ty_expected ~arg_label:Nolabel
         ~first ~in_function ~has_poly:false
     in
@@ -6485,7 +6481,7 @@ and type_function_cases_expect
         ~check_if_total:true loc cases
     in
     let ty_fun =
-      instance (newgenty (Tarrow (Nolabel, ty_arg, ty_ret, commu_ok)))
+      instance (newgenty (Tarrow (Nolabel, ty_param, ty_ret, commu_ok)))
     in
     unify_exp_types loc env ty_fun (instance ty_expected);
     cases, partial, ty_fun

@@ -3415,14 +3415,14 @@ type filter_arrow_failure =
 exception Filter_arrow_failed of filter_arrow_failure
 
 type filtered_arrow =
-  { ty_arg : type_expr;
+  { ty_param : type_expr;
     ty_ret : type_expr;
   }
 
-let filter_arrow env t l ~force_tpoly =
+let filter_arrow env t l ~param_hole =
   let function_type level =
     let t1 =
-      if not force_tpoly then begin
+      if param_hole then begin
         assert (not (is_optional l));
         newvar2 level
       end else begin
@@ -3452,12 +3452,12 @@ let filter_arrow env t l ~force_tpoly =
   in
   match get_desc t with
   | Tvar _ ->
-      let t', ty_arg, ty_ret = function_type (get_level t) in
+      let t', ty_param, ty_ret = function_type (get_level t) in
       link_type t t';
-      { ty_arg; ty_ret }
-  | Tarrow(l', ty_arg, ty_ret, _) ->
+      { ty_param; ty_ret }
+  | Tarrow(l', ty_param, ty_ret, _) ->
       if l = l' || !Clflags.classic && l = Nolabel && not (is_optional l')
-      then { ty_arg; ty_ret }
+      then { ty_param; ty_ret }
       else raise (Filter_arrow_failed
                     (Label_mismatch
                        { got = l; expected = l'; expected_type = t }))

@@ -293,16 +293,16 @@ val unify_var: Env.t -> type_expr -> type_expr -> unit
            is a variable. *)
 
 type filtered_arrow =
-  { ty_arg : type_expr;
+  { ty_param : type_expr;
     ty_ret : type_expr;
   }
 
-val filter_arrow: Env.t -> type_expr -> arg_label -> force_tpoly:bool ->
+val filter_arrow: Env.t -> type_expr -> arg_label -> param_hole:bool ->
         filtered_arrow
-        (* A special case of unification with [l:'a -> 'b]. If
-           [force_poly] is false then the usual invariant that the
-           argument type be a [Tpoly] node is not enforced. Raises
-           [Filter_arrow_failed] instead of [Unify].  *)
+        (* A special case of unification with [l:'a -> 'b]. If [param_hole] is
+           true then ['a] might be initialized with a [Tvar _] hole to be filled
+           later by a [Tpoly _].
+           Raises [Filter_arrow_failed] instead of [Unify]. *)
 val is_really_poly : Env.t -> type_expr -> bool
 val filter_method: Env.t -> string -> type_expr -> type_expr
         (* A special case of unification (with {m : 'a; 'b}).  Raises
