@@ -2323,7 +2323,7 @@ let type_pattern_list
   (patl, !!new_penv, pattern_forces, pvs, mvs)
 
 let type_class_arg_pattern cl_num val_env met_env l spat =
-  let pvs, pat =
+  let pattern_variables, pat =
     with_local_level_generalize_structure_if_principal begin fun () ->
       let tps = create_type_pat_state Modules_rejected in
       let nv = newvar () in
@@ -2371,7 +2371,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             met_env
          in
          ((id', pv_id, pv_type)::pv, val_env, met_env))
-      pvs ([], val_env, met_env)
+      pattern_variables ([], val_env, met_env)
   in
   (pat, pv, val_env, met_env)
 
