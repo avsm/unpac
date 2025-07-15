@@ -5932,7 +5932,7 @@ and type_apply_arg env ~app_loc (lbl, arg) =
               let arg =
                 type_argument env sarg ty_arg' ty_arg0'
               in
-              arg, ty_arg, vars
+              arg, ty_arg, vars0
             end
             ~before_generalize:(fun (arg, _, _) ->
                                   may_lower_contravariant env arg)
