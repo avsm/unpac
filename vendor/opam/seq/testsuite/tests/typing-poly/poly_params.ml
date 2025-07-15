@@ -488,6 +488,12 @@ val poly_poly_var : [< `A | `B ] -> unit = <fun>
 val accept_poly_poly_var : ('a. ([< `A | `B ] as 'a) -> unit) -> unit = <fun>
 |}]
 
+let f (`B|_) = ()
+let h (f:'a. ([> `A ] as 'a) -> unit ) = f `B
+[%%expect {|
+val f : [> `B ] -> unit = <fun>
+val h : ('a. ([> `A ] as 'a) -> unit) -> unit = <fun>
+|}]
 
 let (let*) x (id : 'a. 'a -> 'a) = id x, id 1
 [%%expect {|
@@ -517,4 +523,10 @@ let f ((g, x) : 'a. ('a -> int) * 'a) =
 
 [%%expect{|
 val f : ('a. ('a -> int) * 'a) -> int * int = <fun>
+|}]
+
+
+let f (x: [< `A of ('a. 'a option) -> unit ]) = match x with `A f -> f None
+[%%expect{|
+val f : [< `A of ('a. 'a option) -> unit & 'b option -> 'c ] -> 'c = <fun>
 |}]
