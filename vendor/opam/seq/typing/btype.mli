@@ -78,6 +78,7 @@ val newty2: level:int -> type_desc -> type_expr
 val newgenty: type_desc -> type_expr
         (* Create a generic type *)
 val newgenmono: type_expr -> type_expr
+        (* Create a new generic type wrapped inside a [Tpoly(x,[])] *)
 val newgenvar: ?name:string -> unit -> type_expr
         (* Return a fresh generic variable *)
 val newgenstub: scope:int -> type_expr
