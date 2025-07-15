@@ -3464,16 +3464,6 @@ let filter_arrow env t l ~force_tpoly =
   | _ ->
       raise (Filter_arrow_failed Not_a_function)
 
-exception Filter_arrow_mono_failed
-
-let filter_arrow_mono env t l =
-  match filter_arrow env t l ~force_tpoly:true with
-  | exception Filter_arrow_failed _ -> raise Filter_arrow_mono_failed
-  | {ty_arg; _} as farr  ->
-      match tpoly_get_mono_opt ty_arg with
-      | None -> raise Filter_arrow_mono_failed
-      | Some ty_arg -> { farr with ty_arg}
-
 let is_really_poly env ty =
   let snap = Btype.snapshot () in
   let really_poly =

@@ -5954,6 +5954,15 @@ and type_apply_arg env ~app_loc (lbl, arg) =
   | Omitted _ as arg -> (lbl, arg)
 
 and type_application env app_loc funct sargs =
+  let exception Filter_arrow_mono_failed in
+  let filter_arrow_mono env t l =
+    match filter_arrow env t l ~force_tpoly:true with
+    | exception Filter_arrow_failed _ -> raise Filter_arrow_mono_failed
+    | {ty_arg; _} as farr  ->
+        match tpoly_get_mono_opt ty_arg with
+        | None -> raise Filter_arrow_mono_failed
+        | Some ty_arg -> { farr with ty_arg}
+  in
   let is_ignore funct =
     is_prim ~name:"%ignore" funct &&
     (try ignore (filter_arrow_mono env (instance funct.exp_type) Nolabel); true
