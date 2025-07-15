@@ -3745,23 +3745,21 @@ let with_explanation explanation f =
 
 
 
-(* The result of splitting a function type into its argument/return types along
-   with some extra information relevant to typechecking. The "extra information"
-   is documented on the fields of [t] below.
+(** The result of splitting a function type into its argument/return types along
+    with some extra information relevant to typechecking. The "extra
+    information" is documented on the fields of [t] below.
 
-   As a running example, we'll suppose the type of a function
-   [f = fun x_1 ... x_n -> e] is [a_1 -> a_2 -> ... -> a_n -> b], and we're
-   currently typechecking [a_i -> a_{i+1} -> ... -> b] for [i <= n].
+    As a running example, we'll suppose the type of a function
+    [f = fun x_1 ... x_n -> e] is [a_1 -> a_2 -> ... -> a_n -> b], and we're
+    currently typechecking [a_i -> a_{i+1} -> ... -> b] for [i <= n].
 *)
 type split_function_ty =
-{ (* The result of calling [Ctype.filter_arrow] on
-     [a_i -> a_{i+1} -> ... -> b].
-  *)
-  filtered_arrow: filtered_arrow;
-  (* An instance of [a_i], unless [x_i] is annotated as polymorphic,
-     in which case it's just [a_i] (not an instance).
-  *)
+{ filtered_arrow: filtered_arrow;
+    (** The result of calling [Ctype.filter_arrow] on
+        [a_i -> a_{i+1} -> ... -> b]. *)
   ty_arg_mono: type_expr;
+    (** An instance of [a_i], unless [x_i] is annotated as polymorphic,
+        in which case it's just [a_i] (not an instance). *)
 }
 
 type type_function_result_param =
