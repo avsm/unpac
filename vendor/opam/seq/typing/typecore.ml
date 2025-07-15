@@ -5215,12 +5215,11 @@ and split_function_ty env ty_expected ~arg_label ~has_poly ~first ~in_function =
         raise (Error(loc, env, err))
     end
   in
-  if not has_poly && not (tpoly_is_mono ty_arg) && !Clflags.principal
-      && get_level ty_arg < Btype.generic_level then begin
-    let really_poly = Ctype.is_really_poly env ty_arg in
-    if really_poly then
-      Location.prerr_warning loc (not_principal "this higher-rank function");
-  end;
+  if !Clflags.principal
+      && not has_poly && not (tpoly_is_mono ty_arg)
+      && get_level ty_arg < Btype.generic_level
+      && Ctype.is_really_poly env ty_arg
+   then Location.prerr_warning loc (not_principal "this higher-rank function");
   let ty_param =
     if has_poly then ty_arg
     else begin
@@ -5919,12 +5918,11 @@ and type_apply_arg env ~app_loc (lbl, arg) =
             type_argument env sarg ty_arg' ty_arg0'
         end else begin
           if !Clflags.principal
-             && get_level ty_arg < Btype.generic_level then begin
-            let really_poly = Ctype.is_really_poly env ty_arg in
-            if really_poly then
-              Location.prerr_warning app_loc
-                (not_principal "applying a higher-rank function here");
-          end;
+             && get_level ty_arg < Btype.generic_level
+             && Ctype.is_really_poly env ty_arg
+          then
+            Location.prerr_warning app_loc
+              (not_principal "applying a higher-rank function here");
           let arg, ty_arg, vars =
             with_local_level_generalize begin fun () ->
               let separate =
