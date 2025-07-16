@@ -468,8 +468,8 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
       let tr = match mis, last with
         | None, Some elt -> tr @ [elt]
         | Some _, _ | _, None -> tr
-       in
-       fprintf ppf
+      in
+      fprintf ppf
         "@[<v>\
           @[%a%a@]%a%a\
          @]"
@@ -479,8 +479,8 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
         (pp_print_option pp_doc) mis;
       if env <> Env.empty
       then warn_on_missing_defs env ppf head;
-       Internal_names.print_explanations env ppf;
-       Ident_conflicts.err_print ppf
+      Internal_names.print_explanations env ppf;
+      Ident_conflicts.err_print ppf
     )
 
 let report_error trace_format ppf mode env tr
