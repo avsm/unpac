@@ -2821,32 +2821,43 @@ ifeq "$(INSTALL_BYTECODE_PROGRAMS)" "true"
                ocamlc$(EXE),"$(INSTALL_BINDIR)/ocamlc.byte$(EXE)")
 endif
 	$(MAKE) -C stdlib install
+
+define INSTALL_ONE_NAT_TOOL
+install::
 ifeq "$(INSTALL_BYTECODE_PROGRAMS)" "true"
+	$(INSTALL_PROG) "tools/$(1)$(EXE)" "$(INSTALL_BINDIR)/$(1).byte$(EXE)";\
+	if test -f "tools/$(1)".opt$(EXE); then \
+	  $(INSTALL_PROG) "tools/$(1).opt$(EXE)" "$(INSTALL_BINDIR)" && \
+	  (cd "$(INSTALL_BINDIR)" && $(LN) "$(1).opt$(EXE)" "$(1)$(EXE)"); \
+	else \
+	  (cd "$(INSTALL_BINDIR)" && $(LN) "$(1).byte$(EXE)" "$(1)$(EXE)"); \
+	fi
+else
+	if test -f "tools/$(1)".opt$(EXE); then \
+	  $(INSTALL_PROG) "tools/$(1).opt$(EXE)" "$(INSTALL_BINDIR)"; \
+	  (cd "$(INSTALL_BINDIR)" && $(LN) "$(1).opt$(EXE)" "$(1)$(EXE)"); \
+	fi
+endif
+endef
+
+ifeq "$(INSTALL_BYTECODE_PROGRAMS)" "true"
+install::
 	$(INSTALL_PROG) lex/ocamllex$(EXE) \
 	  "$(INSTALL_BINDIR)/ocamllex.byte$(EXE)"
-	for i in $(TOOLS_TO_INSTALL_NAT); \
-	do \
-	  $(INSTALL_PROG) "tools/$$i$(EXE)" "$(INSTALL_BINDIR)/$$i.byte$(EXE)";\
-	  if test -f "tools/$$i".opt$(EXE); then \
-	    $(INSTALL_PROG) "tools/$$i.opt$(EXE)" "$(INSTALL_BINDIR)" && \
-	    (cd "$(INSTALL_BINDIR)" && $(LN) "$$i.opt$(EXE)" "$$i$(EXE)"); \
-	  else \
-	    (cd "$(INSTALL_BINDIR)" && $(LN) "$$i.byte$(EXE)" "$$i$(EXE)"); \
-	  fi; \
-	done
-else
-	for i in $(TOOLS_TO_INSTALL_NAT); \
-	do \
-	  if test -f "tools/$$i".opt$(EXE); then \
-	    $(INSTALL_PROG) "tools/$$i.opt$(EXE)" "$(INSTALL_BINDIR)"; \
-	    (cd "$(INSTALL_BINDIR)" && $(LN) "$$i.opt$(EXE)" "$$i$(EXE)"); \
-	  fi; \
-	done
 endif
-	for i in $(TOOLS_TO_INSTALL_BYT); \
-	do \
-	  $(INSTALL_PROG) "tools/$$i$(EXE)" "$(INSTALL_BINDIR)";\
-	done
+
+$(foreach tool, $(TOOLS_TO_INSTALL_NAT), \
+  $(eval $(call INSTALL_ONE_NAT_TOOL,$(tool))))
+
+define INSTALL_ONE_BYT_TOOL
+install::
+	$(INSTALL_PROG) "tools/$(1)$(EXE)" "$(INSTALL_BINDIR)"
+endef
+
+$(foreach tool, $(TOOLS_TO_INSTALL_BYT), \
+  $(eval $(call INSTALL_ONE_BYT_TOOL,$(tool))))
+
+install::
 	$(INSTALL_PROG) $(ocamlyacc_PROGRAM)$(EXE) "$(INSTALL_BINDIR)"
 	$(INSTALL_DATA) \
 	   utils/*.cmi \
