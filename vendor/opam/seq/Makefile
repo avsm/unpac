@@ -3015,18 +3015,9 @@ endif
 	    $(ocamlopt_CMO_FILES) \
 	    "$(INSTALL_COMPLIBDIR)"
 ifeq "$(build_ocamldoc)" "true"
-	$(MKDIR) "$(INSTALL_LIBDIR)/ocamldoc"
 	$(INSTALL_PROG) $(OCAMLDOC_OPT) "$(INSTALL_BINDIR)"
 	$(INSTALL_DATA) \
-	  $(OCAMLDOC_LIBCMIS) \
-	  "$(INSTALL_LIBDIR)/ocamldoc"
-ifeq "$(INSTALL_SOURCE_ARTIFACTS)" "true"
-	$(INSTALL_DATA) \
-	  $(OCAMLDOC_LIBMLIS) $(OCAMLDOC_LIBCMTS) \
-	  "$(INSTALL_LIBDIR)/ocamldoc"
-endif
-	$(INSTALL_DATA) \
-	  ocamldoc/ocamldoc.hva ocamldoc/*.cmx ocamldoc/odoc_info.$(A) \
+	  ocamldoc/*.cmx ocamldoc/odoc_info.$(A) \
 	  ocamldoc/odoc_info.cmxa \
 	  "$(INSTALL_LIBDIR)/ocamldoc"
 endif
