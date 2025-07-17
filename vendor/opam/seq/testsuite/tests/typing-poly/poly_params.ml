@@ -490,9 +490,17 @@ val accept_poly_poly_var : ('a. ([< `A | `B ] as 'a) -> unit) -> unit = <fun>
 
 let f (`B|_) = ()
 let h (f:'a. ([> `A ] as 'a) -> unit ) = f `B
+let error = h f
 [%%expect {|
 val f : [> `B ] -> unit = <fun>
 val h : ('a. ([> `A ] as 'a) -> unit) -> unit = <fun>
+Line 3, characters 14-15:
+3 | let error = h f
+                  ^
+Error: The value "f" has type "[> `B ] -> unit"
+       but an expression was expected of type "[> `A ] -> unit"
+       The second variant type is bound to the universal type variable "'a",
+       it may not allow the tag(s) "`B"
 |}]
 
 let (let*) x (id : 'a. 'a -> 'a) = id x, id 1
