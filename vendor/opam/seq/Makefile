@@ -2776,9 +2776,11 @@ NATIVE_ARTEFACT_DIRS = \
 # future.
 
 ifeq "$(NATIVE_COMPILER)" "true"
-install: full-installoptopt ;
+install: full-installoptopt
+	$(call INSTALL_END)
 else
-install: common-install ;
+install: common-install
+	$(call INSTALL_END)
 endif
 
 # These three targets are the slightly esoteric special sauce that avoid
@@ -2807,15 +2809,7 @@ full-installoptopt: full-installopt
 
 .PHONY: common-install
 common-install::
-	$(MKDIR) "$(INSTALL_BINDIR)"
-	$(MKDIR) "$(INSTALL_LIBDIR)"
-ifeq "$(SUPPORTS_SHARED_LIBRARIES)" "true"
-	$(MKDIR) "$(INSTALL_STUBLIBDIR)"
-endif
-	$(MKDIR) "$(INSTALL_LIBDIR_COMPILERLIBS)"
-	$(MKDIR) "$(INSTALL_DOCDIR)"
-	$(MKDIR) "$(INSTALL_LIBDIR_CAML)"
-	$(MKDIR) "$(INSTALL_LIBDIR_PROFILING)"
+	$(call INSTALL_BEGIN)
 
 ifeq "$(SUFFIXING)" "true"
 MANGLE_RUNTIME_NAME = $(TARGET)-$(1)-$(BYTECODE_RUNTIME_ID)$(EXE)
@@ -2827,16 +2821,9 @@ endif
 
 define INSTALL_RUNTIME
 common-install::
-	$(INSTALL_PROG) \
-	  runtime/$(1)$(EXE) \
-	    "$(INSTALL_BINDIR)/$(call MANGLE_RUNTIME_NAME,$(1))"
-ifeq "$(SUFFIXING)" "true"
-	cd "$(INSTALL_BINDIR)" && \
-	  $(LN) "$(TARGET)-$(1)-$(BYTECODE_RUNTIME_ID)$(EXE)" "$(1)$(EXE)"
-	cd "$(INSTALL_BINDIR)" && \
-	  $(LN) "$(TARGET)-$(1)-$(BYTECODE_RUNTIME_ID)$(EXE)" \
-	    "$(1)-$(ZINC_RUNTIME_ID)$(EXE)"
-endif
+	$$(call INSTALL_ITEM, runtime/$(1)$(EXE), bin, , \
+	  $(call MANGLE_RUNTIME_NAME,$(1)), $(if $(filter true, $(SUFFIXING)), \
+	    $(1)$(EXE) $(1)-$(ZINC_RUNTIME_ID)$(EXE)))
 endef
 define INSTALL_RUNTIME_LIB
 ifeq "$(2)" "BYTECODE"
@@ -2844,53 +2831,59 @@ common-install::
 else
 full-installopt native-install::
 endif
-	$(INSTALL_PROG) \
-	  runtime/lib$(1)_shared$(EXT_DLL) \
-	    "$(INSTALL_LIBDIR)/$(call MANGLE_RUNTIME_DLL_NAME,$(1),$(2))"
-ifeq "$(SUFFIXING)" "true"
-	cd "$(INSTALL_LIBDIR)" && \
-	  $(LN) "$(call MANGLE_RUNTIME_DLL_NAME,$(1),$(2))" \
-	  "lib$(1)_shared$(EXT_DLL)"
-endif
+	$$(call INSTALL_ITEM, runtime/lib$(1)_shared$(EXT_DLL), libexec, , \
+	  $(call MANGLE_RUNTIME_DLL_NAME,$(1),$(2)), \
+	    $(if $(filter true, $(SUFFIXING)), lib$(1)_shared$(EXT_DLL)))
 endef
 
 $(foreach runtime, $(runtime_PROGRAMS), \
   $(eval $(call INSTALL_RUNTIME,$(runtime))))
 
 common-install::
-	$(INSTALL_DATA) runtime/ld.conf $(runtime_BYTECODE_STATIC_LIBRARIES) \
-	  "$(INSTALL_LIBDIR)"
+	$(call INSTALL_ITEMS, runtime/ld.conf $(runtime_BYTECODE_STATIC_LIBRARIES), \
+	  lib)
 
 $(foreach shared_runtime, $(runtime_BYTECODE_SHARED_LIBRARIES), \
   $(eval $(call INSTALL_RUNTIME_LIB,$(shared_runtime),BYTECODE)))
 
 common-install::
-	$(INSTALL_DATA) runtime/caml/domain_state.tbl runtime/caml/*.h \
-	  "$(INSTALL_LIBDIR_CAML)"
-	$(INSTALL_PROG) ocaml$(EXE) "$(INSTALL_BINDIR)"
+	$(call INSTALL_ITEMS, \
+	    runtime/caml/domain_state.tbl runtime/caml/*.h, \
+	  lib, $(INSTALL_LIBDIR_CAML))
+	$(call INSTALL_ITEMS, ocaml$(EXE), bin)
 ifeq "$(INSTALL_BYTECODE_PROGRAMS)" "true"
 	$(call STRIP_BYTE_PROG, ocamlc$(EXE))
-	$(INSTALL_PROG) ocamlc$(EXE).stripped "$(INSTALL_BINDIR)/ocamlc.byte$(EXE)"
+ifeq "$(NATIVE_COMPILER)" "true"
+	$(call INSTALL_ITEM, \
+	  ocamlc$(EXE).stripped, bin, , ocamlc.byte$(EXE))
+else
+	$(call INSTALL_ITEM, \
+	  ocamlc$(EXE).stripped, bin, , ocamlc.byte$(EXE), ocamlc$(EXE))
+endif
 endif
 	$(MAKE) -C stdlib install
 
 define INSTALL_ONE_NAT_TOOL
 common-install::
-ifeq "$(INSTALL_BYTECODE_PROGRAMS)" "true"
-	$(INSTALL_PROG) "tools/$(1)$(EXE)" "$(INSTALL_BINDIR)/$(1).byte$(EXE)"
-endif
 ifeq "$(NATIVE_COMPILER)" "true"
-	$(INSTALL_PROG) "tools/$(1).opt$(EXE)" "$(INSTALL_BINDIR)"
+ifeq "$(INSTALL_BYTECODE_PROGRAMS)" "true"
+	$$(call INSTALL_ITEM, tools/$(1)$(EXE), bin, , $(1).byte$(EXE))
 endif
-	(cd "$(INSTALL_BINDIR)" && \
-	  $(LN) "$(1).$(if $(filter true, $(NATIVE_COMPILER)),opt,byte)$(EXE)" \
-	        "$(1)$(EXE)")
+	$$(call INSTALL_ITEM, tools/$(1).opt$(EXE), bin, , , $(1)$(EXE))
+else
+	$$(call INSTALL_ITEM, tools/$(1)$(EXE), bin, , $(1).byte$(EXE), $(1)$(EXE))
+endif
 endef
 
 ifeq "$(INSTALL_BYTECODE_PROGRAMS)" "true"
 common-install::
-	$(INSTALL_PROG) lex/ocamllex$(EXE) \
-	  "$(INSTALL_BINDIR)/ocamllex.byte$(EXE)"
+ifeq "$(NATIVE_COMPILER)" "true"
+	$(call INSTALL_ITEM, \
+	  lex/ocamllex$(EXE), bin, , ocamllex.byte$(EXE))
+else
+	$(call INSTALL_ITEM, \
+	  lex/ocamllex$(EXE), bin, , ocamllex.byte$(EXE), ocamllex$(EXE))
+endif
 endif
 
 $(foreach tool, $(TOOLS_TO_INSTALL_NAT), \
@@ -2898,108 +2891,100 @@ $(foreach tool, $(TOOLS_TO_INSTALL_NAT), \
 
 define INSTALL_ONE_BYT_TOOL
 common-install::
-	$(INSTALL_PROG) "tools/$(1)$(EXE)" "$(INSTALL_BINDIR)"
+	$$(call INSTALL_ITEMS, tools/$(1)$(EXE), bin)
 endef
 
 $(foreach tool, $(TOOLS_TO_INSTALL_BYT), \
   $(eval $(call INSTALL_ONE_BYT_TOOL,$(tool))))
 
 common-install::
-	$(INSTALL_PROG) $(ocamlyacc_PROGRAM)$(EXE) "$(INSTALL_BINDIR)"
-	$(INSTALL_DATA) \
-	  $(call COMPILER_ARTEFACT_DIRS, *.cmi) \
-	  "$(INSTALL_LIBDIR_COMPILERLIBS)"
+	$(call INSTALL_ITEMS, $(ocamlyacc_PROGRAM)$(EXE), bin)
+	$(call INSTALL_ITEMS, \
+	    $(call COMPILER_ARTEFACT_DIRS, *.cmi), \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
 ifeq "$(INSTALL_SOURCE_ARTIFACTS)" "true"
-	$(INSTALL_DATA) \
-	  $(call COMPILER_ARTEFACT_DIRS, *.cmt *.cmti *.mli) \
-	  "$(INSTALL_LIBDIR_COMPILERLIBS)"
-	$(INSTALL_DATA) \
-	   toplevel/byte/*.cmt \
-	   "$(INSTALL_LIBDIR_COMPILERLIBS)"
-	$(INSTALL_DATA) \
-	  tools/profiling.cmt tools/profiling.cmti \
-	  "$(INSTALL_LIBDIR_PROFILING)"
+	$(call INSTALL_ITEMS, \
+	    $(call COMPILER_ARTEFACT_DIRS, *.cmt *.cmti *.mli), \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
+	$(call INSTALL_ITEMS, toplevel/byte/*.cmt, \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
+	$(call INSTALL_ITEMS, tools/profiling.cmt tools/profiling.cmti, \
+	  lib, $(INSTALL_LIBDIR_PROFILING))
 endif
-	$(INSTALL_DATA) \
-	  compilerlibs/*.cma compilerlibs/META \
-	  "$(INSTALL_LIBDIR_COMPILERLIBS)"
-	$(INSTALL_DATA) \
-	   $(ocamlc_CMO_FILES) $(ocaml_CMO_FILES) \
-	   "$(INSTALL_LIBDIR_COMPILERLIBS)"
-	$(INSTALL_PROG) $(expunge) "$(INSTALL_LIBDIR)"
+	$(call INSTALL_ITEMS, compilerlibs/*.cma compilerlibs/META, \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
+	$(call INSTALL_ITEMS, $(ocamlc_CMO_FILES) $(ocaml_CMO_FILES), \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
+	$(call INSTALL_ITEMS, $(expunge), libexec)
 # If installing over a previous OCaml version, ensure some modules are removed
 # from the previous installation.
-	rm -f "$(INSTALL_LIBDIR)"/topdirs.cm* "$(INSTALL_LIBDIR)/topdirs.mli"
-	rm -f "$(INSTALL_LIBDIR)"/profiling.cm* "$(INSTALL_LIBDIR)/profiling.$(O)"
-	$(INSTALL_DATA) \
-	  tools/profiling.cmi tools/profiling.cmo \
-	  "$(INSTALL_LIBDIR_PROFILING)"
+	$(call INSTALL_RM, \
+	  "$(INSTALL_LIBDIR)"/topdirs.cm* "$(INSTALL_LIBDIR)/topdirs.mli")
+	$(call INSTALL_RM, \
+	  "$(INSTALL_LIBDIR)"/profiling.cm* "$(INSTALL_LIBDIR)/profiling.$(O)")
+	$(call INSTALL_ITEMS, tools/profiling.cmi tools/profiling.cmo, \
+	  lib, $(INSTALL_LIBDIR_PROFILING))
 ifeq "$(UNIX_OR_WIN32)" "unix" # Install manual pages only on Unix
 	$(MAKE) -C man install
 endif
 # For dynlink, if installing over a previous OCaml version, ensure
 # dynlink is removed from the previous installation.
-	rm -f "$(INSTALL_LIBDIR)"/dynlink.cm* "$(INSTALL_LIBDIR)/dynlink.mli" \
-        "$(INSTALL_LIBDIR)/dynlink.$(A)" \
-        $(addprefix "$(INSTALL_LIBDIR)/", $(notdir $(dynlink_CMX_FILES)))
-	$(MKDIR) "$(INSTALL_LIBDIR_DYNLINK)"
-	$(INSTALL_DATA) \
-	  otherlibs/dynlink/dynlink.cmi otherlibs/dynlink/dynlink.cma \
-	  otherlibs/dynlink/META \
-	  "$(INSTALL_LIBDIR_DYNLINK)"
+	$(call INSTALL_RM, \
+	  "$(INSTALL_LIBDIR)"/dynlink.cm* \
+	  "$(INSTALL_LIBDIR)/dynlink.mli" \
+	  "$(INSTALL_LIBDIR)/dynlink.$(A)" \
+	  $(addprefix "$(INSTALL_LIBDIR)/", $(notdir $(dynlink_CMX_FILES))))
+	$(call INSTALL_ITEMS, \
+	    otherlibs/dynlink/dynlink.cmi otherlibs/dynlink/dynlink.cma \
+	    otherlibs/dynlink/META, \
+	  lib, $(INSTALL_LIBDIR_DYNLINK))
 ifeq "$(INSTALL_SOURCE_ARTIFACTS)" "true"
-	$(INSTALL_DATA) \
-	  otherlibs/dynlink/dynlink.cmti otherlibs/dynlink/dynlink.mli \
-	  "$(INSTALL_LIBDIR_DYNLINK)"
+	$(call INSTALL_ITEMS, \
+	    otherlibs/dynlink/dynlink.cmti otherlibs/dynlink/dynlink.mli, \
+	  lib, $(INSTALL_LIBDIR_DYNLINK))
 endif
 	for i in $(OTHERLIBS); do \
 	  $(MAKE) -C otherlibs/$$i install || exit $$?; \
 	done
 ifeq "$(build_ocamldoc)" "true"
-	$(MKDIR) "$(INSTALL_LIBDIR_OCAMLDOC)"
-	$(INSTALL_PROG) ocamldoc/ocamldoc$(EXE) "$(INSTALL_BINDIR)"
-	$(INSTALL_DATA) \
-	  ocamldoc/ocamldoc.hva ocamldoc/*.cmi ocamldoc/odoc_info.cma \
-	  ocamldoc/META \
-	  "$(INSTALL_LIBDIR_OCAMLDOC)"
+	$(call INSTALL_ITEMS, ocamldoc/ocamldoc$(EXE), bin)
+	$(call INSTALL_ITEMS, \
+	    ocamldoc/ocamldoc.hva ocamldoc/*.cmi ocamldoc/odoc_info.cma \
+	    ocamldoc/META, \
+	  lib, $(INSTALL_LIBDIR_OCAMLDOC))
 ifeq "$(INSTALL_SOURCE_ARTIFACTS)" "true"
-	$(INSTALL_DATA) \
-	  $(OCAMLDOC_LIBMLIS) $(OCAMLDOC_LIBCMTS) \
-	  "$(INSTALL_LIBDIR_OCAMLDOC)"
+	$(call INSTALL_ITEMS, $(OCAMLDOC_LIBMLIS) $(OCAMLDOC_LIBCMTS), \
+	  lib, $(INSTALL_LIBDIR_OCAMLDOC))
 endif
 endif
 ifeq "$(build_libraries_manpages)" "true"
 	$(MAKE) -C api_docgen install
 endif
 ifneq "$(WITH_DEBUGGER)" ""
-	$(INSTALL_PROG) debugger/ocamldebug$(EXE) "$(INSTALL_BINDIR)"
+	$(call INSTALL_ITEMS, debugger/ocamldebug$(EXE), bin)
 endif
 ifeq "$(BOOTSTRAPPING_FLEXDLL)" "true"
 ifeq "$(TOOLCHAIN)" "msvc"
-	$(INSTALL_DATA) $(FLEXDLL_SOURCE_DIR)/$(FLEXDLL_MANIFEST) \
-    "$(INSTALL_BINDIR)/"
+	# Technically this should not be installed with "executable"
+	# permissions, but in practice that request will be ignored.
+	$(call INSTALL_ITEMS, $(FLEXDLL_SOURCE_DIR)/$(FLEXDLL_MANIFEST), bin)
 endif
 ifeq "$(INSTALL_BYTECODE_PROGRAMS)" "true"
-	$(INSTALL_PROG) \
-	  flexlink.byte$(EXE) "$(INSTALL_BINDIR)"
-endif # ifeq "$(INSTALL_BYTECODE_PROGRAMS)" "true"
-	$(MKDIR) "$(INSTALL_LIBDIR_FLEXDLL)"
-	$(INSTALL_DATA) $(FLEXDLL_OBJECTS) "$(INSTALL_LIBDIR_FLEXDLL)"
-endif # ifeq "$(BOOTSTRAPPING_FLEXDLL)" "true"
-	$(INSTALL_DATA) Makefile.config "$(INSTALL_LIBDIR)"
-	$(INSTALL_DATA) $(DOC_FILES) "$(INSTALL_DOCDIR)"
-ifeq "$(NATIVE_COMPILER)-$(INSTALL_BYTECODE_PROGRAMS)" "false-true"
-	cd "$(INSTALL_BINDIR)"; \
-	$(LN) ocamlc.byte$(EXE) ocamlc$(EXE); \
-	$(LN) ocamllex.byte$(EXE) ocamllex$(EXE); \
-	(test -f flexlink.byte$(EXE) && \
-	  $(LN) flexlink.byte$(EXE) flexlink$(EXE)) || true
+ifeq "$(NATIVE_COMPILER)" "true"
+	$(call INSTALL_ITEMS, flexlink.byte$(EXE), bin)
+else
+	$(call INSTALL_ITEM, flexlink.byte$(EXE), bin, , , flexlink$(EXE))
 endif
+endif # ifeq "$(INSTALL_BYTECODE_PROGRAMS)" "true"
+	$(call INSTALL_ITEMS, $(FLEXDLL_OBJECTS), lib, $(INSTALL_LIBDIR_FLEXDLL))
+endif # ifeq "$(BOOTSTRAPPING_FLEXDLL)" "true"
+	$(call INSTALL_ITEMS, Makefile.config, lib)
+	$(call INSTALL_ITEMS, $(DOC_FILES), doc)
 
 # Installation of the native-code compiler
 .PHONY: full-installopt native-install
 full-installopt native-install::
-	$(INSTALL_DATA) $(runtime_NATIVE_STATIC_LIBRARIES) "$(INSTALL_LIBDIR)"
+	$(call INSTALL_ITEMS, $(runtime_NATIVE_STATIC_LIBRARIES), lib)
 
 $(foreach shared_runtime, $(runtime_NATIVE_SHARED_LIBRARIES), \
   $(eval $(call INSTALL_RUNTIME_LIB,$(shared_runtime),NATIVE)))
@@ -3007,103 +2992,92 @@ $(foreach shared_runtime, $(runtime_NATIVE_SHARED_LIBRARIES), \
 full-installopt native-install::
 ifeq "$(INSTALL_BYTECODE_PROGRAMS)" "true"
 	$(call STRIP_BYTE_PROG, ocamlopt$(EXE))
-	$(INSTALL_PROG) \
-	  ocamlopt$(EXE).stripped "$(INSTALL_BINDIR)/ocamlopt.byte$(EXE)"
+	$(call INSTALL_ITEM, ocamlopt$(EXE).stripped, bin, , ocamlopt.byte$(EXE))
 endif
 	$(MAKE) -C stdlib installopt
-	$(INSTALL_DATA) \
-	    middle_end/*.cmi \
-	    "$(INSTALL_LIBDIR_COMPILERLIBS)"
-	$(INSTALL_DATA) \
-	    middle_end/closure/*.cmi \
-	    "$(INSTALL_LIBDIR_COMPILERLIBS)"
-	$(INSTALL_DATA) \
-	    middle_end/flambda/*.cmi \
-	    "$(INSTALL_LIBDIR_COMPILERLIBS)"
-	$(INSTALL_DATA) \
-	    middle_end/flambda/base_types/*.cmi \
-	    "$(INSTALL_LIBDIR_COMPILERLIBS)"
-	$(INSTALL_DATA) \
-	    asmcomp/*.cmi \
-	    "$(INSTALL_LIBDIR_COMPILERLIBS)"
+	$(call INSTALL_ITEMS, \
+	    middle_end/*.cmi, \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
+	$(call INSTALL_ITEMS, \
+	    middle_end/closure/*.cmi, \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
+	$(call INSTALL_ITEMS, \
+	    middle_end/flambda/*.cmi, \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
+	$(call INSTALL_ITEMS, \
+	    middle_end/flambda/base_types/*.cmi, \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
+	$(call INSTALL_ITEMS, \
+	    asmcomp/*.cmi, \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
 ifeq "$(INSTALL_SOURCE_ARTIFACTS)" "true"
-	$(INSTALL_DATA) \
-	    $(addprefix middle_end/, *.cmt *.cmti *.mli) \
-	    "$(INSTALL_LIBDIR_COMPILERLIBS)"
-	$(INSTALL_DATA) \
-	    $(addprefix middle_end/closure/, *.cmt *.cmti *.mli) \
-	    "$(INSTALL_LIBDIR_COMPILERLIBS)"
-	$(INSTALL_DATA) \
-	    $(addprefix middle_end/flambda/, *.cmt *.cmti *.mli) \
-	    "$(INSTALL_LIBDIR_COMPILERLIBS)"
-	$(INSTALL_DATA) \
-	    $(addprefix middle_end/flambda/base_types/, *.cmt *.cmti *.mli) \
-	    "$(INSTALL_LIBDIR_COMPILERLIBS)"
-	$(INSTALL_DATA) \
-	    $(addprefix asmcomp/, *.cmt *.cmti *.mli) \
-	    "$(INSTALL_LIBDIR_COMPILERLIBS)"
+	$(call INSTALL_ITEMS, \
+	    $(addprefix middle_end/, *.cmt *.cmti *.mli), \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
+	$(call INSTALL_ITEMS, \
+	    $(addprefix middle_end/closure/, *.cmt *.cmti *.mli), \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
+	$(call INSTALL_ITEMS, \
+	    $(addprefix middle_end/flambda/, *.cmt *.cmti *.mli), \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
+	$(call INSTALL_ITEMS, \
+	    $(addprefix middle_end/flambda/base_types/, *.cmt *.cmti *.mli), \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
+	$(call INSTALL_ITEMS, \
+	    $(addprefix asmcomp/, *.cmt *.cmti *.mli), \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
 endif
-	$(INSTALL_DATA) \
-	    $(ocamlopt_CMO_FILES) \
-	    "$(INSTALL_LIBDIR_COMPILERLIBS)"
+	$(call INSTALL_ITEMS, $(ocamlopt_CMO_FILES), \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
 ifeq "$(build_ocamldoc)" "true"
-	$(INSTALL_PROG) ocamldoc/ocamldoc.opt$(EXE) "$(INSTALL_BINDIR)"
-	$(INSTALL_DATA) \
-	  ocamldoc/*.cmx ocamldoc/odoc_info.$(A) \
-	  ocamldoc/odoc_info.cmxa \
-	  "$(INSTALL_LIBDIR_OCAMLDOC)"
+	$(call INSTALL_ITEMS, ocamldoc/ocamldoc.opt$(EXE), bin)
+	$(call INSTALL_ITEMS, \
+	    ocamldoc/*.cmx ocamldoc/odoc_info.$(A) ocamldoc/odoc_info.cmxa, \
+	  lib, $(INSTALL_LIBDIR_OCAMLDOC))
 endif
 ifeq "$(strip $(NATDYNLINK))" "true"
-	$(INSTALL_DATA) \
-	  $(dynlink_CMX_FILES) otherlibs/dynlink/dynlink.cmxa \
-	  otherlibs/dynlink/dynlink.$(A) \
-	  "$(INSTALL_LIBDIR_DYNLINK)"
+	$(call INSTALL_ITEMS, \
+	    $(dynlink_CMX_FILES) otherlibs/dynlink/dynlink.cmxa \
+	    otherlibs/dynlink/dynlink.$(A), \
+	  lib, $(INSTALL_LIBDIR_DYNLINK))
 endif
 	for i in $(OTHERLIBS); do \
 	  $(MAKE) -C otherlibs/$$i installopt || exit $$?; \
 	done
-	$(INSTALL_DATA) \
-          tools/profiling.cmx tools/profiling.$(O) \
-	  "$(INSTALL_LIBDIR_PROFILING)"
+	$(call INSTALL_ITEMS, tools/profiling.cmx tools/profiling.$(O), \
+	  lib, $(INSTALL_LIBDIR_PROFILING))
 
 .PHONY: full-installoptopt installopt installoptopt
 full-installoptopt installopt installoptopt:
-	$(INSTALL_PROG) ocamlc.opt$(EXE) "$(INSTALL_BINDIR)"
-	$(INSTALL_PROG) ocamlopt.opt$(EXE) "$(INSTALL_BINDIR)"
-	$(INSTALL_PROG) lex/ocamllex.opt$(EXE) "$(INSTALL_BINDIR)"
-	cd "$(INSTALL_BINDIR)"; \
-	   $(LN) ocamlc.opt$(EXE) ocamlc$(EXE); \
-	   $(LN) ocamlopt.opt$(EXE) ocamlopt$(EXE); \
-	   $(LN) ocamllex.opt$(EXE) ocamllex$(EXE)
+	$(call INSTALL_ITEM, ocamlc.opt$(EXE), bin, , , ocamlc$(EXE))
+	$(call INSTALL_ITEM, ocamlopt.opt$(EXE), bin, , , ocamlopt$(EXE))
+	$(call INSTALL_ITEM, lex/ocamllex.opt$(EXE), bin, , , ocamllex$(EXE))
 ifeq "$(BOOTSTRAPPING_FLEXDLL)" "true"
-	$(INSTALL_PROG) flexlink.opt$(EXE) "$(INSTALL_BINDIR)"
-	cd "$(INSTALL_BINDIR)"; \
-	  $(LN) flexlink.opt$(EXE) flexlink$(EXE)
+	$(call INSTALL_ITEM, flexlink.opt$(EXE), bin, , , flexlink$(EXE))
 endif
-	$(INSTALL_DATA) \
-	  $(call COMPILER_ARTEFACT_DIRS, *.cmx, $(NATIVE_ARTEFACT_DIRS)) \
-	  toplevel/native/tophooks.cmi \
-    "$(INSTALL_LIBDIR_COMPILERLIBS)"
-	$(INSTALL_DATA) \
-	   compilerlibs/*.cmxa compilerlibs/*.$(A) \
-	   "$(INSTALL_LIBDIR_COMPILERLIBS)"
-	$(INSTALL_DATA) \
-	   $(ocamlc_CMX_FILES:.cmx=.$(O)) \
-	   $(ocamlopt_CMX_FILES:.cmx=.$(O)) \
-	   $(ocamlnat_CMX_FILES:.cmx=.$(O)) \
-	   "$(INSTALL_LIBDIR_COMPILERLIBS)"
+	$(call INSTALL_ITEMS, \
+	    $(call COMPILER_ARTEFACT_DIRS, *.cmx, $(NATIVE_ARTEFACT_DIRS)) \
+	    toplevel/native/tophooks.cmi, \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
+	$(call INSTALL_ITEMS, compilerlibs/*.cmxa compilerlibs/*.$(A), \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
+	$(call INSTALL_ITEMS, \
+	    $(ocamlc_CMX_FILES:.cmx=.$(O)) \
+	    $(ocamlopt_CMX_FILES:.cmx=.$(O)) \
+	    $(ocamlnat_CMX_FILES:.cmx=.$(O)), \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
 ifeq "$(INSTALL_OCAMLNAT)" "true"
-	  $(INSTALL_PROG) ocamlnat$(EXE) "$(INSTALL_BINDIR)"
+	  $(call INSTALL_ITEMS, ocamlnat$(EXE), bin)
 endif
 
 # Installation of the *.ml sources of compiler-libs
 .PHONY: install-compiler-sources
 install-compiler-sources:
 ifeq "$(INSTALL_SOURCE_ARTIFACTS)" "true"
-	$(INSTALL_DATA) \
-	  $(call COMPILER_ARTEFACT_DIRS, *.ml, $(NATIVE_ARTEFACT_DIRS)) \
-	  toplevel/byte/*.ml \
-	  "$(INSTALL_LIBDIR_COMPILERLIBS)"
+	$(call INSTALL_ITEMS, \
+	    $(call COMPILER_ARTEFACT_DIRS, *.ml, $(NATIVE_ARTEFACT_DIRS)) \
+	    toplevel/byte/*.ml, \
+	  lib, $(INSTALL_LIBDIR_COMPILERLIBS))
 endif
 
 include .depend

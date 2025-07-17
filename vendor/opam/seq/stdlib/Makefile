@@ -66,25 +66,19 @@ opt.opt: allopt
 
 .PHONY: install
 install::
-	$(INSTALL_DATA) \
-	  stdlib.cma std_exit.cmo *.cmi "$(INSTALL_LIBDIR)"
-	$(MKDIR) "$(INSTALL_LIBDIR_STDLIB)"
-	$(INSTALL_DATA) META "$(INSTALL_LIBDIR_STDLIB)"
+	$(call INSTALL_ITEMS, stdlib.cma std_exit.cmo *.cmi, lib)
+	$(call INSTALL_ITEMS, META, lib, $(LIBNAME))
 ifeq "$(INSTALL_SOURCE_ARTIFACTS)" "true"
-	$(INSTALL_DATA) \
-	  *.cmt *.cmti *.mli *.ml *.ml.in \
-	  "$(INSTALL_LIBDIR)"
+	$(call INSTALL_ITEMS, *.cmt *.cmti *.mli *.ml *.ml.in, lib)
 endif
-	$(INSTALL_DATA) $(HEADER_NAME) "$(INSTALL_LIBDIR)/$(HEADER_NAME)"
+	$(call INSTALL_ITEMS, $(HEADER_NAME), lib)
 
 .PHONY: installopt
 installopt: installopt-default
 
 .PHONY: installopt-default
 installopt-default:
-	$(INSTALL_DATA) \
-	  stdlib.cmxa stdlib.$(A) std_exit.$(O) *.cmx \
-	  "$(INSTALL_LIBDIR)"
+	$(call INSTALL_ITEMS, stdlib.cmxa stdlib.$(A) std_exit.$(O) *.cmx, lib)
 
 MANGLING = $(filter true,$(SUFFIXING))
 runtime-launch-info: tmpheader.exe

@@ -122,6 +122,4 @@ build/latex/compilerlibs_input.tex: | build/latex
 
 .PHONY: install
 install:
-	$(MKDIR) "$(INSTALL_MANDIR_LIBRARIES)"
-	$(if $(wildcard build/man), \
-	  $(INSTALL_DATA) build/man/*.3o "$(INSTALL_MANDIR_LIBRARIES)")
+	$(call INSTALL_ITEMS_OPT, build/man/*.3o, man, $(INSTALL_MANDIR_LIBRARIES))

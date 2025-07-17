@@ -106,26 +106,20 @@ distclean: clean
 
 install:
 ifeq "$(SUPPORTS_SHARED_LIBRARIES)" "true"
-	$(INSTALL_PROG) $(DLLTHREADS) "$(INSTALL_STUBLIBDIR)"
+	$(call INSTALL_ITEMS, $(DLLTHREADS), stublibs)
 endif
-	$(INSTALL_DATA) libthreads.$(A) "$(INSTALL_LIBDIR)"
-	$(MKDIR) "$(INSTALL_LIBDIR_SYSTHREADS)"
-	$(INSTALL_DATA) \
-	  $(CMIFILES) threads.cma META \
-	  "$(INSTALL_LIBDIR_SYSTHREADS)"
+	$(call INSTALL_ITEMS, libthreads.$(A), lib)
+	$(call INSTALL_ITEMS, $(CMIFILES) threads.cma META, lib, $(LIBNAME))
 ifeq "$(INSTALL_SOURCE_ARTIFACTS)" "true"
-	$(INSTALL_DATA) \
-	  $(CMIFILES:.cmi=.cmti) \
-	  "$(INSTALL_LIBDIR_SYSTHREADS)"
-	$(INSTALL_DATA) $(MLIFILES) "$(INSTALL_LIBDIR_SYSTHREADS)"
+	$(call INSTALL_ITEMS, $(CMIFILES:.cmi=.cmti), lib, $(LIBNAME))
+	$(call INSTALL_ITEMS, $(MLIFILES), lib, $(LIBNAME))
 endif
-	$(INSTALL_DATA) caml/threads.h "$(INSTALL_LIBDIR_CAML)"
+	$(call INSTALL_ITEMS, caml/threads.h, lib, $(INSTALL_LIBDIR_CAML))
 
 installopt:
-	$(INSTALL_DATA) libthreadsnat.$(A) "$(INSTALL_LIBDIR)"
-	$(INSTALL_DATA) \
-	  $(THREADS_NCOBJS) threads.cmxa threads.$(A) \
-	  "$(INSTALL_LIBDIR_SYSTHREADS)"
+	$(call INSTALL_ITEMS, libthreadsnat.$(A), lib)
+	$(call INSTALL_ITEMS, $(THREADS_NCOBJS) threads.cmxa threads.$(A), \
+	  lib, $(LIBNAME))
 
 %.cmi: %.mli
 	$(V_OCAMLC)$(CAMLC) -c $(COMPFLAGS) $<

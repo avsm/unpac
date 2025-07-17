@@ -99,17 +99,121 @@ INSTALL_STUBLIBDIR = $(DESTDIR)$(STUBLIBDIR)
 
 # Library subdirectories. The compiler distribution does make assumptions about
 # these, and they cannot be freely overridden by the user.
-INSTALL_LIBDIR_CAML = $(INSTALL_LIBDIR)/caml
-INSTALL_LIBDIR_COMPILERLIBS = $(INSTALL_LIBDIR)/compiler-libs
-INSTALL_LIBDIR_DYNLINK = $(INSTALL_LIBDIR)/dynlink
-INSTALL_LIBDIR_FLEXDLL = $(INSTALL_LIBDIR)/flexdll
-INSTALL_LIBDIR_OCAMLDOC = $(INSTALL_LIBDIR)/ocamldoc
-INSTALL_LIBDIR_PROFILING = $(INSTALL_LIBDIR)/profiling
-INSTALL_LIBDIR_STDLIB = $(INSTALL_LIBDIR)/stdlib
-INSTALL_LIBDIR_SYSTHREADS = $(INSTALL_LIBDIR)/threads
+INSTALL_LIBDIR_CAML = caml
+INSTALL_LIBDIR_COMPILERLIBS = compiler-libs
+INSTALL_LIBDIR_DYNLINK = dynlink
+INSTALL_LIBDIR_FLEXDLL = flexdll
+INSTALL_LIBDIR_OCAMLDOC = ocamldoc
+INSTALL_LIBDIR_PROFILING = profiling
+INSTALL_LIBDIR_STDLIB = stdlib
+INSTALL_LIBDIR_SYSTHREADS = threads
 
-INSTALL_MANDIR_PROGRAMS = $(INSTALL_MANDIR)/man1
-INSTALL_MANDIR_LIBRARIES = $(INSTALL_MANDIR)/man3
+INSTALL_MANDIR_PROGRAMS = man1
+INSTALL_MANDIR_LIBRARIES = man3
+
+INSTALL_MODE ?= install
+
+# INSTALL_ITEM installs a single file, possibly with a different name and
+# possibly creating additional symlinks/copies
+#   $1 = source file (may include directories)
+#   $2 = section (bin, doc, lib, libexec, man, stublibs)
+#   $3 = directory within section (may be empty)
+#   $4 = target basename (may be empty)
+#   $5 = additional basenames (either symlinked or copied, depending on what the
+#        platform supports)
+# The $(origin n) dance is necessary to suppress warnings about undefined
+# variables.
+INSTALL_ITEM = \
+  $(INSTALL_$(INSTALL_MODE)_PREFIX)$(call INSTALL_ENSURE_DIR,$\
+    $(strip $(2)),$(if $(filter-out undefined,$(origin 3)),$(strip $(3))))$\
+  $(call INSTALL_DESPATCH_$(INSTALL_MODE)_ITEM,$\
+    $(strip $(1)),$\
+    $(strip $(2)),$\
+    $(if $(filter-out undefined,$(origin 3)),$(strip $(3))),$\
+    $(if $(filter-out undefined,$(origin 4)),$(strip $(4))),$\
+    $(if $(filter-out undefined,$(origin 5)),$(strip $(5))))
+
+# INSTALL_ITEMS installs a series of files to a single directory
+#   $1 = source file(s) (may include directories and glob patterns)
+#   $2 = section (as for INSTALL_ITEM)
+#   $3 = directory within section (may be omitted)
+# INSTALL_ITEMS is sometimes an alias for INSTALL_ITEM. For simplicity with
+# undefined variable warnings, INSTALL_DESPATCH_foo_ITEMS is passed 5 parameters
+# but $4 and $5 are always empty.
+INSTALL_ITEMS = \
+  $(INSTALL_$(INSTALL_MODE)_PREFIX)$(call INSTALL_ENSURE_DIR,$\
+    $(strip $(2)),$(if $(filter-out undefined,$(origin 3)),$(strip $(3))))$\
+  $(call INSTALL_DESPATCH_$(INSTALL_MODE)_ITEMS,$\
+    $(strip $(1)),$\
+    $(strip $(2)),$\
+    $(if $(filter-out undefined,$(origin 3)),$(strip $(3))),,)
+
+# INSTALL_ITEMS_OPT is INSTALL_ITEMS, but does nothing if the source file(s) do
+# not exist
+INSTALL_ITEMS_OPT = \
+  $(if $(wildcard $(1)),$(call INSTALL_ITEMS, \
+    $(1), $(2), $(if $(filter-out undefined,$(origin 3)), $(3))))
+
+INSTALL_ENSURE_DIR = \
+  $(if $(filter undefined,$(origin DIR_CREATED_$(subst exec,,$(1))_$(2))),$\
+    $(eval DIR_CREATED_$(subst exec,,$(1))_$(2):=)$\
+    $(call INSTALL_DESPATCH_$(INSTALL_MODE)_MKDIR,$\
+      $(subst exec,,$(1)),$(2)))
+
+# INSTALL_RM takes a single argument which may include glob patterns of files to
+# be removed when performing a physical install.
+INSTALL_RM = $(call INSTALL_DESPATCH_$(INSTALL_MODE)_RM,$(strip $(1)))
+
+# INSTALL_BEGIN and INSTALL_END are used in the root Makefile's install target
+INSTALL_BEGIN = $(INSTALL_DESPATCH_$(INSTALL_MODE)_BEGIN)
+INSTALL_END = $(INSTALL_DESPATCH_$(INSTALL_MODE)_END)
+
+# Normal installation
+INSTALL_CMD_bin = $(INSTALL_PROG)
+INSTALL_CMD_doc = $(INSTALL_DATA)
+INSTALL_CMD_lib = $(INSTALL_DATA)
+INSTALL_CMD_libexec = $(INSTALL_PROG)
+INSTALL_CMD_man = $(INSTALL_DATA)
+INSTALL_CMD_stublibs = $(INSTALL_PROG)
+
+INSTALL_SECTION_bin = $(INSTALL_BINDIR)
+INSTALL_SECTION_doc = $(INSTALL_DOCDIR)
+INSTALL_SECTION_lib = $(INSTALL_LIBDIR)
+INSTALL_SECTION_libexec = $(INSTALL_LIBDIR)
+INSTALL_SECTION_man = $(INSTALL_MANDIR)
+INSTALL_SECTION_stublibs = $(INSTALL_STUBLIBDIR)
+
+QUOTE_SINGLE = '$(subst ','\'',$(1))'
+
+define NEWLINE
+
+
+endef
+SH_AND = && \$(NEWLINE)
+
+INSTALL_install_PREFIX =
+
+INSTALL_DESPATCH_install_RM = rm -f $(1)
+
+INSTALL_DESPATCH_install_MKDIR = \
+  $(MKDIR) $(call QUOTE_SINGLE,$(INSTALL_SECTION_$(1))$(addprefix /,$(2))) \
+    $(SH_AND)
+
+MK_LINK = \
+  (cd "$(INSTALL_SECTION_$(2))$(addprefix /,$(3))" && \
+    $(LN) $(call QUOTE_SINGLE,$(1)) $(call QUOTE_SINGLE,$(4)))
+
+INSTALL_DESPATCH_install_ITEM = \
+  $(INSTALL_CMD_$(2)) $(1) \
+    $(call QUOTE_SINGLE,$\
+      $(INSTALL_SECTION_$(2))$(addprefix /,$(3))$(addprefix /,$(4))) \
+  $(foreach link, $(5),$(SH_AND)$\
+    $(call MK_LINK,$(if $(4),$(4),$(notdir $(1))),$(2),$(3),$(link)))
+
+INSTALL_DESPATCH_install_ITEMS = $(INSTALL_DESPATCH_install_ITEM)
+
+INSTALL_DESPATCH_install_BEGIN = @
+INSTALL_DESPATCH_install_END = @
 
 FLEXDLL_SUBMODULE_PRESENT := $(wildcard $(ROOTDIR)/flexdll/Makefile)
 
