@@ -2913,7 +2913,7 @@ endif
 	done
 ifeq "$(build_ocamldoc)" "true"
 	$(MKDIR) "$(INSTALL_LIBDIR)/ocamldoc"
-	$(INSTALL_PROG) $(OCAMLDOC) "$(INSTALL_BINDIR)"
+	$(INSTALL_PROG) ocamldoc/ocamldoc$(EXE) "$(INSTALL_BINDIR)"
 	$(INSTALL_DATA) \
 	  ocamldoc/ocamldoc.hva ocamldoc/*.cmi ocamldoc/odoc_info.cma \
 	  ocamldoc/META \
@@ -3012,7 +3012,7 @@ endif
 	    $(ocamlopt_CMO_FILES) \
 	    "$(INSTALL_COMPLIBDIR)"
 ifeq "$(build_ocamldoc)" "true"
-	$(INSTALL_PROG) $(OCAMLDOC_OPT) "$(INSTALL_BINDIR)"
+	$(INSTALL_PROG) ocamldoc/ocamldoc.opt$(EXE) "$(INSTALL_BINDIR)"
 	$(INSTALL_DATA) \
 	  ocamldoc/*.cmx ocamldoc/odoc_info.$(A) \
 	  ocamldoc/odoc_info.cmxa \
