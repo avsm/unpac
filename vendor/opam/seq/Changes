@@ -188,6 +188,10 @@ Working version
   rather than failing with an internal error.
   (Florian Angeletti, review by Gabriel Scherer)
 
+- #14147: print row types in error messages when they are a type constructor,
+  e.g. `< foo : int; .. as $0>` when $0 is introduced by a GADT constructor
+  (Stefan Muenzel, review by Jacques Garrigue and Florian Angeletti)
+
 ### Internal/compiler-libs changes:
 
 - #13839, #14008: Reimplement `let open`, `let module` and `let exception` in
