@@ -3084,8 +3084,8 @@ endif
 	   compilerlibs/*.cmxa compilerlibs/*.$(A) \
 	   "$(INSTALL_COMPLIBDIR)"
 	$(INSTALL_DATA) \
-	   $(ocamlc_CMX_FILES) $(ocamlc_CMX_FILES:.cmx=.$(O)) \
-	   $(ocamlopt_CMX_FILES) $(ocamlopt_CMX_FILES:.cmx=.$(O)) \
+	   $(ocamlc_CMX_FILES:.cmx=.$(O)) \
+	   $(ocamlopt_CMX_FILES:.cmx=.$(O)) \
 	   $(ocamlnat_CMX_FILES:.cmx=.$(O)) \
 	   "$(INSTALL_COMPLIBDIR)"
 ifeq "$(INSTALL_OCAMLNAT)" "true"
