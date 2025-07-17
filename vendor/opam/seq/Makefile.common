@@ -215,6 +215,57 @@ INSTALL_DESPATCH_install_ITEMS = $(INSTALL_DESPATCH_install_ITEM)
 INSTALL_DESPATCH_install_BEGIN = @
 INSTALL_DESPATCH_install_END = @
 
+INSTALL_display_PREFIX = @
+
+INSTALL_DESPATCH_display_RM = @
+
+INSTALL_DESPATCH_display_MKDIR = \
+  echo $(call QUOTE_SINGLE,$\
+    -> MKDIR $(INSTALL_SECTION_$(1))$(addprefix /,$(2))) $(SH_AND)
+
+MKLINK_display = \
+  echo $(call QUOTE_SINGLE,-> LN \
+         $(abspath $(INSTALL_SECTION_$(2))$(addprefix /,$(3))/$(1)) -> \
+         $(if $(4),$(4),$(notdir $(1))))
+
+INSTALL_DESPATCH_display_ITEM = \
+  echo $(call QUOTE_SINGLE,-> INSTALL $(1) \
+         $(INSTALL_SECTION_$(2))$(addprefix /,$(3))$(addprefix /,$(4))) \
+  $(foreach link, $(5), && \
+    $(call MKLINK_display,$(if $(4),$(4),$(notdir $(1))),$(2),$(3),$(link)))
+
+INSTALL_DESPATCH_display_ITEMS = $(INSTALL_DESPATCH_display_ITEM)
+
+INSTALL_DESPATCH_display_BEGIN = @
+INSTALL_DESPATCH_display_END = @
+
+INSTALL_list_PREFIX = @
+
+INSTALL_DESPATCH_list_RM = @
+
+INSTALL_DESPATCH_list_MKDIR =
+
+MKLINK_list = \
+  echo $(call QUOTE_SINGLE,-> \
+         $(abspath $(INSTALL_SECTION_$(2))$(addprefix /,$(3))/$\
+                     $(if $(4),$(4),$(notdir $(1)))))
+
+INSTALL_DESPATCH_list_ITEM = \
+  echo $(call QUOTE_SINGLE,-> \
+         $(abspath $(INSTALL_SECTION_$(2))$(addprefix /,$(3))/$\
+                     $(if $(4),$(4),$(notdir $(1))))) \
+  $(foreach link, $(5), && \
+    $(call MKLINK_list,$(if $(4),$(4),$(notdir $(1))),$(2),$(3),$(link)))
+
+INSTALL_DESPATCH_list_ITEMS = \
+  $(foreach file, $(wildcard $(1)), \
+    echo $(call QUOTE_SINGLE,-> \
+           $(INSTALL_SECTION_$(2))$(addprefix /,$(3))/$(notdir $(file)));) \
+  true
+
+INSTALL_DESPATCH_list_BEGIN = @
+INSTALL_DESPATCH_list_END = @
+
 FLEXDLL_SUBMODULE_PRESENT := $(wildcard $(ROOTDIR)/flexdll/Makefile)
 
 IN_COREBOOT_CYCLE ?= false
