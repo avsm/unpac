@@ -530,3 +530,18 @@ let f (x: [< `A of ('a. 'a option) -> unit ]) = match x with `A f -> f None
 [%%expect{|
 val f : [< `A of ('a. 'a option) -> unit & 'b option -> 'c ] -> 'c = <fun>
 |}]
+
+let f: type a. unit -> (a, ('b. 'b -> 'b) -> int) Type.eq ->  a =
+  fun () Equal f -> f 0
+[%%expect{|
+Line 2, characters 2-23:
+2 |   fun () Equal f -> f 0
+      ^^^^^^^^^^^^^^^^^^^^^
+Error: The syntactic arity of the function doesn't match the type constraint:
+       This function has 3 syntactic arguments, but its type is constrained to
+         "unit -> (a, ('b. 'b -> 'b) -> int) Type.eq -> a".
+        Hint: consider splitting the function definition into
+          "fun ... gadt_pat -> fun ..."
+          where "gadt_pat" is the pattern with the GADT constructor that
+          introduces the local type equation on "a".
+|}]
