@@ -107,8 +107,9 @@ build: [
     "--disable-warn-error"
   ]
   [make "-j%{jobs}%"]
+  [make "INSTALL_MODE=opam" "install"]
 ]
-install: [make "install"]
+install: ["sh" "./%{name}%-fixup.sh" prefix]
 depopts: [
   "ocaml-option-32bit"
   "ocaml-option-afl"
