@@ -172,6 +172,14 @@ Working version
   variables.
   (Florian Angeletti, review by Gabriel Scherer)
 
+- #14146: add an error message for external declaration with
+  a non-syntactic arity
+  ```
+   external fail: (int -> int as 'a) -> 'a = "%identity"
+  ```
+  rather than failing with an internal error.
+  (Florian Angeletti, review by Gabriel Scherer)
+
 ### Internal/compiler-libs changes:
 
 - #13839, #14008: Reimplement `let open`, `let module` and `let exception` in

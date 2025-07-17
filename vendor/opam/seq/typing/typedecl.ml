@@ -76,6 +76,7 @@ type error =
   | Nonrec_gadt
   | Invalid_private_row_declaration of type_expr
   | Atomic_field_must_be_mutable of string
+  | External_with_non_syntactic_arity
 
 open Typedtree
 
@@ -1619,7 +1620,9 @@ let rec parse_native_repr_attributes env core_type ty ~global_repr =
     (repr_arg :: repr_args, repr_res)
   | (Ptyp_poly (_, t) | Ptyp_alias (t, _)), _, _ ->
      parse_native_repr_attributes env t ty ~global_repr
-  | Ptyp_arrow _, _, _ | _, Tarrow _, _ -> assert false
+  | Ptyp_arrow _, _, _ -> assert false
+  | _, Tarrow _, _ ->
+      raise (Error (core_type.ptyp_loc, External_with_non_syntactic_arity))
   | _ -> ([], make_native_repr env core_type ty ~global_repr)
 
 
@@ -2354,6 +2357,11 @@ let report_error ~loc = function
       Location.errorf ~loc
         "@[The label %a must be mutable to be declared atomic.@]"
         Style.inline_code name
+  | External_with_non_syntactic_arity ->
+      Location.errorf ~loc
+        "This external declaration has a non-syntactic arity,@ \
+         its arity is greater than its syntatic arity."
+
 
 let () =
   Location.register_error_of_exn
