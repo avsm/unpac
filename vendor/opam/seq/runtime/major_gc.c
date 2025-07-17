@@ -882,10 +882,10 @@ update_major_slice_work(intnat howmuch,
   if (pending > (int64_t)total_cycle_work * 2) {
     intnat catchup = pending - total_cycle_work;
     CAML_GC_MESSAGE(SLICESIZE,
-                    "work counter %"ARCH_INTNAT_PRINTF_FORMAT"u falling behind "
-                    "alloc counter %"ARCH_INTNAT_PRINTF_FORMAT"u by more than "
-                    "twice a total cycle's work %"ARCH_INTNAT_PRINTF_FORMAT"d; "
-                    "catching up by %"ARCH_INTNAT_PRINTF_FORMAT "d\n",
+                    "work counter %"CAML_PRIuNAT" falling behind "
+                    "alloc counter %"CAML_PRIuNAT" by more than "
+                    "twice a total cycle's work %"CAML_PRIuNAT"; "
+                    "catching up by %"CAML_PRIdNAT"\n",
                     atomic_load(&work_counter),
                     atomic_load(&alloc_counter),
                     total_cycle_work, catchup);
@@ -1985,8 +1985,15 @@ mark_again:
 
   if (mode != Slice_opportunistic && caml_marking_started()) {
     /* Finalisers */
+
+    /* TODO: various improvement work here:
+     * - updating finalisers should be made incremental;
+     * - we should measure and account for the work of it against work meters.
+     * - but until it is made incremental, don't gate it on available work.
+     *   because we have to do it (and therefore advance the phase) in domains
+     *   which don't allocate. */
+
     if (caml_gc_phase == Phase_mark_final &&
-        get_major_slice_work(mode) > 0 &&
         caml_final_update_first(domain_state)) {
       /* This domain has updated finalise first values */
       (void)caml_atomic_counter_decr(&num_domains_to_final_update_first);
@@ -1995,8 +2002,9 @@ mark_again:
         goto mark_again;
     }
 
+    /* TODO finaliser improvement work as listed above. */
+
     if (caml_gc_phase == Phase_sweep_ephe &&
-        get_major_slice_work(mode) > 0 &&
         caml_final_update_last(domain_state)) {
       /* This domain has updated finalise last values */
       (void)caml_atomic_counter_decr(&num_domains_to_final_update_last);
@@ -2092,6 +2100,9 @@ mark_again:
     }
 
     /* Complete GC phase */
+
+    /* TODO: move this outside the containing if so that it's possible
+     * in opportunistic slices? */
     if (is_complete_phase_sweep_and_mark_main() ||
         is_complete_phase_mark_final ()) {
       CAMLassert (caml_gc_phase != Phase_sweep_ephe);
