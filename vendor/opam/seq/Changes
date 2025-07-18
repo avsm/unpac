@@ -207,6 +207,9 @@ Working version
   macros to define OCaml integers.
   (Antonin Décimo, review by Nick Barnes)
 
+- #14148: Remove an unused field from package_type in typedtree
+  (Samuel Vivien, review by Gabriel Scherer)
+
 ### Build system:
 
 - #13810: Support build of cross compilers to native freestanding targets
