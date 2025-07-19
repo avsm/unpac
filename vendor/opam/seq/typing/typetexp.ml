@@ -692,12 +692,12 @@ and transl_type_aux env ~row_context ~aliased ~policy styp =
       let path, ptys = transl_package env ~policy ~row_context ptyp in
       let ty = newty (Tpackage {
           pack_path = path;
-          pack_cstrs = List.map (fun (s, cty) ->
+          pack_constraints = List.map (fun (s, cty) ->
                          (Longident.flatten s.txt, cty.ctyp_type)) ptys})
       in
       ctyp (Ttyp_package {
             tpt_path = path;
-            tpt_cstrs = ptys;
+            tpt_constraints = ptys;
             tpt_txt = ptyp.ppt_path;
            }) ty
   | Ptyp_open (mod_ident, t) ->
@@ -777,7 +777,7 @@ and transl_fields env ~policy ~row_context o fields =
 
 and transl_package env ~policy ~row_context ptyp =
   let loc = ptyp.ppt_loc in
-  let l = sort_constraints_no_duplicates loc env ptyp.ppt_cstrs in
+  let l = sort_constraints_no_duplicates loc env ptyp.ppt_constraints in
   let mty = Ast_helper.Mty.mk ~loc (Pmty_ident ptyp.ppt_path) in
   let mty = TyVarEnv.with_local_scope (fun () -> !transl_modtype env mty) in
   let ptys =

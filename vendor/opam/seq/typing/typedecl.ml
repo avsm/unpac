@@ -350,11 +350,11 @@ let transl_declaration env sdecl (id, uid) =
   TyVarEnv.reset();
   let tparams = make_params env sdecl.ptype_params in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
-  let cstrs = List.map
+  let constraints = List.map
     (fun (sty, sty', loc) ->
       transl_simple_type env ~closed:false sty,
       transl_simple_type env ~closed:false sty', loc)
-    sdecl.ptype_cstrs
+    sdecl.ptype_constraints
   in
   let unboxed_attr = get_unboxed_from_attributes sdecl in
   begin match unboxed_attr with
@@ -407,7 +407,7 @@ let transl_declaration env sdecl (id, uid) =
       | Ptype_external name -> Ttype_external name, Type_external name
       | Ptype_variant scstrs ->
         if List.exists (fun cstr -> cstr.pcd_res <> None) scstrs then begin
-          match cstrs with
+          match constraints with
             [] -> ()
           | (_,_,loc)::_ ->
               Location.prerr_warning loc Warnings.Constraint_on_gadt
@@ -506,7 +506,7 @@ let transl_declaration env sdecl (id, uid) =
         let ty' = cty'.ctyp_type in
         try Ctype.unify env ty ty' with Ctype.Unify err ->
           raise(Error(loc, Inconsistent_constraint (env, err))))
-      cstrs;
+      constraints;
   (* Add abstract row *)
     if is_fixed_type sdecl then begin
       let p, _ =
@@ -522,7 +522,7 @@ let transl_declaration env sdecl (id, uid) =
         typ_name = sdecl.ptype_name;
         typ_params = tparams;
         typ_type = decl;
-        typ_cstrs = cstrs;
+        typ_constraints = constraints;
         typ_loc = sdecl.ptype_loc;
         typ_manifest = tman;
         typ_kind = tkind;
@@ -1742,7 +1742,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
          constraints report an error on the constraint location
          rather than the parameter location. *)
       (cty, cty', loc)
-    ) sdecl.ptype_cstrs
+    ) sdecl.ptype_constraints
   in
   let no_row = not (is_fixed_type sdecl) in
   let (tman, man) =  match sdecl.ptype_manifest with
@@ -1851,7 +1851,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
     typ_name = sdecl.ptype_name;
     typ_params = tparams;
     typ_type = new_sig_decl;
-    typ_cstrs = constraints;
+    typ_constraints = constraints;
     typ_loc = loc;
     typ_manifest = Some tman;
     typ_kind = Ttype_abstract;
