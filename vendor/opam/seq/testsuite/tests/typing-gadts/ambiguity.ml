@@ -204,22 +204,24 @@ module M = struct
   let r = ref []
 end
 
-let foo p (e : (T.t, T.u) eq) (x : T.t) (y : T.u) =
-  match e with
-  | Refl ->
-    let z = if p then x else y in
-    let module N = struct
-      module type S = module type of struct let r = ref [z] end
-    end in
-    let module O : N.S = M in
-    ()
+module S = struct
+  let foo p (e : (T.t, T.u) eq) (x : T.t) (y : T.u) =
+    match e with
+    | Refl ->
+        let z = if p then x else y in
+        let module N = struct
+          module type S = module type of struct let r = ref [z] end
+        end in
+        let module O : N.S = M in
+        ()
 
-module type S = module type of M ;;
+  module type S = module type of M
+end;;
 [%%expect{|
 module M : sig val r : '_weak1 list ref end
-Line 12, characters 25-26:
-12 |     let module O : N.S = M in
-                              ^
+Line 13, characters 29-30:
+13 |         let module O : N.S = M in
+                                  ^
 Error: Signature mismatch:
        Modules do not match:
          sig val r : '_weak1 list ref end
@@ -232,29 +234,30 @@ Error: Signature mismatch:
        The type "'_weak1 list ref" is not compatible with the type "T.t list ref"
        This instance of "T.t" is ambiguous:
        it would escape the scope of its equation
-Unexecuted phrases: 1 phrases did not execute due to an error
 |}]
 
 module M = struct
   let r = ref []
 end
 
-let foo p (e : (T.u, T.t) eq) (x : T.t) (y : T.u) =
-  match e with
-  | Refl ->
-    let z = if p then x else y in
-    let module N = struct
-      module type S = module type of struct let r = ref [z] end
-    end in
-    let module O : N.S = M in
-    ()
+module S = struct
+  let foo p (e : (T.u, T.t) eq) (x : T.t) (y : T.u) =
+    match e with
+    | Refl ->
+        let z = if p then x else y in
+        let module N = struct
+          module type S = module type of struct let r = ref [z] end
+        end in
+        let module O : N.S = M in
+        ()
 
-module type S = module type of M ;;
+  module type S = module type of M
+end;;
 [%%expect{|
 module M : sig val r : '_weak2 list ref end
-Line 12, characters 25-26:
-12 |     let module O : N.S = M in
-                              ^
+Line 13, characters 29-30:
+13 |         let module O : N.S = M in
+                                  ^
 Error: Signature mismatch:
        Modules do not match:
          sig val r : '_weak2 list ref end
@@ -268,5 +271,4 @@ Error: Signature mismatch:
        Type "'_weak2" is not compatible with type "T.t" = "T.u"
        This instance of "T.u" is ambiguous:
        it would escape the scope of its equation
-Unexecuted phrases: 1 phrases did not execute due to an error
 |}]

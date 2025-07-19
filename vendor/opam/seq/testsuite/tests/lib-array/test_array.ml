@@ -20,16 +20,12 @@ a;;
 [|None; None; Some 42; Some 0; Some 42; None; None; None|]
 |}]
 let _ = Array.fill a 3 6 None;;
-a;;
 [%%expect{|
 Exception: Invalid_argument "Array.fill".
-Unexecuted phrases: 1 phrases did not execute due to an error
 |}]
 let _ = Array.fill a (-1) 2 None;;
-a;;
 [%%expect{|
 Exception: Invalid_argument "Array.fill".
-Unexecuted phrases: 1 phrases did not execute due to an error
 |}]
 let _ = Gc.compact ();;
 let _ = Array.fill a 5 1 (Some (if Random.int 2 < 0 then 1 else 2));;
