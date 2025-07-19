@@ -299,10 +299,10 @@ RECORD_SYMLINK_TO_INSTALL = \
 else
 # Symlinks aren't available, so copy the file again using the target name
 RECORD_SYMLINK_TO_INSTALL = \
-  $(call RECORD_opam_ITEM_TO_INSTALL,$(1),$(2),$(3),$(5))
+  $(call RECORD_$(INSTALL_MODE)_ITEM_TO_INSTALL,$(1),$(2),$(3),$(5))
 endif
 
-# Process the arguments to pass to RECORD_opam_ITEM_TO_INSTALL:
+# Process the arguments to pass to RECORD_$(INSTALL_MODE)_ITEM_TO_INSTALL:
 # - Items installed to the stublibs section need to be remapped to the stublibs
 #   subdirectory of libexec (since we install to lib/ocaml/stublibs rather than
 #   opam's default lib/stublibs)
@@ -316,7 +316,7 @@ RECORD_ITEM_TO_INSTALL = \
   $(if $(filter stublibs,$(2)),\
     $(call RECORD_ITEM_TO_INSTALL,$\
       $(1),libexec,stublibs$(addprefix /,$(3)),$(4),$(5)),\
-    $(call RECORD_opam_ITEM_TO_INSTALL,$\
+    $(call RECORD_$(INSTALL_MODE)_ITEM_TO_INSTALL,$\
       $(addsuffix /,$(SUBDIR_NAME))$(1),$\
       $(2),$\
       $(if $(filter doc lib%,$(2)),ocaml$(addprefix /,$(3)),$(3)),$\
@@ -383,6 +383,37 @@ INSTALL_DESPATCH_opam_BEGIN = \
 # then munge clone-* and create-symlinks into the fixup script.
 INSTALL_DESPATCH_opam_END = \
   tools/opam/generate-install.sh $(OPAM_PACKAGE_NAME) $(UNIX_OR_WIN32) '$(LN)'
+
+# Generate $(OPAM_PACKAGE_NAME)-clone.sh (INSTALL_MODE=clone)
+
+# ld.conf is explicitly copied, rather than cloned, to allow (in principle, if
+# not in practice) the cloning installation to edit it.
+RECORD_clone_ITEM_TO_INSTALL = \
+  $(if $(filter runtime/ld.conf Makefile.config, $(1)), true, \
+    $(if $(filter libexec,$(2)), \
+      $(call RECORD_clone_ITEM_TO_INSTALL,$(1),lib,$(3),$(4),$(5)), \
+      $(call ADD_LINE, \
+        $(ROOTDIR)/clone-$(2)$(addprefix @,$(subst /,@,$(3))), \
+        $(2)$(addprefix /,$(3))/$(if $(4),$(4),$(notdir $(1)))) \
+      $(foreach link, $(5), && \
+        $(call RECORD_SYMLINK_TO_INSTALL,$(1),$(2),$(3),$(4),$(link)))))
+
+INSTALL_DESPATCH_clone_ITEM = $(RECORD_ITEM_TO_INSTALL)
+
+INSTALL_DESPATCH_clone_ITEMS = $(INSTALL_EVALUATE_GLOBS)
+
+INSTALL_clone_PREFIX = @
+
+INSTALL_DESPATCH_clone_RM = @
+
+# INSTALL_MKDIR is ignored - INSTALL_DESPATCH_clone_END automatically creates
+# directories for each cp file.
+INSTALL_DESPATCH_clone_MKDIR =
+
+INSTALL_DESPATCH_clone_BEGIN = rm -f clone-* create-symlinks
+
+INSTALL_DESPATCH_clone_END = \
+  tools/opam/generate-clone.sh $(OPAM_PACKAGE_NAME) $(UNIX_OR_WIN32) '$(LN)'
 
 FLEXDLL_SUBMODULE_PRESENT := $(wildcard $(ROOTDIR)/flexdll/Makefile)
 
