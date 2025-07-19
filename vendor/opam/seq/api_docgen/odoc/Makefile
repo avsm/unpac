@@ -191,11 +191,11 @@ $(ALL_PAGED_DOC:%=build/%.3o.stamp):build/%.3o.stamp:build/%.odocl | build/
 # Man pages are the only installed documentation
 .PHONY: install
 install:
-	$(MKDIR) "$(INSTALL_LIBRARIES_MAN_DIR)"
+	$(MKDIR) "$(INSTALL_MANDIR_LIBRARIES)"
 	$(if $(wildcard build/man/libref), \
-	  $(INSTALL_DATA) build/man/libref/* "$(INSTALL_LIBRARIES_MAN_DIR)")
+	  $(INSTALL_DATA) build/man/libref/* "$(INSTALL_MANDIR_LIBRARIES)")
 	$(if $(wildcard build/man/compilerlibref), \
-	  $(INSTALL_DATA) build/man/libref/* "$(INSTALL_LIBRARIES_MAN_DIR)")
+	  $(INSTALL_DATA) build/man/libref/* "$(INSTALL_MANDIR_LIBRARIES)")
 
 # Dependencies for stdlib modules.
 # Use the same dependencies used for compiling .cmx files.

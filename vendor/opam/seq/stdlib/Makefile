@@ -47,6 +47,9 @@ endif
 OPTCOMPILER=$(ROOTDIR)/ocamlopt$(EXE)
 CAMLOPT=$(OCAMLRUN) $(OPTCOMPILER)
 
+# At present, only META is installed to the package directory
+LIBNAME = stdlib
+
 include StdlibModules
 
 OBJS=$(addsuffix .cmo,$(STDLIB_MODULES))
@@ -60,14 +63,12 @@ all: stdlib.cma std_exit.cmo $(HEADER_NAME)
 allopt: stdlib.cmxa std_exit.cmx
 opt.opt: allopt
 
-INSTALL_STDLIB_META_DIR=$(DESTDIR)$(LIBDIR)/stdlib
-
 .PHONY: install
 install::
 	$(INSTALL_DATA) \
 	  stdlib.cma std_exit.cmo *.cmi "$(INSTALL_LIBDIR)"
-	$(MKDIR) "$(INSTALL_STDLIB_META_DIR)"
-	$(INSTALL_DATA) META "$(INSTALL_STDLIB_META_DIR)"
+	$(MKDIR) "$(INSTALL_LIBDIR_STDLIB)"
+	$(INSTALL_DATA) META "$(INSTALL_LIBDIR_STDLIB)"
 ifeq "$(INSTALL_SOURCE_ARTIFACTS)" "true"
 	$(INSTALL_DATA) \
 	  *.cmt *.cmti *.mli *.ml *.ml.in \

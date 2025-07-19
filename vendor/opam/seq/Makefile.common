@@ -86,15 +86,30 @@ V_ODOC       =
 endif
 
 DESTDIR ?=
-INSTALL_BINDIR := $(DESTDIR)$(BINDIR)
-INSTALL_LIBDIR := $(DESTDIR)$(LIBDIR)
-INSTALL_INCDIR=$(INSTALL_LIBDIR)/caml
-INSTALL_STUBLIBDIR := $(DESTDIR)$(STUBLIBDIR)
+
+# Augment directories from Makefile.config / Makefile.build_config with
+# $(DESTDIR). i.e. each of these 5 directories may be overridden by the user,
+# and the compiler distribution makes no assumptions about where they are
+# relative to each other.
+INSTALL_BINDIR = $(DESTDIR)$(BINDIR)
+INSTALL_DOCDIR = $(DESTDIR)$(DOCDIR)
+INSTALL_LIBDIR = $(DESTDIR)$(LIBDIR)
+INSTALL_MANDIR = $(DESTDIR)$(MANDIR)
+INSTALL_STUBLIBDIR = $(DESTDIR)$(STUBLIBDIR)
+
+# Library subdirectories. The compiler distribution does make assumptions about
+# these, and they cannot be freely overridden by the user.
+INSTALL_LIBDIR_CAML = $(INSTALL_LIBDIR)/caml
+INSTALL_LIBDIR_COMPILERLIBS = $(INSTALL_LIBDIR)/compiler-libs
+INSTALL_LIBDIR_DYNLINK = $(INSTALL_LIBDIR)/dynlink
+INSTALL_LIBDIR_FLEXDLL = $(INSTALL_LIBDIR)/flexdll
+INSTALL_LIBDIR_OCAMLDOC = $(INSTALL_LIBDIR)/ocamldoc
 INSTALL_LIBDIR_PROFILING = $(INSTALL_LIBDIR)/profiling
-INSTALL_MANDIR := $(DESTDIR)$(MANDIR)
-INSTALL_PROGRAMS_MAN_DIR := $(DESTDIR)$(PROGRAMS_MAN_DIR)
-INSTALL_LIBRARIES_MAN_DIR := $(DESTDIR)$(LIBRARIES_MAN_DIR)
-INSTALL_DOCDIR := $(DESTDIR)$(DOCDIR)
+INSTALL_LIBDIR_STDLIB = $(INSTALL_LIBDIR)/stdlib
+INSTALL_LIBDIR_SYSTHREADS = $(INSTALL_LIBDIR)/threads
+
+INSTALL_MANDIR_PROGRAMS = $(INSTALL_MANDIR)/man1
+INSTALL_MANDIR_LIBRARIES = $(INSTALL_MANDIR)/man3
 
 FLEXDLL_SUBMODULE_PRESENT := $(wildcard $(ROOTDIR)/flexdll/Makefile)
 
