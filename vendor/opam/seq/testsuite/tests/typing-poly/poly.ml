@@ -1410,17 +1410,6 @@ let rec depth : 'a. 'a t -> _ =
 let rec depth : 'a. 'a t -> _ =
   function Leaf _ -> 1 | Node x -> 1 + d x
 and d x = depth x;; (* fails *)
-let rec depth : 'a. 'a t -> _ =
-  function Leaf x -> x | Node x -> 1 + depth x;; (* fails *)
-let rec depth : 'a. 'a t -> _ =
-  function Leaf x -> x | Node x -> depth x;; (* fails *)
-let rec depth : 'a 'b. 'a t -> 'b =
-  function Leaf x -> x | Node x -> depth x;; (* fails *)
-let rec r : 'a. 'a list * 'b list ref = [], ref []
-and q () = r;;
-let f : 'a. _ -> _ = fun x -> x;;
-let zero : 'a. [> `Int of int | `B of 'a] as 'a  = `Int 0;; (* ok *)
-let zero : 'a. [< `Int of int] as 'a = `Int 0;; (* fails *)
 [%%expect {|
 val f : 'a -> int = <fun>
 val g : 'a -> int = <fun>
@@ -1428,11 +1417,51 @@ type 'a t = Leaf of 'a | Node of ('a * 'a) t
 val depth : 'a t -> int = <fun>
 val depth : 'a t -> int = <fun>
 val d : ('a * 'a) t -> int = <fun>
-Line 9, characters 2-46:
-9 |   function Leaf x -> x | Node x -> 1 + depth x;; (* fails *)
+|}];;
+let rec depth : 'a. 'a t -> _ =
+  function Leaf x -> x | Node x -> 1 + depth x;; (* fails *)
+[%%expect {|
+Line 2, characters 2-46:
+2 |   function Leaf x -> x | Node x -> 1 + depth x;; (* fails *)
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This definition has type "int t -> int" which is less general than
          "'a. 'a t -> int"
+|}];;
+let rec depth : 'a. 'a t -> _ =
+  function Leaf x -> x | Node x -> depth x;; (* fails *)
+[%%expect {|
+Line 2, characters 2-42:
+2 |   function Leaf x -> x | Node x -> depth x;; (* fails *)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This definition has type "'b t -> 'b" which is less general than
+         "'a. 'a t -> 'c"
+|}];;
+let rec depth : 'a 'b. 'a t -> 'b =
+  function Leaf x -> x | Node x -> depth x;; (* fails *)
+[%%expect {|
+Line 2, characters 2-42:
+2 |   function Leaf x -> x | Node x -> depth x;; (* fails *)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This definition has type "'c. 'c t -> 'c" which is less general than
+         "'a 'b. 'a t -> 'b"
+|}];;
+let rec r : 'a. 'a list * 'b list ref = [], ref []
+and q () = r;;
+let f : 'a. _ -> _ = fun x -> x;;
+let zero : 'a. [> `Int of int | `B of 'a] as 'a  = `Int 0;; (* ok *)
+let zero : 'a. [< `Int of int] as 'a = `Int 0;; (* fails *)
+[%%expect {|
+val r : 'a list * '_b list ref = ([], {contents = []})
+val q : unit -> 'a list * '_b list ref = <fun>
+val f : 'a -> 'a = <fun>
+val zero : [> `B of 'a | `Int of int ] as 'a = `Int 0
+Line 5, characters 39-45:
+5 | let zero : 'a. [< `Int of int] as 'a = `Int 0;; (* fails *)
+                                           ^^^^^^
+Error: This constructor has type "[> `Int of int ]"
+       but an expression was expected of type "[< `Int of int ]"
+       The second variant type is bound to the universal type variable "'a",
+       it may not allow the tag(s) "`Int"
 |}];;
 
 (* compare with records (should be the same) *)
