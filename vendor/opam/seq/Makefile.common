@@ -510,12 +510,11 @@ $(eval $(call _OCAML_BYTECODE_LIBRARY,$(1)))
 $(eval $(call _OCAML_NATIVE_LIBRARY,$(1)))
 endef # OCAML_LIBRARY
 
-# Installing a bytecode executable, with debug information removed
-define INSTALL_STRIPPED_BYTE_PROG
-$(OCAMLRUN) $(ROOTDIR)/tools/stripdebug$(EXE) $(1) $(1).tmp \
-&& $(INSTALL_PROG) $(1).tmp $(2) \
-&& rm $(1).tmp
-endef # INSTALL_STRIPPED_BYTE_PROG
+# Strip debug information from a bytecode executable
+define STRIP_BYTE_PROG
+$(OCAMLRUN) $(ROOTDIR)/tools/stripdebug$(EXE) \
+  $(strip $(1)) $(strip $(1)).stripped
+endef # STRIP_BYTE_PROG
 
 # ocamlc has several mechanisms for linking a bytecode image to the runtime
 # which executes it. The exact mechanism depends on the platform and the precise
