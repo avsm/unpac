@@ -15,6 +15,7 @@
 
 # Used by included Makefiles
 ROOTDIR = ../..
+SUBDIR_NAME = api_docgen/odoc
 
 include ../Makefile.common
 

@@ -16,6 +16,8 @@
 # The main Makefile
 
 ROOTDIR = .
+SUBDIR_NAME =
+
 # NOTE: it is important that the OCAMLDEP and OCAMLLEX variables
 # are defined *before* Makefile.common gets included, so that
 # their local definitions here take precedence over their

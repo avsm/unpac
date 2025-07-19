@@ -14,6 +14,7 @@
 #**************************************************************************
 
 ROOTDIR=../..
+SUBDIR_NAME=otherlibs/systhreads
 
 include $(ROOTDIR)/Makefile.common
 include $(ROOTDIR)/Makefile.best_binaries

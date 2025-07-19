@@ -14,6 +14,7 @@
 #**************************************************************************
 
 ROOTDIR = ..
+SUBDIR_NAME = stdlib
 # NOTE: it is important that the OCAMLDEP variable is defined *before*
 # Makefile.common gets included, so that its local definition here
 # take precedence over its general shared definitions in Makefile.common.

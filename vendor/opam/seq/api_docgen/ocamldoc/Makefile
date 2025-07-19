@@ -14,6 +14,7 @@
 #**************************************************************************
 # Used by included Makefiles
 ROOTDIR = ../..
+SUBDIR_NAME = api_docgen/ocamldoc
 include ../Makefile.common
 vpath %.mli ../../stdlib $(DOC_COMPILERLIBS_DIRS)  $(DOC_STDLIB_DIRS)
 
