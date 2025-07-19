@@ -47,6 +47,7 @@ Error: This class type is recursive. This use of the class type "Foo.c"
        makes the module type of "Bar" depend on the module type of "Foo".
        Such recursive definitions of class types within recursive modules
        are not allowed.
+Unexecuted phrases: 3 phrases did not execute due to an error
 |}]
 
 (* #12480 *)

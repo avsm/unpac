@@ -126,6 +126,7 @@ Line 1, characters 61-63:
                                                                  ^^
 Error:    The type "'a" does not expand to a polymorphic variant type
 Hint: Did you mean "`a"?
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}]
 
 (* PR#5927 *)

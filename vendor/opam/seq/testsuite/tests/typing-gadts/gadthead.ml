@@ -27,4 +27,5 @@ Line 2, characters 15-16:
                    ^
 Error: This pattern matches values of type "'a g"
        but a pattern was expected which matches values of type "M.t"
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}]

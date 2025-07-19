@@ -39,6 +39,7 @@ Error: The value "x" has type "(module S2 with type t = int and type u = bool)"
        is not included in
          sig type u = bool type t = int type w end
        The type "w" is required but not provided
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}];;
 
 (* but you cannot forget values (no physical coercions) *)

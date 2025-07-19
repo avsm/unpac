@@ -44,6 +44,7 @@ Line 4, characters 13-16:
 4 | module Bad = Fix(Id)
                  ^^^
 Error: Unbound module "Fix"
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}]
 
 (* addendum: ensure that hidden paths are checked too *)

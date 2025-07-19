@@ -45,6 +45,7 @@ Error: In this GADT constructor definition, the variance of the 2nd parameter
        in other parameters.
        In GADTS, covariant or contravariant type parameters must not depend
        on other parameters.
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}];;
 
 type (_, +_) eq2 = Neq : ('a, 'b) eq2 | Refl : ('a, 'a) eq2

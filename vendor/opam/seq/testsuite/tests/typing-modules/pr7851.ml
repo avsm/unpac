@@ -44,6 +44,7 @@ Line 2, characters 28-30:
 2 |   let (E y : M1.u) = (E x : M1.t) in
                                 ^^
 Error: Unbound module "M1"
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}]
 
 (* Also check the original version *)
@@ -85,4 +86,5 @@ Error: This variant or record definition does not match that of type "M1.t"
          "E of (M1.x, M1.y) eq"
        The type "(M1.x, M1.x) eq" is not equal to the type "(M1.x, M1.y) eq"
        Type "M1.x" = "int" is not equal to type "M1.y" = "bool"
+Unexecuted phrases: 3 phrases did not execute due to an error
 |}]

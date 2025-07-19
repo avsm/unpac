@@ -128,4 +128,5 @@ Line 1, characters 50-51:
 Error: The value "x" has type "$0 M.t" but an expression was expected of type
          "b M.t"
        Type "$0" is not compatible with type "b"
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}]

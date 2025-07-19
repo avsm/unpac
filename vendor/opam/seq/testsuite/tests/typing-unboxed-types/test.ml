@@ -81,6 +81,7 @@ Line 1, characters 0-51:
 1 | type t7 = I of string | J of bool [@@ocaml.unboxed];;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because it has more than one constructor.
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}];;
 type t9 = K of { j : string; l : int } [@@ocaml.unboxed];;
 [%%expect{|

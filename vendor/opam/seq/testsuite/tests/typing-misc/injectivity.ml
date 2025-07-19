@@ -191,6 +191,7 @@ Line 1, characters 0-58:
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be injective invariant,
        but it is unrestricted.
+Unexecuted phrases: 2 phrases did not execute due to an error
 |}]
 
 (* Injective bivariance in a signature is respected in its structures *)
@@ -231,6 +232,7 @@ Line 3, characters 2-29:
 Error: In the GADT constructor
          "G : 'a X.t -> 'a X.t u x"
        the type variable "'a" cannot be deduced from the type parameters.
+Unexecuted phrases: 2 phrases did not execute due to an error
 |}]
 
 (* Try to be clever *)
@@ -460,6 +462,7 @@ Line 1, characters 18-19:
 1 | let x_eq_y : (int R.t, string R.t) eql = Refl
                       ^
 Error: Unbound module "R"
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}]
 
 (* #10028 by Stephen Dolan *)
@@ -494,6 +497,7 @@ Line 3, characters 2-35:
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be injective invariant,
        but it is invariant.
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}]
 
 module Priv2 :
@@ -515,4 +519,5 @@ Line 3, characters 2-31:
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be injective invariant,
        but it is invariant.
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}]

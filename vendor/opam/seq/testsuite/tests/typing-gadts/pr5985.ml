@@ -59,6 +59,7 @@ Line 1, characters 0-49:
 Error: In the definition
          "type 'b t = A of 'a constraint 'b = [< `X of 'a ]"
        the type variable "'a" cannot be deduced from the type parameters.
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}];;
 
 type 'a t = A : 'a -> [< `X of 'a ] t;; (* fail *)

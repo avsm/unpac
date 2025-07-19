@@ -317,4 +317,5 @@ Error: This variant or record definition does not match that of type "M.t"
          "(MkT(Desc).t, MkT(Desc).t) eq"
        Type "MkT(M.T).t" = "Set.Make(M.Term0).t" is not equal to type
          "MkT(Desc).t" = "Set.Make(Desc).t"
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}]

@@ -147,4 +147,5 @@ Line 6, characters 2-23:
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be covariant,
        but it is invariant.
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}]

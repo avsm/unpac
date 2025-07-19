@@ -167,6 +167,7 @@ Error: Signature mismatch:
        is not included in
          type t [@@immediate]
        The first is not an immediate type.
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}];;
 
 (* Can't use a non-immediate type even if mutually recursive *)

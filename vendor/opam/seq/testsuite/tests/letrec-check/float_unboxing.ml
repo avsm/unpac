@@ -34,4 +34,5 @@ Line 4, characters 16-28:
 4 |     let rec x = (f <- y; ()) and y = 2.0 in f
                     ^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}];;

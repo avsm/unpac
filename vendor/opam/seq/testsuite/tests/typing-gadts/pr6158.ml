@@ -22,4 +22,5 @@ Error: This pattern matches values of type "(int s, int s) eq"
        but a pattern was expected which matches values of type
          "(int s, int t) eq"
        Type "int s" is not compatible with type "int t"
+Unexecuted phrases: 1 phrases did not execute due to an error
 |}];;
