@@ -37,13 +37,7 @@ let jsont_tool =
 
 (* Tests *)
 
-let test ?(requires = []) =
-  (* TODO b0: don't let jsoo builds downgrade everything to bytecode *)
-  let meta =
-    B0_meta.empty
-    |> B0_meta.add B0_ocaml.Code.needs `Native
-  in
-  B0_ocaml.test ~meta ~requires:(jsont :: requires)
+let test ?(requires = []) = B0_ocaml.test ~requires:(jsont :: requires)
 
 let quickstart =
   let doc = "Quick start examples" in
