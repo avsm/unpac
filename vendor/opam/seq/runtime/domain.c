@@ -418,24 +418,29 @@ asize_t caml_norm_minor_heap_size (intnat wsize)
   These variables accessed in [stw_resize_minor_heap_reservation],
   synchronized by a global barrier.
 
-- Each domain then commits a segment of size
+- Each STW-participating domain then commits a segment of size
     [domain_state->minor_heap_wsz]
   starting at
     [domain_state->minor_heap_area_start]
   that it actually uses.
 
   This is done below in
-    [caml_reallocate_minor_heap]
+    [allocate_minor_heap]
   which is called both at domain-initialization (by [domain_create])
   and if a request comes to change the minor heap size.
 
-  The boundaries of this committed memory area are
+  The boundaries of this committed memory segment are
      [domain_state->young_start]
    and
      [domain_state->young_end].
 
   Those [young_{start,end}] variables are never accessed by another
   domain, so they need no synchronization.
+
+- Domains decommit their minor heap segment before leaving the set of
+  STW participants. Otherwise, their minor heap segments could get
+  desynchronized with future changes in the reserved minor heap
+  area. This is done by calling [free_minor_heap].
 */
 
 Caml_inline void check_minor_heap(void) {
@@ -462,6 +467,9 @@ Caml_inline void check_minor_heap(void) {
 static void free_minor_heap(void) {
   caml_domain_state* domain_state = Caml_state;
 
+  /* Exit early if the minor heap is not allocated. */
+  if (domain_state->minor_heap_wsz == 0) return;
+
   caml_gc_log("trying to free old minor heap: %" CAML_PRIuSZT "k words",
               domain_state->minor_heap_wsz / 1024);
 
@@ -474,6 +482,7 @@ static void free_minor_heap(void) {
       (void*)domain_self->minor_heap_area_start,
       Bsize_wsize(domain_state->minor_heap_wsz));
 
+  domain_state->minor_heap_wsz = 0;
   domain_state->young_start   = NULL;
   domain_state->young_end     = NULL;
   domain_state->young_ptr     = NULL;
@@ -486,6 +495,7 @@ static void free_minor_heap(void) {
 static int allocate_minor_heap(asize_t wsize) {
   caml_domain_state* domain_state = Caml_state;
 
+  CAMLassert (domain_state->minor_heap_wsz == 0);
   check_minor_heap();
 
   wsize = caml_norm_minor_heap_size(wsize);
@@ -675,7 +685,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->major_work_done_between_slices = 0;
 
   /* the minor heap will be initialized by
-     [caml_reallocate_minor_heap] below. */
+     [allocate_minor_heap] below. */
   domain_state->young_start = NULL;
   domain_state->young_end = NULL;
   domain_state->young_ptr = NULL;
@@ -695,8 +705,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
     goto init_major_gc_failure;
   }
 
-  if(caml_reallocate_minor_heap(initial_minor_heap_wsize) < 0) {
-    goto reallocate_minor_heap_failure;
+  if(allocate_minor_heap(initial_minor_heap_wsize) < 0) {
+    goto allocate_minor_heap_failure;
   }
 
   domain_state->dls_root = Val_unit;
@@ -773,7 +783,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 alloc_main_stack_failure:
 create_stack_cache_failure:
   caml_remove_generational_global_root(&domain_state->dls_root);
-reallocate_minor_heap_failure:
+  free_minor_heap();
+allocate_minor_heap_failure:
   caml_teardown_major_gc();
 init_major_gc_failure:
   caml_orphan_shared_heap(d->state->shared_heap);
@@ -2115,8 +2126,13 @@ void caml_domain_terminate(bool last)
       s->terminating = 0;
       s->running = 0;
 
-      /* Remove this domain from stw_domains. */
+      /* Remove this domain from stw_domains.
+         (This will only be observed after [all_domains_lock] is released.) */
       remove_from_stw_domains(domain_self);
+
+      /* The minor heap area is only valid for STW-participating domains,
+         so we free the minor heap when we stop STW participation. */
+      free_minor_heap();
 
       /* Signal the interruptor condition variable
          because the backup thread may be waiting on it. */
