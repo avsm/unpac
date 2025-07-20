@@ -234,7 +234,7 @@ Working version
 
 - #14155: Audit unexecuted phrases in compiler expect tests and
   fix all occurences
-  (Stefan Muenzel, review by ????)
+  (Stefan Muenzel, review by Gabriel Scherer)
 
 
 OCaml 5.4.0
