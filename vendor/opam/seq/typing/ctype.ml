@@ -330,6 +330,8 @@ let newobj fields      = newty (Tobject (fields, ref None))
 
 let newconstr path tyl = newty (Tconstr (path, tyl, ref Mnil))
 
+let newmono ty = newty (Tpoly(ty, []))
+
 let none = newty (Ttuple [])                (* Clearly ill-formed type *)
 
 (**** information for [Typecore.unify_pat_*] ****)
@@ -1154,7 +1156,7 @@ let rec copy ?partial ?keep_names ?scope copy_scope ty =
       match partial with
         None -> assert false
       | Some (free_univars, keep) ->
-          if TypeSet.is_empty (free_univars ty) then
+          if not (is_Tpoly ty) && TypeSet.is_empty (free_univars ty) then
             if keep then level else !current_level
           else generic_level
     in
@@ -1505,9 +1507,14 @@ let instance_poly' copy_scope ~keep_names ~fixed univars sch =
   let ty = copy_sep ~copy_scope ~fixed ~visited sch in
   vars, ty
 
-let instance_poly ?(keep_names=false) ~fixed univars sch =
+let instance_poly_fixed ?(keep_names=false) univars sch =
   For_copy.with_scope (fun copy_scope ->
-    instance_poly' copy_scope ~keep_names ~fixed univars sch
+    instance_poly' copy_scope ~keep_names ~fixed:true univars sch
+  )
+
+let instance_poly ?(keep_names=false) univars sch =
+  For_copy.with_scope (fun copy_scope ->
+    snd (instance_poly' copy_scope ~keep_names ~fixed:false univars sch)
   )
 
 let instance_label ~fixed lbl =
@@ -3407,9 +3414,29 @@ type filter_arrow_failure =
 
 exception Filter_arrow_failed of filter_arrow_failure
 
-let filter_arrow env t l =
+type filtered_arrow =
+  { ty_param : type_expr;
+    ty_ret : type_expr;
+  }
+
+let filter_arrow env t l ~param_hole =
   let function_type level =
-    let t1 = newvar2 level and t2 = newvar2 level in
+    let t1 =
+      if param_hole then begin
+        assert (not (is_optional l));
+        newvar2 level
+      end else begin
+        let t1 =
+          if is_optional l then
+            newty2 ~level
+              (Tconstr(Predef.path_option,[newvar2 level], ref Mnil))
+          else
+            newvar2 level
+        in
+        newty2 ~level (Tpoly(t1, []))
+      end
+    in
+    let t2 = newvar2 level in
     let t' = newty2 ~level (Tarrow (l, t1, t2, commu_ok)) in
     t', t1, t2
   in
@@ -3425,17 +3452,28 @@ let filter_arrow env t l =
   in
   match get_desc t with
   | Tvar _ ->
-      let t', t1, t2 = function_type (get_level t) in
+      let t', ty_param, ty_ret = function_type (get_level t) in
       link_type t t';
-      (t1, t2)
-  | Tarrow(l', t1, t2, _) ->
+      { ty_param; ty_ret }
+  | Tarrow(l', ty_param, ty_ret, _) ->
       if l = l' || !Clflags.classic && l = Nolabel && not (is_optional l')
-      then (t1, t2)
+      then { ty_param; ty_ret }
       else raise (Filter_arrow_failed
                     (Label_mismatch
                        { got = l; expected = l'; expected_type = t }))
   | _ ->
       raise (Filter_arrow_failed Not_a_function)
+
+let is_really_poly env ty =
+  let snap = Btype.snapshot () in
+  let really_poly =
+    try
+      unify env (newmono (newvar ())) ty;
+      false
+    with Unify _ -> true
+  in
+  Btype.backtrack snap;
+  really_poly
 
 type filter_method_failure =
   | Unification_error of unification_error
@@ -4975,13 +5013,9 @@ let rec subtype_rec env trace t1 t2 constraints =
         (trace, t1, t2, !univar_pairs)::constraints
     | (Tarrow(l1, t1, u1, _), Tarrow(l2, t2, u2, _))
       when compatible_labels ~in_pattern_mode:false l1 l2 ->
-        let constraints =
-          subtype_rec
-            env
-            (Subtype.Diff {got = t2; expected = t1} :: trace)
-            t2 t1
-            constraints
-        in
+        (* the trace will be updated at the next step due to the Tpoly wrapping
+           of parameter. *)
+        let constraints = subtype_rec env trace t2 t1 constraints in
         subtype_rec
           env
           (Subtype.Diff {got = u1; expected = u2} :: trace)
@@ -5046,11 +5080,14 @@ let rec subtype_rec env trace t1 t2 constraints =
           (trace, t1, t2, !univar_pairs)::constraints
         end
     | (Tpoly (u1, []), Tpoly (u2, [])) ->
+        let trace = Subtype.Diff {got = u1; expected = u2} :: trace in
         subtype_rec env trace u1 u2 constraints
     | (Tpoly (u1, tl1), Tpoly (u2, [])) ->
-        let _, u1' = instance_poly ~fixed:false tl1 u1 in
+        let trace = Subtype.Diff {got = t1; expected = u2} :: trace in
+        let u1' = instance_poly tl1 u1 in
         subtype_rec env trace u1' u2 constraints
     | (Tpoly (u1, tl1), Tpoly (u2,tl2)) ->
+        let trace = Subtype.Diff {got = t1; expected = t2} :: trace in
         begin try
           enter_poly env u1 tl1 u2 tl2
             (fun t1 t2 -> subtype_rec env trace t1 t2 constraints)

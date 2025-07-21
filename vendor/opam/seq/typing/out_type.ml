@@ -1047,11 +1047,13 @@ let rec tree_of_typexp mode ty =
         in
         let t1 =
           if is_optional l then
-            match get_desc ty1 with
-            | Tconstr(path, [ty], _)
-              when Path.same path Predef.path_option ->
-                tree_of_typexp mode ty
-            | _ -> Otyp_stuff "<hidden>"
+            if tpoly_is_mono ty1 then
+              match get_desc (tpoly_get_mono ty1) with
+              | Tconstr(path, [ty], _)
+                when Path.same path Predef.path_option ->
+                  tree_of_typexp mode ty
+              | _ -> Otyp_stuff "<hidden>"
+            else Otyp_stuff "<hidden>"
           else tree_of_typexp mode ty1 in
         Otyp_arrow (lab, t1, tree_of_typexp mode ty2)
     | Ttuple tyl ->
