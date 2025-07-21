@@ -83,6 +83,7 @@ ocamltest_libunix=None
 ocamltest_unix_impl="dummy"
 unix_library=""
 unix_directory=""
+diff_supports_color=false
 
 # Information about the package
 
@@ -273,7 +274,6 @@ AC_CONFIG_FILES([Makefile.config])
 AC_CONFIG_FILES([stdlib/sys.ml])
 AC_CONFIG_FILES([manual/src/version.tex])
 AC_CONFIG_FILES([manual/src/html_processing/src/common.ml])
-AC_CONFIG_FILES([ocamltest/ocamltest_config.ml])
 AC_CONFIG_FILES([otherlibs/dynlink/dynlink_config.ml])
 AC_CONFIG_FILES([utils/config.common.ml])
 AC_CONFIG_FILES([utils/config.generated.ml])
@@ -832,12 +832,16 @@ otherlibraries="dynlink runtime_events"
 otherlibs="runtime_events"
 optional_libraries="$optional_libraries otherlibs/dynlink/dynlink"
 lib_dynlink=true
-dldir=otherlibs/dynlink
-AC_CONFIG_LINKS([
-  $dldir/dynlink_cmo_format.mli:file_formats/cmo_format.mli
-  $dldir/dynlink_cmxs_format.mli:file_formats/cmxs_format.mli
-  $dldir/dynlink_platform_intf.mli:$dldir/dynlink_platform_intf.ml
-])
+dnl dldir needs to be expanded by autoconf, not by configure, if it were instead
+dnl put in $dldir, this would end up in config.status, except that the value
+dnl would be missing.
+m4_define([dldir], [otherlibs/dynlink])
+AC_CONFIG_LINKS(
+  dldir[/dynlink_cmo_format.mli:file_formats/cmo_format.mli]
+  dldir[/dynlink_cmxs_format.mli:file_formats/cmxs_format.mli]
+  dldir[/dynlink_platform_intf.mli:]dldir[/dynlink_platform_intf.ml]
+)
+m4_undefine([dldir])
 lib_runtime_events=true
 AS_IF([test x"$enable_unix_lib" != "xno"],
   [enable_unix_lib=yes
@@ -2725,9 +2729,16 @@ testsuite/tools/test_in_prefix"])
   [build_ocamltest=false
   ocamltest=''])
 
+# config.status needs the values of ocamltest_unix_mod and unix_or_win32
+# for creating symlinks
+AC_CONFIG_COMMANDS([links], [], [
+  ocamltest_unix_mod='$ocamltest_unix_mod'
+  unix_or_win32='$unix_or_win32'])
+
+ocamltest_unix_mod="ocamltest/ocamltest_unix_${ocamltest_unix_impl}.ml"
 AS_IF([$build_ocamltest],
   [optional_libraries="$optional_libraries testsuite/lib/testing"
-  ocamltest_unix_mod="ocamltest/ocamltest_unix_${ocamltest_unix_impl}.ml"
+  AC_CONFIG_FILES([ocamltest/ocamltest_config.ml])
   AC_CONFIG_LINKS([
     ocamltest/ocamltest_unix.ml:${ocamltest_unix_mod}
   ])
