@@ -194,8 +194,8 @@ struct dom_internal {
   bool domain_canceled;
 
   /* modified only during STW sections */
-  uintnat minor_heap_area_start;
-  uintnat minor_heap_area_end;
+  uintnat minor_heap_reservation_start;
+  uintnat minor_heap_reservation_end;
 };
 typedef struct dom_internal dom_internal;
 
@@ -250,11 +250,11 @@ uintnat caml_minor_heap_max_wsz;
   reservation based on the increased minor heap size.
 
   New domains are created with a minor heap of size
-  caml_params->init_minor_heap_wsz.
+  [caml_params->init_minor_heap_wsz].
 
-  To perform a new virtual memory reservation for the heaps, we stop the world
-  and do a minor collection on all domains.
-  See [stw_resize_minor_heap_reservation].
+  To perform a new reservation for the minor heaps, we stop the world
+  and do a minor collection on all domains. See
+  [stw_resize_minor_heaps_reservation].
 */
 
 CAMLexport uintnat caml_minor_heaps_start;
@@ -401,58 +401,57 @@ asize_t caml_norm_minor_heap_size (intnat wsize)
 
 /* The current minor heap layout is as follows:
 
-- A contiguous memory block of size
-   [caml_minor_heap_max_wsz * caml_params->max_domains]
-  is reserved by [caml_init_domains]. The boundaries
-  of this reserved area are stored in the globals
+- The 'minor heaps reservation' is a contiguous address space of size
+    [caml_minor_heap_max_wsz * caml_params->max_domains]
+  reserved by [caml_init_domains]. Its boundaries are
     [caml_minor_heaps_start]
   and
     [caml_minor_heaps_end].
 
-- Each domain gets a reserved section of this block
-  of size [caml_minor_heap_max_wsz], whose boundaries are stored as
-    [domain_self->minor_heap_area_start]
+- Each domain gets a 'minor heap reservation', a segment of the global
+  reservation of size [caml_minor_heap_max_wsz], whose boundaries are
+    [domain_self->minor_heap_reservation_start]
   and
-    [domain_self->minor_heap_area_end]
+    [domain_self->minor_heap_reservation_end]
 
-  These variables accessed in [stw_resize_minor_heap_reservation],
+  These variables are accessed in [stw_resize_minor_heaps_reservation],
   synchronized by a global barrier.
 
-- Each STW-participating domain then commits a segment of size
-    [domain_state->minor_heap_wsz]
-  starting at
-    [domain_state->minor_heap_area_start]
-  that it actually uses.
-
-  This is done below in
-    [allocate_minor_heap]
-  which is called both at domain-initialization (by [domain_create])
-  and if a request comes to change the minor heap size.
-
-  The boundaries of this committed memory segment are
-     [domain_state->young_start]
+- Each STW-participating domain then commits their 'minor heap' within
+  their minor heap reservation. The minor heap has size
+  [domain_state->minor_heap_wsz], and its boundaries are
+    [domain_state->young_start]
    and
      [domain_state->young_end].
 
   Those [young_{start,end}] variables are never accessed by another
   domain, so they need no synchronization.
 
-- Domains decommit their minor heap segment before leaving the set of
-  STW participants. Otherwise, their minor heap segments could get
-  desynchronized with future changes in the reserved minor heap
-  area. This is done by calling [free_minor_heap].
+  Domains commit their minor heap in
+    [allocate_minor_heap]
+  which is called both at domain-initialization (by [domain_create])
+  and if a request comes to change the minor heap size.
+
+  Domains decommit their minor heap before leaving the set of STW
+  participants. Otherwise, their minor heap could get desynchronized
+  with future changes in the global minor heap reservation. This is
+  done by calling [free_minor_heap].
 */
 
 Caml_inline void check_minor_heap(void) {
   caml_domain_state* domain_state = Caml_state;
   CAMLassert(domain_state->young_ptr == domain_state->young_end);
 
-  caml_gc_log("young_start: %p, young_end: %p, minor_heap_area_start: %p,"
-      " minor_heap_area_end: %p, minor_heap_wsz: %" CAML_PRIuSZT " words",
+  caml_gc_log(
+      "young_start: %p,"
+      " young_end: %p,"
+      " minor_heap_reservation_start: %p,"
+      " minor_heap_reservation_end: %p,"
+      " minor_heap_wsz: %" CAML_PRIuSZT " words",
       domain_state->young_start,
       domain_state->young_end,
-      (value*)domain_self->minor_heap_area_start,
-      (value*)domain_self->minor_heap_area_end,
+      (value*)domain_self->minor_heap_reservation_start,
+      (value*)domain_self->minor_heap_reservation_end,
       domain_state->minor_heap_wsz);
   CAMLassert(
     (/* uninitialized minor heap */
@@ -460,8 +459,10 @@ Caml_inline void check_minor_heap(void) {
       && domain_state->young_end == NULL)
     ||
     (/* initialized minor heap */
-      domain_state->young_start == (value*)domain_self->minor_heap_area_start
-      && domain_state->young_end <= (value*)domain_self->minor_heap_area_end));
+      domain_state->young_start
+      == (value*)domain_self->minor_heap_reservation_start
+      && domain_state->young_end
+         <= (value*)domain_self->minor_heap_reservation_end));
 }
 
 static void free_minor_heap(void) {
@@ -479,7 +480,7 @@ static void free_minor_heap(void) {
      instead of unmapping the heap, we decommit it, so there's
      no race whereby other code could attempt to reuse the memory. */
   caml_mem_decommit(
-      (void*)domain_self->minor_heap_area_start,
+      (void*)domain_self->minor_heap_reservation_start,
       Bsize_wsize(domain_state->minor_heap_wsz));
 
   domain_state->minor_heap_wsz = 0;
@@ -506,16 +507,18 @@ static int allocate_minor_heap(asize_t wsize) {
               wsize / 1024);
 
   if (!caml_mem_commit(
-          (void*)domain_self->minor_heap_area_start, Bsize_wsize(wsize))) {
+       (void*)domain_self->minor_heap_reservation_start,
+       Bsize_wsize(wsize))) {
     return -1;
   }
 
 #ifdef DEBUG
   {
-    uintnat* p = (uintnat*)domain_self->minor_heap_area_start;
-    for (;
-      p < (uintnat*)(domain_self->minor_heap_area_start + Bsize_wsize(wsize));
-      p++) {
+    uintnat* start = (uintnat*)domain_self->minor_heap_reservation_start;
+    uintnat* end = (uintnat*)(domain_self->minor_heap_reservation_start
+                              + Bsize_wsize(wsize));
+    for (uintnat* p = start; p < end; p++)
+    {
       *p = Debug_free_minor;
     }
   }
@@ -523,9 +526,9 @@ static int allocate_minor_heap(asize_t wsize) {
 
   domain_state->minor_heap_wsz = wsize;
 
-  domain_state->young_start = (value*)domain_self->minor_heap_area_start;
+  domain_state->young_start = (value*)domain_self->minor_heap_reservation_start;
   domain_state->young_end =
-      (value*)(domain_self->minor_heap_area_start + Bsize_wsize(wsize));
+      (value*)(domain_self->minor_heap_reservation_start + Bsize_wsize(wsize));
   domain_state->young_ptr = domain_state->young_end;
   /* Trigger a GC poll when half of the minor heap is filled. At that point, a
    * major slice is scheduled. */
@@ -831,46 +834,50 @@ CAMLexport void caml_reset_domain_lock(void)
 
 /* minor heap initialization and resizing */
 
-static void reserve_minor_heaps_from_stw_single(void) {
+static void reserve_minor_heaps_reservation_from_stw_single(void) {
   void* heaps_base;
-  uintnat minor_heap_reservation_bsize;
+  uintnat minor_heaps_reservation_bsize;
   uintnat minor_heap_max_bsz;
 
   CAMLassert (caml_mem_round_up_pages(Bsize_wsize(caml_minor_heap_max_wsz))
           == Bsize_wsize(caml_minor_heap_max_wsz));
 
   minor_heap_max_bsz = (uintnat)Bsize_wsize(caml_minor_heap_max_wsz);
-  minor_heap_reservation_bsize = minor_heap_max_bsz * caml_params->max_domains;
+  minor_heaps_reservation_bsize = minor_heap_max_bsz * caml_params->max_domains;
 
   /* reserve memory space for minor heaps */
-  heaps_base = caml_mem_map(minor_heap_reservation_bsize, 1 /* reserve_only */);
+  heaps_base = caml_mem_map(minor_heaps_reservation_bsize, 1/* reserve_only */);
   if (heaps_base == NULL)
     caml_fatal_error("Not enough heap memory to reserve minor heaps");
 
   caml_minor_heaps_start = (uintnat) heaps_base;
-  caml_minor_heaps_end = (uintnat) heaps_base + minor_heap_reservation_bsize;
+  caml_minor_heaps_end =
+    (uintnat) heaps_base + minor_heaps_reservation_bsize;
 
-  caml_gc_log("new minor heap reserved from %p to %p",
-              (value*)caml_minor_heaps_start, (value*)caml_minor_heaps_end);
+  caml_gc_log("new minor heap reservation from %p to %p",
+              (value*)caml_minor_heaps_start,
+              (value*)caml_minor_heaps_end);
 
   for (int i = 0; i < caml_params->max_domains; i++) {
     struct dom_internal* dom = &all_domains[i];
 
-    uintnat domain_minor_heap_area = caml_minor_heaps_start +
-      minor_heap_max_bsz * (uintnat)i;
+    uintnat domain_minor_heap_reservation =
+      caml_minor_heaps_start
+      + minor_heap_max_bsz * (uintnat)i;
 
-    dom->minor_heap_area_start = domain_minor_heap_area;
-    dom->minor_heap_area_end =
-         domain_minor_heap_area + minor_heap_max_bsz;
+    dom->minor_heap_reservation_start = domain_minor_heap_reservation;
+    dom->minor_heap_reservation_end =
+      domain_minor_heap_reservation + minor_heap_max_bsz;
 
-    CAMLassert(dom->minor_heap_area_end <= caml_minor_heaps_end);
+    CAMLassert(dom->minor_heap_reservation_end
+               <= caml_minor_heaps_end);
   }
 }
 
-static void unreserve_minor_heaps_from_stw_single(void) {
+static void unreserve_minor_heaps_reservation_from_stw_single(void) {
   uintnat size;
 
-  caml_gc_log("unreserve_minor_heaps");
+  caml_gc_log("unreserve_minor_heaps_reservation");
 
   for (int i = 0; i < caml_params->max_domains; i++) {
     struct dom_internal* dom = &all_domains[i];
@@ -889,8 +896,8 @@ static void unreserve_minor_heaps_from_stw_single(void) {
        concurrently with STW sections so we cannot observe partial
        initialization states. */
 
-    /* uninitialize the minor heap area */
-    dom->minor_heap_area_start = dom->minor_heap_area_end = 0;
+    /* uninitialize the minor heap reservation. */
+    dom->minor_heap_reservation_start = dom->minor_heap_reservation_end = 0;
   }
 
   size = caml_minor_heaps_end - caml_minor_heaps_start;
@@ -900,21 +907,21 @@ static void unreserve_minor_heaps_from_stw_single(void) {
 }
 
 static
-void domain_resize_heap_reservation_from_stw_single(uintnat new_minor_wsz)
+void domain_resize_heaps_reservation_from_stw_single(uintnat new_minor_wsz)
 {
   CAML_EV_BEGIN(EV_DOMAIN_RESIZE_HEAP_RESERVATION);
-  caml_gc_log("stw_resize_minor_heap_reservation: unreserve_minor_heaps");
+  caml_gc_log("stw_resize_minor_heaps_reservation: unreserve");
 
-  unreserve_minor_heaps_from_stw_single();
+  unreserve_minor_heaps_reservation_from_stw_single();
   /* new_minor_wsz is page-aligned because caml_norm_minor_heap_size has
      been called to normalize it earlier.
   */
   caml_minor_heap_max_wsz = new_minor_wsz;
-  caml_gc_log("stw_resize_minor_heap_reservation: reserve_minor_heaps");
-  reserve_minor_heaps_from_stw_single();
-  /* The call to [reserve_minor_heaps_from_stw_single] makes a new
+  caml_gc_log("stw_resize_minor_heaps_reservation: reserve");
+  reserve_minor_heaps_reservation_from_stw_single();
+  /* The call to [reserve_minor_heaps_reservation_from_stw_single] makes a new
      reservation, and it also updates the reservation boundaries of each
-     domain by mutating its [minor_heap_area_start{,_end}] variables.
+     domain by mutating its [minor_heap_reservation_start{,_end}] variables.
 
      These variables are synchronized by the fact that we are inside
      a STW section: no other domains are running in parallel, and
@@ -925,24 +932,24 @@ void domain_resize_heap_reservation_from_stw_single(uintnat new_minor_wsz)
 }
 
 static void
-stw_resize_minor_heap_reservation(caml_domain_state* domain,
+stw_resize_minor_heaps_reservation(caml_domain_state* domain,
                                   void* minor_wsz_data,
                                   int participating_count,
                                   caml_domain_state** participating) {
-  caml_gc_log("stw_resize_minor_heap_reservation: "
+  caml_gc_log("stw_resize_minor_heaps_reservation: "
               "caml_empty_minor_heap_no_major_slice_from_stw");
   caml_empty_minor_heap_no_major_slice_from_stw(
     domain, NULL, participating_count, participating);
 
-  caml_gc_log("stw_resize_minor_heap_reservation: free_minor_heap");
+  caml_gc_log("stw_resize_minor_heaps_reservation: free_minor_heap");
   free_minor_heap();
 
   Caml_global_barrier_if_final(participating_count) {
     uintnat new_minor_wsz = (uintnat) minor_wsz_data;
-    domain_resize_heap_reservation_from_stw_single(new_minor_wsz);
+    domain_resize_heaps_reservation_from_stw_single(new_minor_wsz);
   }
 
-  caml_gc_log("stw_resize_minor_heap_reservation: allocate_minor_heap");
+  caml_gc_log("stw_resize_minor_heaps_reservation: allocate_minor_heap");
   /* Note: each domain allocates its own minor heap. This seems
      important to get good NUMA behavior. We don't want a single
      domain to allocate all minor heaps, which could create locality
@@ -958,7 +965,7 @@ void caml_update_minor_heap_max(uintnat requested_wsz) {
               caml_minor_heap_max_wsz, requested_wsz);
   while (requested_wsz > caml_minor_heap_max_wsz) {
     caml_try_run_on_all_domains(
-      &stw_resize_minor_heap_reservation, (void*)requested_wsz, 0);
+      &stw_resize_minor_heaps_reservation, (void*)requested_wsz, 0);
   }
   check_minor_heap();
 }
@@ -983,7 +990,7 @@ void caml_init_domains(uintnat max_domains, uintnat minor_heap_wsz)
   if (stw_domains.domains == NULL)
     caml_fatal_error("Failed to allocate stw_domains.domains");
 
-  reserve_minor_heaps_from_stw_single();
+  reserve_minor_heaps_reservation_from_stw_single();
   /* stw_single: mutators and domains have not started yet. */
 
   for (int i = 0; i < max_domains; i++) {
