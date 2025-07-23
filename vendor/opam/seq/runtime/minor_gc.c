@@ -133,7 +133,7 @@ void caml_set_minor_heap_size (asize_t wsize)
     caml_minor_collection();
   }
 
-  if(caml_reallocate_minor_heap(wsize) < 0) {
+  if(caml_reallocate_minor_heap_arena(wsize) < 0) {
     caml_fatal_error("Fatal error: No memory for minor heap");
   }
 
