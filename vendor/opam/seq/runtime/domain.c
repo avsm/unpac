@@ -262,57 +262,117 @@ CAMLexport uintnat caml_minor_heaps_end;
 static CAMLthread_local dom_internal* domain_self;
 
 /*
- * This structure is protected by all_domains_lock.
- * [0, participating_domains) are all the domains taking part in STW sections.
- * [participating_domains, caml_params->max_domains) are all those domains free
- * to be used.
+  This structure is protected by all_domains_lock.
+
+  Three regions in the [domains]  array correspond to three states for domains:
+   - at indices [0, active_domains) are the 'active' domains,
+     which participate in STW sections.
+   - [active_domains, parked_domains) are the 'parked' domains,
+     in the process of spawning.
+   - [parked_domains, caml_params->max_domains) are the 'stopped' domains,
+     which are currently unused by the runtime.
  */
 static struct {
-  int participating_domains;
+  int active_domains;
+  int parked_domains;
   dom_internal** domains;
 } stw_domains = {
+  0,
   0,
   NULL
 };
 
-static void add_next_to_stw_domains(void)
-{
-  CAMLassert(stw_domains.participating_domains < caml_params->max_domains);
-  stw_domains.participating_domains++;
+
+static void check_domain_limit(int idx) {
+  CAMLassert(0 <= idx && idx <= caml_params->max_domains);
+}
+static void check_stw_domains(void) {
+  check_domain_limit(stw_domains.active_domains);
+  check_domain_limit(stw_domains.parked_domains);
+  CAMLassert(stw_domains.active_domains
+             <= stw_domains.parked_domains);
 #ifdef DEBUG
-  /* Enforce here the invariant for early-exit in
+  /* Check here the invariant for early-exit in
      [caml_interrupt_all_signal_safe], because the latter must be
      async-signal-safe and one cannot CAMLassert inside it. */
   bool prev_has_interrupt_word = true;
   for (int i = 0; i < caml_params->max_domains; i++) {
     bool has_interrupt_word = all_domains[i].interruptor.interrupt_word != NULL;
-    if (i < stw_domains.participating_domains) CAMLassert(has_interrupt_word);
+    if (i < stw_domains.active_domains) CAMLassert(has_interrupt_word);
     if (!prev_has_interrupt_word) CAMLassert(!has_interrupt_word);
     prev_has_interrupt_word = has_interrupt_word;
   }
 #endif
 }
 
-static void remove_from_stw_domains(dom_internal* dom) {
-  int i;
-  for(i=0; stw_domains.domains[i]!=dom; ++i) {
-    CAMLassert(i<caml_params->max_domains);
+static int find_stw_domain(int start, int end, dom_internal *dom) {
+  check_domain_limit(start);
+  check_domain_limit(end);
+  for (int i = start; i < end; i++)
+  {
+    if (stw_domains.domains[i] == dom)
+      return i;
   }
-  CAMLassert(i < stw_domains.participating_domains);
-
-  /* swap passed domain to first free domain */
-  stw_domains.participating_domains--;
-  stw_domains.domains[i] =
-      stw_domains.domains[stw_domains.participating_domains];
-  stw_domains.domains[stw_domains.participating_domains] = dom;
+  caml_fatal_error("find_stw_domain");
+}
+static int find_active_domain(dom_internal *dom) {
+  int start = 0;
+  int end = stw_domains.active_domains;
+  return find_stw_domain(start, end, dom);
+}
+static int find_parked_domain(dom_internal *dom) {
+  int start = stw_domains.active_domains;
+  int end = stw_domains.parked_domains;
+  return find_stw_domain(start, end, dom);
 }
 
-static dom_internal* next_free_domain(void) {
-  if (stw_domains.participating_domains == caml_params->max_domains)
+static void swap_stw_domains(int idx1, int idx2) {
+  if (idx1 == idx2) return;
+  dom_internal *dom1 = stw_domains.domains[idx1];
+  dom_internal *dom2 = stw_domains.domains[idx2];
+  stw_domains.domains[idx1] = dom2;
+  stw_domains.domains[idx2] = dom1;
+}
+
+
+/* One needs to hold [all_domains_lock] to call any of the
+   [stw_domains] transition functions that follow. */
+
+static dom_internal* park_next_stopped_domain(void) {
+  if (stw_domains.parked_domains == caml_params->max_domains)
     return NULL;
 
-  CAMLassert(stw_domains.participating_domains < caml_params->max_domains);
-  return stw_domains.domains[stw_domains.participating_domains];
+  dom_internal *dom = stw_domains.domains[stw_domains.parked_domains];
+  stw_domains.parked_domains++;
+  check_stw_domains();
+  return dom;
+}
+
+static void stop_parked_domain(dom_internal *dom) {
+  int idx = find_parked_domain(dom);
+  stw_domains.parked_domains--;
+  swap_stw_domains(idx, stw_domains.parked_domains);
+  check_stw_domains();
+}
+
+static void activate_parked_domain(dom_internal *dom)
+{
+  int idx = find_parked_domain(dom);
+  swap_stw_domains(stw_domains.active_domains, idx);
+  stw_domains.active_domains++;
+  check_stw_domains();
+}
+
+static void stop_active_domain(dom_internal* dom) {
+  int idx = find_active_domain(dom);
+  stw_domains.active_domains--;
+  swap_stw_domains(idx, stw_domains.active_domains);
+
+  idx = stw_domains.active_domains;
+  stw_domains.parked_domains--;
+  swap_stw_domains(idx, stw_domains.parked_domains);
+
+  check_stw_domains();
 }
 
 CAMLexport CAMLthread_local caml_domain_state* caml_state;
@@ -609,10 +669,10 @@ static void domain_create(uintnat initial_minor_heap_wsize,
     }
   }
 
-  d = next_free_domain();
+  d = park_next_stopped_domain();
 
   if (d == NULL)
-    goto domain_init_complete;
+    goto domain_parking_failure;
 
   s = &d->interruptor;
   CAMLassert(!s->running);
@@ -633,7 +693,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
     domain_state = (caml_domain_state*)
       caml_stat_calloc_noexc(1, sizeof(caml_domain_state));
     if (domain_state == NULL)
-      goto domain_init_complete;
+      goto domain_state_init_failure;
     d->state = domain_state;
   } else {
     domain_state = d->state;
@@ -777,7 +837,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->trap_barrier_block = -1;
 #endif
 
-  add_next_to_stw_domains();
+  activate_parked_domain(d);
   goto domain_init_complete;
 
 alloc_main_stack_failure:
@@ -800,6 +860,10 @@ init_memprof_failure:
   domain_self = NULL;
 
   atomic_fetch_add(&caml_num_domains_running, -1);
+
+domain_state_init_failure:
+  stop_parked_domain(d);
+domain_parking_failure:
 
 domain_init_complete:
   caml_gc_log("domain init complete");
@@ -1691,10 +1755,10 @@ int caml_try_run_on_all_domains_with_spin_work(
   stw_request.enter_spin_data = enter_spin_data;
   stw_request.callback = handler;
   stw_request.data = data;
-  stw_request.num_domains = stw_domains.participating_domains;
+  stw_request.num_domains = stw_domains.active_domains;
   /* stw_request.barrier doesn't need resetting */
   atomic_store_release(&stw_request.num_domains_still_processing,
-                       stw_domains.participating_domains);
+                       stw_domains.active_domains);
 
   int is_alone = stw_request.num_domains == 1;
   int should_sync = sync && !is_alone;
@@ -1714,13 +1778,13 @@ int caml_try_run_on_all_domains_with_spin_work(
       if(all_domains[i].interruptor.running)
         domains_participating++;
     }
-    CAMLassert(domains_participating == stw_domains.participating_domains);
+    CAMLassert(domains_participating == stw_domains.active_domains);
     CAMLassert(domains_participating > 0);
   }
 #endif
 
   /* Next, interrupt all domains */
-  for(i = 0; i < stw_domains.participating_domains; i++) {
+  for(i = 0; i < stw_domains.active_domains; i++) {
     dom_internal * d = stw_domains.domains[i];
     stw_request.participating[i] = d->state;
     CAMLassert(!interruptor_has_pending(&d->interruptor));
@@ -2128,7 +2192,7 @@ void caml_domain_terminate(bool last)
 
       /* Remove this domain from stw_domains.
          (This will only be observed after [all_domains_lock] is released.) */
-      remove_from_stw_domains(domain_self);
+      stop_active_domain(domain_self);
 
       /* The minor heap area is only valid for STW-participating domains,
          so we free the minor heap when we stop STW participation. */
@@ -2151,7 +2215,7 @@ void caml_domain_terminate(bool last)
   if (!last) caml_assert_shared_heap_is_empty(domain_state->shared_heap);
 
   /* [domain_state] may be re-used by a fresh domain here, now that we
-     have done [remove_from_stw_domains] and released the
+     have done [stop_active_domain] and released the
      [all_domains_lock]. In particular, we cannot touch
      [domain_self->interruptor] after here because it may be reused.
 
