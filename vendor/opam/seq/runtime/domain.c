@@ -240,25 +240,15 @@ static atomic_intnat domains_exiting = 0;
 
 CAMLexport atomic_uintnat caml_num_domains_running = 0;
 
-/* size of the virtual memory reservation for the minor heap, per domain */
+/* Size of the virtual memory reservation for the minor heap, per domain.
+   See note [memory heap layout] below. */
 uintnat caml_minor_heap_max_wsz;
-/*
-  The amount of memory reserved for all minor heaps of all domains is
-  caml_params->max_domains * caml_minor_heap_max_wsz. Individual domains can
-  allocate smaller minor heaps, but when a domain calls Gc.set to allocate a
-  bigger minor heap than this reservation, we perform a new virtual memory
-  reservation based on the increased minor heap size.
 
-  New domains are created with a minor heap arena of size
-  [caml_params->init_minor_heap_wsz].
-
-  To perform a new reservation for the minor heaps, we stop the world
-  and do a minor collection on all domains. See
-  [stw_resize_minor_heaps_reservation].
-*/
-
+/* The boundaries of the reserved address space for all minor heaps.
+   See note [memory heap layout] below. */
 CAMLexport uintnat caml_minor_heaps_start;
 CAMLexport uintnat caml_minor_heaps_end;
+
 static CAMLthread_local dom_internal* domain_self;
 
 /*
@@ -399,7 +389,7 @@ asize_t caml_norm_minor_heap_size (intnat wsize)
   return Wsize_bsize(bs);
 }
 
-/* The current minor heap layout is as follows:
+/* Note [minor heap layout]:
 
 - The 'minor heaps reservation' is a contiguous address space of size
     [caml_minor_heap_max_wsz * caml_params->max_domains]
@@ -428,6 +418,9 @@ asize_t caml_norm_minor_heap_size (intnat wsize)
   Those [young_{start,end}] variables are never accessed by another
   domain, so they need no synchronization.
 
+  New domains are created with a minor heap arena of size
+  [caml_params->init_minor_heap_wsz].
+
   Domains commit their minor heap arena in
     [allocate_minor_heap_arena]
   which is called both at domain-initialization (by [domain_create])
@@ -436,6 +429,13 @@ asize_t caml_norm_minor_heap_size (intnat wsize)
   They decommit their minor heap arena by calling
     [free_minor_heap_arena]
   before leaving the set of STW participants.
+
+  If a domain uses [Gc.set] to change the size of its memory area, and
+  the requested size is larger than its minor heap reservation, then
+  we need to change the global minor heaps reservation. This is done
+  by a STW section that first performs a minor collection and
+  deallocates the arena of each domain. See
+  [stw_resize_minor_heap_reservation].
 */
 
 Caml_inline void check_minor_heap(void) {
