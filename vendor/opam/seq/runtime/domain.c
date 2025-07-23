@@ -199,6 +199,8 @@ struct dom_internal {
 };
 typedef struct dom_internal dom_internal;
 
+static CAMLthread_local dom_internal* domain_self;
+
 static struct {
   /* enter barrier for STW sections, participating domains arrive into
      the barrier before executing the STW callback */
@@ -239,17 +241,6 @@ static dom_internal* all_domains;
 static atomic_intnat domains_exiting = 0;
 
 CAMLexport atomic_uintnat caml_num_domains_running = 0;
-
-/* Size of the virtual memory reservation for the minor heap, per domain.
-   See note [memory heap layout] below. */
-uintnat caml_minor_heap_max_wsz;
-
-/* The boundaries of the reserved address space for all minor heaps.
-   See note [memory heap layout] below. */
-CAMLexport uintnat caml_minor_heaps_start;
-CAMLexport uintnat caml_minor_heaps_end;
-
-static CAMLthread_local dom_internal* domain_self;
 
 /*
   This structure is protected by all_domains_lock.
@@ -497,6 +488,13 @@ asize_t caml_norm_minor_heap_size (intnat wsize)
   deallocates the arena of each domain. See
   [stw_resize_minor_heap_reservation].
 */
+
+/* Size of the virtual memory reservation for the minor heap, per domain. */
+uintnat caml_minor_heap_max_wsz;
+
+/* The boundaries of the reserved address space for all minor heaps. */
+CAMLexport uintnat caml_minor_heaps_start;
+CAMLexport uintnat caml_minor_heaps_end;
 
 Caml_inline void check_minor_heap(void) {
   caml_domain_state* domain_state = Caml_state;
