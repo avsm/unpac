@@ -46,11 +46,11 @@ depends: [
   # amd64 mingw-w64 / MSVC
   (("arch-x86_64" {os = "win32" & arch = "x86_64"} &
      (("system-mingw" & "mingw-w64-shims" {os-distribution = "cygwin" & build}) |
-      ("system-msvc" & "winpthreads" & "ocaml-option-no-compression" {os = "win32"}))) |
+      ("system-msvc" & "winpthreads" {os = "win32"} & "ocaml-option-no-compression" {os = "win32"}))) |
   # i686 mingw-w64 / MSVC
    ("arch-x86_32" {os = "win32"} & "ocaml-option-bytecode-only" {os = "win32"} &
      (("system-mingw" & "mingw-w64-shims" {os-distribution = "cygwin" & build}) |
-      ("system-msvc" & "winpthreads" & "ocaml-option-no-compression" {os = "win32"}))) |
+      ("system-msvc" & "winpthreads" {os = "win32"} & "ocaml-option-no-compression" {os = "win32"}))) |
   # Non-Windows systems
    "host-system-other" {os != "win32" & post})
 
@@ -81,7 +81,7 @@ build: [
     "--enable-runtime-search"
     "--enable-runtime-search-target=fallback"
     "--with-flexdll=%{flexdll:share}%" {os = "win32" & flexdll:installed}
-    "--with-winpthreads-msvc=%{winpthreads:share}%" {system-msvc:installed}
+    "--with-winpthreads-msvc=%{winpthreads:share}%" {winpthreads:installed & system-msvc:installed}
     "-C"
     "--with-afl" {ocaml-option-afl:installed}
     "--disable-native-compiler" {ocaml-option-bytecode-only:installed}
