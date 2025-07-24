@@ -714,6 +714,9 @@ stw_resize_minor_heaps_reservation(caml_domain_state* domain,
   caml_empty_minor_heap_no_major_slice_from_stw(
     domain, NULL, participating_count, participating);
 
+  // We must read this now because [free_minor_heap_arena] will zero it.
+  uintnat minor_heap_wsz = Caml_state->minor_heap_wsz;
+
   caml_gc_log("stw_resize_minor_heaps_reservation: free_minor_heap_arena");
   free_minor_heap_arena();
 
@@ -727,7 +730,7 @@ stw_resize_minor_heaps_reservation(caml_domain_state* domain,
      important to get good NUMA behavior. We don't want a single
      domain to allocate all arenas, which could create locality issues
      we don't understand very well. */
-  if (allocate_minor_heap_arena(Caml_state->minor_heap_wsz) < 0) {
+  if (allocate_minor_heap_arena(minor_heap_wsz) < 0) {
     caml_fatal_error("Fatal error: No memory for minor heap arena");
   }
 }
