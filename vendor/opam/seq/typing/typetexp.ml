@@ -700,13 +700,16 @@ and transl_type_aux env ~row_context ~aliased ~policy styp =
       ctyp (Ttyp_poly (vars, cty)) ty'
   | Ptyp_package ptyp ->
       let path, ptys = transl_package env ~policy ~row_context ptyp in
-      let ty = newty (Tpackage {
-          pack_path = path;
-          pack_constraints = List.map (fun (s, cty) ->
-                         (Longident.flatten s.txt, cty.ctyp_type)) ptys})
+      let pack = {
+        pack_path = path;
+        pack_constraints = List.map (fun (s, cty) ->
+                         (Longident.flatten s.txt, cty.ctyp_type)) ptys
+      } in
+      let ty = newty (Tpackage pack)
       in
       ctyp (Ttyp_package {
             tpt_path = path;
+            tpt_type = pack;
             tpt_constraints = ptys;
             tpt_txt = ptyp.ppt_path;
            }) ty

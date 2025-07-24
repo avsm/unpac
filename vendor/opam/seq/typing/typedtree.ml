@@ -51,7 +51,7 @@ and pat_extra =
   | Tpat_constraint of core_type
   | Tpat_type of Path.t * Longident.t loc
   | Tpat_open of Path.t * Longident.t loc * Env.t
-  | Tpat_unpack
+  | Tpat_unpack of package_type option
 
 and 'k pattern_desc =
   (* value patterns *)
@@ -493,6 +493,7 @@ and core_type_desc =
 and package_type = {
   tpt_path : Path.t;
   tpt_constraints : (Longident.t loc * core_type) list;
+  tpt_type : package;
   tpt_txt : Longident.t loc;
 }
 
