@@ -214,6 +214,10 @@ Working version
   confusing it with constructors.
   (Stefan Muenzel, review by Nicolás Ojeda Bär)
 
+- #14149: Distinguish `(module M : S)` from `(module M) : (module S)` in
+  patterns.
+  (Samuel Vivien, review by Gabriel Scherer)
+
 - #14161: refactor the STW-participants machinery to add an intermediate
   category of 'parked' domain structures.
   (Gabriel Scherer, review by Sivaramakrishnan)
