@@ -1,3 +1,5 @@
+v0.2.0 2025-07-25 Zagreb
+------------------------
 
 - Fix `Jsont_bytesrw.{encode,encode'}`. Do not write the `eod` slice if
   `eod:false` is specified. Thanks to Benjamin Nguyen-Van-Yen for
