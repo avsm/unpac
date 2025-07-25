@@ -121,7 +121,7 @@ let default =
       [ "ocaml", {|>= "4.14.0"|};
         "ocamlfind", {|build|};
         "ocamlbuild", {|build|};
-        "topkg", {|build & >= "1.0.3"|};
+        "topkg", {|build & >= "1.1.0"|};
         "mtime", {|with-test|};]
   in
   B0_pack.make "default" ~doc:"logs package" ~meta ~locked:true @@
