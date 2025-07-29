@@ -30,6 +30,11 @@ Working version
   and RISC-V.  This reduces minor GC work in the presence of deep call stacks.
   (Xavier Leroy, review by Miod Vallat, Gabriel Scherer and Olivier Nicole)
 
+- #14053: Statmemprof: it is now possible to replace a profile in the
+  current domain without stopping it in all domains.
+  Added the function [Gc.Memprof.is_sampling].
+  (Guillaume Munch-Maccagnoni, review by Gabriel Scherer)
+
 ### Code generation and optimizations:
 
 ### Standard library:
