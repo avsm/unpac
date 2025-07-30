@@ -304,12 +304,6 @@ end
 let x : int = let Eq = M.e in M.x
 \end{caml_example*}
 
-Of course, not all abstract types can be refined, as this would
-contradict the exhaustiveness check. Namely, builtin types (those
-defined by the compiler itself, such as "int" or "array"), and
-abstract types defined by the local module, are non-instantiable, and
-as such cause a type error rather than introduce an equation.
-
 
 \section{s:types-used-as-gadt-indices}{Types used as GADT indices}
 
