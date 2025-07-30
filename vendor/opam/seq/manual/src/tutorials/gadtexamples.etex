@@ -373,19 +373,6 @@ end = struct
 end
 \end{caml_example*}
 
-This problem also affects datatype definitions with the same
-constructor or field names, which could be alias of each other.
-\begin{caml_example*}{verbatim}[error]
-module DataTypeNat = struct
-  type zero = TypeNat
-  type 'a succ = TypeNat
-end
-
-let of_singleton : ('a, DataTypeNat.(zero succ)) sized_list -> 'a = function
-  | Cons (v, Nil) -> v
-  | _ -> .
-\end{caml_example*}
-
 The recommended way to avoid this problem is to give a concrete
 definition to types such as "zero" and "succ", that are only meant to
 be used in GADT indices. (This is counter-intuitive, as we will never
@@ -396,6 +383,8 @@ module TypeNat = struct
   type 'a succ = Succ
 end
 \end{caml_example*}
+The types are now incompatibles as their constructor names are exposed
+and distinct.
 
 As an additional refinement, we can define those index types using
 using a "private" annotation, which clarifies that they are not meant
@@ -414,7 +403,7 @@ implementations; see the documentation of private types in
 type is effectively empty. This makes it more explicit that the types
 are only intended to be used as GADT indices.
 
-\subsection{s:abstract-types-current-module}{Legacy behavior: abstract types in the current module}
+\subsection{s:abstract-types-current-module}{Legacy behavior: types in the current module}
 
 Early versions of OCaml, up to OCaml 5.4, had a special handling of
 types defined in the current module. This special case does not apply
@@ -433,7 +422,9 @@ type !'a succ
 The reasoning was that while in general abstract types could be
 defined as anything somewhere in the program, abstract types that we
 just introduced are not defined at all, so it is correct to assume
-that they are distinct.
+that they are distinct. Similarly, datatypes defined in the current
+module were considered distinct even if they used the exact same
+constructors or field names.
 
 This special case made the system more complex and less modular. For
 example, GADT examples would work well when everything is defined in
