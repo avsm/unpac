@@ -12,9 +12,7 @@ let setup_logs () =
   Logs.set_reporter (Logs_fmt.reporter ());
   Logs.set_level ~all:true (Some Logs.Debug);
   Logs_threaded.enable ();
-  let m = Mutex.create () in
-  let lock () = Mutex.lock m and unlock () = Mutex.unlock m in
-  Logs.set_reporter_mutex ~lock ~unlock
+  ()
 
 let main () =
   setup_logs ();
