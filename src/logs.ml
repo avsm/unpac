@@ -188,7 +188,11 @@ let report src level ~over k msgf =
   let mutex = Atomic.get reporter_mutex' in
   let over () = over (); mutex.unlock () in
   mutex.lock ();
-  (Atomic.get reporter').report src level ~over k msgf
+  try (Atomic.get reporter').report src level ~over k msgf with
+  | exn ->
+      let bt = Printexc.get_raw_backtrace ()  in
+      over ();
+      Printexc.raise_with_backtrace exn bt
 
 let pp_brackets pp_v ppf v =
   Format.pp_print_char ppf '['; pp_v ppf v; Format.pp_print_char ppf ']'

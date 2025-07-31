@@ -80,6 +80,9 @@ let test_multi =
 let test_threaded =
   test ~/"test/test_threaded.ml" ~requires:[logs_fmt; logs_threaded; threads]
 
+let test_mutext_safe =
+  test ~/"test/test_mutex_safe.ml" ~requires:[logs_fmt; logs_threaded; threads]
+
 let test_lwt =
   let requires = [b0_std; logs_fmt; logs_lwt; fmt; fmt_tty; lwt; lwt_unix] in
   test ~/"test/test_lwt.ml" ~requires
