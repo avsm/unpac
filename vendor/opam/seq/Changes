@@ -259,6 +259,10 @@ Working version
 - #14169: runtime, fix cache miss within the stack fragments cache
   (Florian Angeletti, review by Gabriel Scherer)
 
+- #14163, #14176: add a filename location to the deprecation alert for implicit
+  uses of libraries bundled with the compiler (unix,re,threads,dynlink)
+  (Florian Angeletti, report by Ali Caglayan, review by Gabriel Scherer)
+
 OCaml 5.4.0
 ---------------
 
