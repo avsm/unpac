@@ -1,3 +1,8 @@
+
+
+* Make log mutex immune to raising logging functions.
+  Thanks to Nathan Taylor for the report and the repro (#57).
+
 v0.9.0 2025-07-08 Zagreb
 ------------------------
 
