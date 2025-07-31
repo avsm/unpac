@@ -283,7 +283,7 @@ let is_row_name s =
   let l = String.length s in
   (* PR#10661: when l=4 and s is "#row", this is not a row name
      but the valid #-type name of a class named "row". *)
-  l > 4 && String.sub s (l-4) 4 = "#row"
+  l > 4 && String.ends_with ~suffix:"#row" s
 
 let is_constr_row ~allow_ident t =
   match get_desc t with

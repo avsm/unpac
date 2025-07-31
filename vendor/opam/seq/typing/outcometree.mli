@@ -72,7 +72,7 @@ type out_type =
   | Otyp_class of out_ident * out_type list
   | Otyp_constr of out_ident * out_type list
   | Otyp_manifest of out_type * out_type
-  | Otyp_object of { fields: (string * out_type) list; open_row:bool}
+  | Otyp_object of { fields: (string * out_type) list; row: out_row}
   | Otyp_record of out_label list
   | Otyp_stuff of string
   | Otyp_sum of out_constructor list
@@ -83,6 +83,11 @@ type out_type =
   | Otyp_module of out_package
   | Otyp_attribute of out_type * out_attribute
   | Otyp_external of string
+
+and out_row =
+  | Orow_closed
+  | Orow_open_anonymous
+  | Orow_open of out_type
 
 and out_label = {
   olab_name: string;

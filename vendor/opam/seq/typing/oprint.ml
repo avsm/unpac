@@ -339,8 +339,9 @@ and print_simple_out_type ppf =
       print_typargs ppf tyl;
       print_ident ppf id;
       pp_close_box ppf ()
-  | Otyp_object {fields; open_row} ->
-      fprintf ppf "@[<2>< %a >@]" (print_fields open_row) fields
+  | Otyp_object { fields; row} ->
+      fprintf ppf "@[<2>< %a >@]"
+        (print_object_fields row) fields
   | Otyp_stuff s -> pp_print_string ppf s
   | Otyp_var (non_gen, s) -> ty_var ~non_gen ppf s
   | Otyp_variant (row_fields, closed, tags) ->
@@ -387,16 +388,21 @@ and print_package ppf pack =
 and print_record_decl ppf lbls =
   fprintf ppf "{%a@;<1 -2>}"
     (print_list_init print_out_label (fun ppf -> fprintf ppf "@ ")) lbls
-and print_fields open_row ppf =
+and print_object_fields row ppf =
   function
     [] ->
-      if open_row then fprintf ppf "..";
+      begin match row with
+      | Orow_closed -> ()
+      | Orow_open_anonymous -> fprintf ppf ".."
+      | Orow_open ty -> fprintf ppf ".. as %a" print_out_type ty
+      end
   | [s, t] ->
       fprintf ppf "%a : %a" print_lident s print_out_type t;
-      if open_row then fprintf ppf ";@ ";
-      print_fields open_row ppf []
+      if row <> Orow_closed then fprintf ppf ";@ ";
+      print_object_fields row ppf []
   | (s, t) :: l ->
-      fprintf ppf "%s : %a;@ %a" s print_out_type t (print_fields open_row) l
+      fprintf ppf "%s : %a;@ %a"
+        s print_out_type t (print_object_fields row) l
 and print_row_field ppf (l, opt_amp, tyl) =
   let pr_of ppf =
     if opt_amp then fprintf ppf " of@ &@ "
