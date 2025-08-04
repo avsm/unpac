@@ -176,8 +176,8 @@ Working version
   recursive modules.
   (Shivam Acharya, review by Gabriel Scherer and Florian Angeletti)
 
-- #14076: error messages, add a short explanation for mismatched universal
-  variables.
+- #14076, 14111: error messages, add a short explanation for mismatched
+  universal variables and universal quantifications.
   (Florian Angeletti, review by Gabriel Scherer)
 
 - #14146: add an error message for external declaration with
@@ -191,6 +191,8 @@ Working version
 - #14147: print row types in error messages when they are a type constructor,
   e.g. `< foo : int; .. as $0>` when $0 is introduced by a GADT constructor
   (Stefan Muenzel, review by Jacques Garrigue and Florian Angeletti)
+
+
 
 ### Internal/compiler-libs changes:
 
