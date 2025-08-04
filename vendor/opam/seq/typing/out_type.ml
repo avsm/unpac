@@ -1001,6 +1001,18 @@ module Aliases = struct
       | Tpoly(ty, tyl) ->
           List.iter add tyl;
           mark_loops_rec visited ty
+      | Tarrow (Optional _, e1, e2, _) ->
+          begin match get_desc e1 with
+          | Tpoly (a, []) ->
+              begin match get_desc a with
+              | Tconstr (path, [ contents ], _)
+                when Path.same path Predef.path_option ->
+                  mark_loops_rec visited contents
+              | _ -> mark_loops_rec visited e1
+              end
+          | _ -> mark_loops_rec visited e1
+          end;
+          mark_loops_rec visited e2;
       | _ ->
           printer_iter_type_expr (mark_loops_rec visited) ty
 
@@ -1062,10 +1074,16 @@ let rec tree_of_typexp mode ty =
         let t1 =
           if is_optional l then
             if tpoly_is_mono ty1 then
-              match get_desc (tpoly_get_mono ty1) with
+              let mono = tpoly_get_mono ty1 in
+              match get_desc mono with
               | Tconstr(path, [ty], _)
                 when Path.same path Predef.path_option ->
-                  tree_of_typexp mode ty
+                  (* If we properly aliased the labeled argument, we
+                     should not hit this case. But check to prevent
+                     loops. *)
+                  if Aliases.is_aliased_proxy (proxy mono)
+                  then Otyp_stuff "<hidden>"
+                  else tree_of_typexp mode ty
               | _ -> Otyp_stuff "<hidden>"
             else Otyp_stuff "<hidden>"
           else tree_of_typexp mode ty1 in

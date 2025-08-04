@@ -2942,7 +2942,7 @@ let collect_unknown_apply_args env funct ty_fun0 rev_args sargs =
 
 let collect_apply_args env funct ignore_labels ty_fun ty_fun0 sargs =
   let warned = ref false in
-  let rec loop ty_fun ty_fun0 rev_args sargs =
+  let rec loop visited ty_fun ty_fun0 rev_args sargs =
     if sargs = [] then
       collect_unknown_apply_args env funct ty_fun0 rev_args sargs
     else
@@ -2970,23 +2970,27 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 sargs =
       begin
         let name = label_name l
         and optional = is_optional l in
-        let remaining_sargs, arg_opt =
+        let remaining_sargs, arg_opt, visited, terminate =
           if ignore_labels then begin
             (* No reordering is allowed, process arguments in order *)
             match sargs with
             | [] -> assert false
             | (l', sarg) :: remaining_sargs ->
                 if name = label_name l' || (not optional && l' = Nolabel) then
-                  (remaining_sargs, Some (sarg, l'))
+                  (remaining_sargs, Some (sarg, l'), TypeSet.empty, false)
                 else if
                   optional &&
                   not (List.exists (fun (l, _) -> name = label_name l)
                         remaining_sargs) &&
                   List.exists (function (Nolabel, _) -> true | _ -> false)
                     sargs
-                then
-                  (sargs, None)
-                else
+                then begin
+                  if TypeSet.mem ty_fun visited then
+                    sargs, None, visited, true
+                  else
+                    let visited = TypeSet.add ty_fun visited in
+                    (sargs, None, visited, false)
+                end else
                   raise(Error(sarg.pexp_loc, env,
                               Apply_wrong_label(l', ty_fun', optional)))
           end else
@@ -3001,10 +3005,17 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 sargs =
                 if not optional && is_optional l' then
                   Location.prerr_warning sarg.pexp_loc
                     (Warnings.Nonoptional_label (Asttypes.string_of_label l));
-                remaining_sargs, Some (sarg, l')
+                remaining_sargs, Some (sarg, l'), TypeSet.empty, false
             | None ->
-                sargs, None
+                if TypeSet.mem ty_fun visited then
+                  sargs, None, visited, true
+                else
+                  let visited = TypeSet.add ty_fun visited in
+                  sargs, None, visited, false
         in
+        if terminate then
+          collect_unknown_apply_args env funct ty_fun0 rev_args remaining_sargs
+        else
         match arrow_kind with
         | `Arrow (ty_arg, ty_ret, ty_arg0, ty_ret0) ->
             let arg =
@@ -3028,10 +3039,10 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 sargs =
                     Omitted { ty_arg; level = lv }
                   end
             in
-            loop ty_ret ty_ret0 ((l, arg) :: rev_args) remaining_sargs
+            loop visited ty_ret ty_ret0 ((l, arg) :: rev_args) remaining_sargs
       end
   in
-  loop ty_fun ty_fun0 [] sargs
+  loop TypeSet.empty ty_fun ty_fun0 [] sargs
 
 let type_omitted_parameters_and_build_result_type ty_ret args =
   let ty_ret, args =
