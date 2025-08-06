@@ -220,7 +220,7 @@ val instance_poly_fixed:
         (* Take an instance of a type scheme containing free univars for
            checking that an expression matches this scheme. *)
 
-val polyfy: Env.t -> type_expr -> type_expr list -> type_expr * bool
+val polyfy: Env.t -> type_expr -> type_expr list -> type_expr * type_expr list
 
 val instance_label:
   fixed:bool ->

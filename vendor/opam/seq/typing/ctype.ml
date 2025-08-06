@@ -2010,7 +2010,7 @@ let rec unify_univar t1 t2 = function
 let unify_univar_for (type a) (tr_exn : a trace_exn) t1 t2 univar_pairs =
   try unify_univar t1 t2 univar_pairs with
   | Cannot_unify_universal_variables {order; diff} ->
-      raise_for tr_exn (Univar_mismatch {order; diff})
+      raise_for tr_exn (Univar (Var_mismatch {order; diff}))
   | Out_of_scope_universal_variable ->
       (* Allow unscoped univars when checking for equality, since one
          might want to compare arbitrary subparts of types, ignoring scopes;
@@ -2163,18 +2163,18 @@ let polyfy env ty vars =
     | Tvar name when get_level ty = generic_level ->
         let t = newty (Tunivar name) in
         For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
-        Some t
-    | _ -> None
+        Either.Left t
+    | Tsubst (t,_) -> Either.Right t
+    | _ -> Either.Right ty
   in
   (* need to expand twice? cf. Ctype.unify2 *)
   let vars = List.map (expand_head env) vars in
   let vars = List.map (expand_head env) vars in
   For_copy.with_scope (fun copy_scope ->
-    let vars' = List.filter_map (subst_univar copy_scope) vars in
+    let vars', err = List.partition_map (subst_univar copy_scope) vars in
     let ty = copy copy_scope ty in
     let ty = newty2 ~level:(get_level ty) (Tpoly(ty, vars')) in
-    let complete = List.length vars = List.length vars' in
-    ty, complete
+    ty, err
   )
 
 (* assumption: [ty] is fully generalized. *)

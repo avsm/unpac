@@ -19,6 +19,7 @@ Line 1, characters 14-30:
                   ^^^^^^^^^^^^^^^^
 Error: This argument has type "int -> int" which is less general than
          "'a. 'a -> 'a"
+       The type "int" is not a type variable.
 |}];;
 
 let id x = x
@@ -33,8 +34,10 @@ let _ = poly1 (id (fun x -> x))
 Line 1, characters 14-31:
 1 | let _ = poly1 (id (fun x -> x))
                   ^^^^^^^^^^^^^^^^^
-Error: This argument has type "'b -> 'b" which is less general than
-         "'a. 'a -> 'a"
+Error: This argument has type "'a -> 'a" which is less general than
+         "'a0. 'a0 -> 'a0"
+       The type variable "'a" is not generalizable to an universal
+       type variable.
 |}];;
 
 let _ = poly1 (let r = ref None in fun x -> r := Some x; x)
@@ -42,8 +45,10 @@ let _ = poly1 (let r = ref None in fun x -> r := Some x; x)
 Line 1, characters 14-59:
 1 | let _ = poly1 (let r = ref None in fun x -> r := Some x; x)
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This argument has type "'b -> 'b" which is less general than
-         "'a. 'a -> 'a"
+Error: This argument has type "'a -> 'a" which is less general than
+         "'a0. 'a0 -> 'a0"
+       The type variable "'a" is not generalizable to an universal
+       type variable.
 |}];;
 
 let escape f = poly1 (fun x -> f x; x)
@@ -51,8 +56,10 @@ let escape f = poly1 (fun x -> f x; x)
 Line 1, characters 21-38:
 1 | let escape f = poly1 (fun x -> f x; x)
                          ^^^^^^^^^^^^^^^^^
-Error: This argument has type "'b -> 'b" which is less general than
-         "'a. 'a -> 'a"
+Error: This argument has type "'a -> 'a" which is less general than
+         "'a0. 'a0 -> 'a0"
+       The type variable "'a" is not generalizable to an universal
+       type variable.
 |}];;
 
 let poly2 : ('a. 'a -> 'a) -> int * string =
@@ -73,6 +80,7 @@ Line 1, characters 14-30:
                   ^^^^^^^^^^^^^^^^
 Error: This argument has type "int -> int" which is less general than
          "'a. 'a -> 'a"
+       The type "int" is not a type variable.
 |}];;
 
 let poly3 : 'b. ('a. 'a -> 'a) -> 'b -> 'b * 'b option =
@@ -93,6 +101,7 @@ Line 1, characters 14-30:
                   ^^^^^^^^^^^^^^^^
 Error: This argument has type "int -> int" which is less general than
          "'a. 'a -> 'a"
+       The type "int" is not a type variable.
 |}];;
 
 let rec poly4 p (id : 'a. 'a -> 'a) =
@@ -113,6 +122,7 @@ Line 1, characters 19-35:
                        ^^^^^^^^^^^^^^^^
 Error: This argument has type "int -> int" which is less general than
          "'a. 'a -> 'a"
+       The type "int" is not a type variable.
 |}];;
 
 let rec poly5 : bool -> ('a. 'a -> 'a) -> int * string =
@@ -134,6 +144,7 @@ Line 1, characters 19-35:
                        ^^^^^^^^^^^^^^^^
 Error: This argument has type "int -> int" which is less general than
          "'a. 'a -> 'a"
+       The type "int" is not a type variable.
 |}];;
 
 
@@ -156,6 +167,7 @@ Line 1, characters 19-35:
                        ^^^^^^^^^^^^^^^^
 Error: This argument has type "int -> int" which is less general than
          "'a. 'a -> 'a"
+       The type "int" is not a type variable.
 |}];;
 
 let needs_magic (magic : 'a 'b. 'a -> 'b) = (magic 5 : string)
@@ -165,8 +177,10 @@ val needs_magic : ('a 'b. 'a -> 'b) -> string = <fun>
 Line 2, characters 20-32:
 2 | let _ = needs_magic (fun x -> x)
                         ^^^^^^^^^^^^
-Error: This argument has type "'c. 'c -> 'c" which is less general than
+Error: This argument has type "'b. 'b -> 'b" which is less general than
          "'a 'b. 'a -> 'b"
+       The universal type variable "'b" in the first type matches multiple
+       distinct variables in the second type.
 |}];;
 
 let with_id (f : ('a. 'a -> 'a) -> 'b) = f (fun x -> x)

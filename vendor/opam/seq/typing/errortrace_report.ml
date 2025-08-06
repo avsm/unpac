@@ -311,6 +311,58 @@ let explain_first_class_module = function
   | Errortrace.Package_coercion pr ->
       Some(doc_printf "@,@[%a@]" Fmt.pp_doc pr)
 
+let explain_univar prev = function
+  | Errortrace.Var_mismatch { diff; order} ->
+      let prev = match prev with
+        | Some (Errortrace.Incompatible_fields f) ->
+            explain_incompatible_fields f.name f.diff
+        | _ -> Fmt.Doc.empty
+      in
+      add_type_to_preparation diff.got;
+      add_type_to_preparation diff.expected;
+      let more = match order with
+        | Equal ->  Fmt.Doc.empty
+        | Less ->
+          Fmt.doc_printf
+            "@ The first type variable %a was introduced in@ an@ earlier@ \
+             universal@ quantification."
+              (Style.as_inline_code prepared_type_expr) diff.got
+        | More ->
+            Fmt.doc_printf
+              "@ The second type variable %a was introduced in@ an@ earlier@ \
+               universal@ quantification."
+              (Style.as_inline_code prepared_type_expr) diff.expected
+      in
+      doc_printf
+        "%a@,@[The universal variables@ %a and@ %a@ are distinct.%a@]"
+        Fmt.pp_doc prev
+        (Style.as_inline_code prepared_type_expr) diff.got
+        (Style.as_inline_code prepared_type_expr) diff.expected
+        pp_doc more
+  | Errortrace.Quantification_mismatch delta ->
+      let qp ppf x = Style.as_inline_code prepared_type_expr ppf x in
+      let pp ppf ty =
+        add_type_to_preparation ty;
+        match Types.get_desc ty with
+        | Tunivar None -> ()
+        | Tunivar (Some name) ->
+            Fmt.fprintf ppf
+              "@,@[The universal type variable %a in the first@ type@ matches@ \
+               multiple@ distinct@ variables in the second type.@]"
+              Style.inline_code ("'" ^ name)
+        | Tvar _ ->
+              Fmt.fprintf ppf
+                "@,@[The type variable %a is not generalizable@ to@ an@ \
+                 universal@ type variable.@]"
+                qp ty
+        | _ ->
+              Fmt.fprintf ppf
+                "@,@[The type %a is not a type variable.@]"
+                qp ty
+      in
+      let pp_sep _ () = () in
+      doc_printf "%a" (pp_print_list ~pp_sep pp) delta
+
 let explanation (type variety) intro prev env
   : (Errortrace.expanded_type, variety) Errortrace.elt -> _ = function
   | Errortrace.Diff {got; expected} ->
@@ -373,34 +425,7 @@ let explanation (type variety) intro prev env
              {[ The type int occurs inside int list -> 'a |}
         *)
     end
-  | Univar_mismatch { diff; order} ->
-      let prev = match prev with
-        | Some (Errortrace.Incompatible_fields f) ->
-            explain_incompatible_fields f.name f.diff
-        | _ -> Fmt.Doc.empty
-      in
-      add_type_to_preparation diff.got;
-      add_type_to_preparation diff.expected;
-      let more = match order with
-        | Equal ->  Fmt.Doc.empty
-        | Less ->
-          Fmt.doc_printf
-            "@ The first type variable %a was introduced in@ an@ earlier@ \
-             universal@ quantification."
-              (Style.as_inline_code prepared_type_expr) diff.got
-        | More ->
-            Fmt.doc_printf
-              "@ The second type variable %a was introduced in@ an@ earlier@ \
-               universal@ quantification."
-              (Style.as_inline_code prepared_type_expr) diff.expected
-      in
-      Some (doc_printf
-              "%a@,@[The universal variables@ %a and@ %a@ are distinct.%a@]"
-              Fmt.pp_doc prev
-              (Style.as_inline_code prepared_type_expr) diff.got
-              (Style.as_inline_code prepared_type_expr) diff.expected
-              pp_doc more
-           )
+  | Univar um -> Some (explain_univar prev um)
 
 let mismatch intro env trace =
   Errortrace.explain trace (fun ~prev h -> explanation intro prev env h)

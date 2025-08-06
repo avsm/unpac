@@ -92,6 +92,10 @@ type first_class_module =
     | Package_inclusion of Format_doc.doc
     | Package_coercion of Format_doc.doc
 
+type univar =
+  | Var_mismatch of { order:order; diff:type_expr diff }
+  | Quantification_mismatch of type_expr list
+
 type ('a, 'variety) elt =
   (* Common *)
   | Diff : 'a diff -> ('a, _) elt
@@ -102,7 +106,7 @@ type ('a, 'variety) elt =
   | Tuple_label_mismatch of string option diff
   | Incompatible_fields : { name:string; diff: type_expr diff } -> ('a, _) elt
   | First_class_module: first_class_module -> ('a,_) elt
-  | Univar_mismatch of { order:order; diff:type_expr diff }
+  | Univar of univar
   (* Unification & Moregen; included in Equality for simplicity *)
   | Rec_occur : type_expr * type_expr -> ('a, _) elt
 
