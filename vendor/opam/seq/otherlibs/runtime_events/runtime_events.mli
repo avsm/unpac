@@ -72,13 +72,14 @@ Triggering of a minor collection during memprof young sampling.
 *)
 | EV_C_MINOR_PROMOTED
 (**
-Total words promoted from the minor heap to the major in the last minor
-collection.
+Total {b bytes} promoted from the minor heap of this Domain to the major heap
+in the last minor collection.
 @since 5.0
 *)
 | EV_C_MINOR_ALLOCATED
 (**
-Total {b bytes} allocated in the minor heap in the last minor collection.
+Total {b bytes} allocated in the minor heap of this Domain in the
+last minor collection.
 @since 5.0
 *)
 | EV_C_REQUEST_MAJOR_ALLOC_SHR
@@ -187,6 +188,18 @@ end of the major slice (see EV_C_MAJOR_SLICE_COUNTER).
 (**
 The budget in 'work' that a domain has to do during the major slice.
 @since 5.3
+ *)
+| EV_C_MINOR_ALLOCATED_WORDS
+(**
+Total words allocated in the minor heap of this Domain in the
+last minor collection.
+@since 5.4
+*)
+| EV_C_MINOR_PROMOTED_WORDS
+(**
+Total words promoted from the minor heap of this Domain to the major heap
+in the last minor collection.
+@since 5.4
 *)
 
 (** The type for span events emitted by the runtime. *)
