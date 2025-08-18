@@ -262,9 +262,6 @@ Working version
   fix all occurences
   (Stefan Muenzel, review by Gabriel Scherer)
 
-- #14169: runtime, fix cache miss within the stack fragments cache
-  (Florian Angeletti, review by Gabriel Scherer)
-
 - #14163, #14176: add a filename location to the deprecation alert for implicit
   uses of libraries bundled with the compiler (unix,re,threads,dynlink)
   (Florian Angeletti, report by Ali Caglayan, review by Gabriel Scherer)
@@ -1007,6 +1004,9 @@ OCaml 5.4.0
 
 - #14135: Fix a rare internal typechecker error when combining recursive
   modules, polymorphic fields or methods, and constrained type parameters.
+  (Florian Angeletti, review by Gabriel Scherer)
+
+- #14169: runtime, fix cache miss within the stack fragments cache
   (Florian Angeletti, review by Gabriel Scherer)
 
 - #14196, #14197: ocamlprof: do not instrument unreachable clauses
