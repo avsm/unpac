@@ -133,8 +133,9 @@ Working version
 
 ### Tools:
 
-- #12139: BUILD_PATH_PREFIX_MAP rewriting in debug-event locations.
-  (Richard L. Ford, review by Gabriel Scherer)
+- #14055: Invert BUILD_PATH_PREFIX_MAP in directories loaded at startup
+  by the debugger.
+  (Pierre Boutillier, review by Gabriel Scherer and Daniel Bünzli)
 
 * #13638: ocamlmklib exits with code 4 if passed an unrecognised option, as it
   does with an unrecognised file.
