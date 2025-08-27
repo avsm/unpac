@@ -205,16 +205,24 @@ static void clean_field (value e, mlsize_t offset)
     do_check_key_clean(e, offset);
 }
 
+/* FIXME: do we want to do the same tsan stuff here as for caml_modify ? */
+/* See the comments in [caml_modify] for an explanation of the
+   atomic_* calls.
+*/
 static void do_set (value e, mlsize_t offset, value v)
 {
+  volatile value *fp = &Field(e, offset);
+  
   if (Is_block(v) && Is_young(v)) {
-    value old = Field(e, offset);
-    Field(e, offset) = v;
+    value old = *fp;
+    atomic_thread_fence(memory_order_acquire);
+    atomic_store_release(&Op_atomic_val((value)fp)[0], v);
     if (!(Is_block(old) && Is_young(old)))
       add_to_ephe_ref_table (&Caml_state->minor_tables->ephe_ref,
                              e, offset);
   } else {
-    Field(e, offset) = v;
+    atomic_thread_fence(memory_order_acquire);
+    atomic_store_release(&Op_atomic_val((value)fp)[0], v);
   }
 }
 
