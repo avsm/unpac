@@ -283,6 +283,10 @@ Working version
   in an unbounded number of labeled or optional arguments.
   (Stefan Muenzel, report by Samuel Vivien, review by Florian Angeletti)
 
+- #14061, #14209: fix a memory-ordering bug in Weak.set that could
+  result in uninitialized memory seen by Weak.get on another domain.
+  (Damien Doligez, review by Gabriel Scherer)
+
 OCaml 5.4.0
 ---------------
 
