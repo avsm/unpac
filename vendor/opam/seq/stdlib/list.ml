@@ -347,6 +347,12 @@ let rec split = function
   | (x,y)::l ->
       let (rx, ry) = split l in (x::rx, y::ry)
 
+let rec split_map f = function
+    [] -> ([], [])
+  | z::l ->
+      let (x,y) = f z in
+      let (rx, ry) = split_map f l in (x::rx, y::ry)
+
 let rec combine l1 l2 =
   match (l1, l2) with
     ([], []) -> []

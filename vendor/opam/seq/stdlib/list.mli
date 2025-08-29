@@ -491,6 +491,15 @@ val split : ('a * 'b) list -> 'a list * 'b list
    Not tail-recursive.
  *)
 
+val split_map : ('c -> 'a * 'b) -> 'c list -> 'a list * 'b list
+(** [split_map f l] is equivalent to [split (map f l)] but avoids
+    allocating intermediate lists.
+
+    @since 5.5
+
+    Not tail-recursive.
+ *)
+
 val combine : 'a list -> 'b list -> ('a * 'b) list
 (** Transform a pair of lists into a list of pairs:
    [combine [a1; ...; an] [b1; ...; bn]] is
