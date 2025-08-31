@@ -1,3 +1,8 @@
+## v0.4
+
+* Clamp max open files to 2^19, as macOS sometimes returns
+  2^32-1.
+
 ## v0.3 (2023-03-10)
 
 * Round timeouts up, not down in Poll.poll (spotted by @talex5)
