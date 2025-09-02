@@ -37,6 +37,7 @@ ${main} -conf --disable-native-compiler \
         -conf --disable-unix-lib \
         -conf --disable-ocamldoc \
         -conf --disable-dependency-generation \
+        -conf --disable-native-toplevel \
         -no-native
 
 echo "============== no flat float arrays, clang, C23 ================="
