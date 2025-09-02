@@ -1670,7 +1670,7 @@ let get_relative_path top_module path =
   let comps = collect_components path in
   let comps =
     match comps with
-    | h :: t when h = top_module -> t
+    | h :: (_ :: _ as t) when h = top_module -> t
     | _ -> comps
   in
   String.concat "." comps
