@@ -136,10 +136,12 @@ module Used_private_constructor : sig type t val nothing : t -> unit end
       type _ t = KA : a t | KB : b t
    ]}
 
-   Our exceptation is that private constructors in type
-   definitions/implementations (not declarations/signatures) are meant
-   to make their types fresh type-level indices and never used
-   directly.
+   Our expectation is that private constructors in type
+   definitions/implementations (not declarations/signatures) are
+   typically used to make their types fresh type-level indices and
+   never used directly -- they are un-constructible, so there is
+   little point in tracking their usage in the rest of the program and
+   complaining that they are never constructed.
 *)
 module Unused_private_constructor : sig
   type t
@@ -148,11 +150,6 @@ end = struct
 end
 ;;
 [%%expect {|
-Line 4, characters 19-20:
-4 |   type t = private T
-                       ^
-Warning 37 [unused-constructor]: unused constructor "T".
-
 module Unused_private_constructor : sig type t end
 |}]
 
@@ -166,11 +163,6 @@ end = struct
 end
 ;;
 [%%expect {|
-Line 3, characters 19-20:
-3 |   type t = private T
-                       ^
-Warning 37 [unused-constructor]: unused constructor "T".
-
 module Hidden_private_constructor : sig end
 |}]
 
@@ -374,11 +366,6 @@ end = struct
 end
 ;;
 [%%expect {|
-Line 5, characters 20-31:
-5 |   type t += private Private_ext
-                        ^^^^^^^^^^^
-Warning 38 [unused-extension]: unused extension constructor "Private_ext"
-
 module Unused_private_extension : sig type t end
 |}]
 
