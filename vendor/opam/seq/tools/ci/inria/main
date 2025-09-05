@@ -320,15 +320,14 @@ if $make_native && $check_make_alldepend; then
   $make --warn-undefined-variables alldepend
 fi
 
+$make --warn-undefined-variables install
 case $confoptions in
   *--disable-unix-lib*) ;;         # test-in-prefix needs Unix lib
-  *--disable-native-toplevel*) ;;  # test-in-prefix needs ocamlnat
   *)
-    $make --warn-undefined-variables install
     $make -f Makefile.test -C testsuite/in_prefix test-in-prefix
-    rm -rf "$instdir"
     ;;
 esac
+rm -rf "$instdir"
 
 cd testsuite
 if test -n "$jobs" && test -x /usr/bin/parallel
