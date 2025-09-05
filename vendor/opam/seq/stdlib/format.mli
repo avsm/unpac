@@ -1420,11 +1420,9 @@ val sprintf : ('a, unit, string) format -> 'a
 (** Same as {!printf} above, but instead of printing on a formatter,
   returns a string containing the result of formatting the arguments.
   Note that the pretty-printer queue is flushed at the end of {e each
-  call} to [sprintf]. Note that you should most likely use {!asprintf}, which
-  has better support for [%a]. [sprintf] is compatible with [%a] conversions,
-  but it expects values with a different type than when using [%a] with
-  {!printf} or {!fprintf}, where {!asprintf} is compatible with the other [Format]
-  functions. [sprintf] is kept only for backward compatibility.
+  call} to [sprintf]. Note that you likely want to use {!asprintf} which can
+  reuse [%a]-printer defined for {!fprintf}. Contrarily, sprintf requires to
+  redefine new [%a]-printers, and is kept only for backward compatility.
 
   In case of multiple and related calls to [sprintf] to output
   material on a single string, you should consider using [fprintf]
