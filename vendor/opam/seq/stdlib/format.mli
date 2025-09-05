@@ -1431,6 +1431,11 @@ val sprintf : ('a, unit, string) format -> 'a
   Alternatively, you can use [Format.fprintf] with a formatter writing to a
   buffer of your own: flushing the formatter and the buffer at the end of
   pretty-printing returns the desired string.
+
+  [sprintf] still exists despite the existence of [asprintf], because it is
+  still possible to use [%a], but the expected values have a different type than
+  if using [fprintf] or [printf]. Removing [sprintf] or making it the same type
+  as [asprintf] would break existing code.
 *)
 
 val asprintf : ('a, formatter, unit, string) format4 -> 'a
