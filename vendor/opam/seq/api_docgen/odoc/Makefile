@@ -192,12 +192,10 @@ $(ALL_PAGED_DOC:%=build/%.3o.stamp):build/%.3o.stamp:build/%.odocl | build/
 .PHONY: install
 install:
 	$(MKDIR) "$(INSTALL_LIBRARIES_MAN_DIR)"
-	if test -d build/man/libref ; then \
-	  $(INSTALL_DATA) build/man/libref/* "$(INSTALL_LIBRARIES_MAN_DIR)"; \
-	fi
-	if test -d build/man/compilerlibref ; then \
-	  $(INSTALL_DATA) build/man/libref/* "$(INSTALL_LIBRARIES_MAN_DIR)"; \
-	fi
+	$(if $(wildcard build/man/libref), \
+	  $(INSTALL_DATA) build/man/libref/* "$(INSTALL_LIBRARIES_MAN_DIR)")
+	$(if $(wildcard build/man/compilerlibref), \
+	  $(INSTALL_DATA) build/man/libref/* "$(INSTALL_LIBRARIES_MAN_DIR)")
 
 # Dependencies for stdlib modules.
 # Use the same dependencies used for compiling .cmx files.

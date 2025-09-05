@@ -134,21 +134,20 @@ ifeq "$(INSTALL_SOURCE_ARTIFACTS)" "true"
           $(CMIFILES:.cmi=.cmti) \
 	  "$(INSTALL_LIBDIR_LIBNAME)/"
 endif
-	if test -n "$(HEADERS)"; then \
-	  $(INSTALL_DATA) $(HEADERS) "$(INSTALL_INCDIR)/"; \
-	fi
+ifneq "$(HEADERS)" ""
+	$(INSTALL_DATA) $(HEADERS) "$(INSTALL_INCDIR)/"
+endif
 
 installopt:
 	$(INSTALL_DATA) \
 	   $(CAMLOBJS_NAT) $(LIBNAME).cmxa $(LIBNAME).$(A) \
 	   "$(INSTALL_LIBDIR_LIBNAME)/"
-	if test -f $(LIBNAME).cmxs; then \
-	  $(INSTALL_PROG) $(LIBNAME).cmxs "$(INSTALL_LIBDIR_LIBNAME)"; \
-	fi
-	if test -f dll$(CLIBNAME_NATIVE)$(EXT_DLL); then \
-	  $(INSTALL_PROG) \
-	    dll$(CLIBNAME_NATIVE)$(EXT_DLL) "$(INSTALL_STUBLIBDIR)"; \
-	fi
+ifeq "$(SUPPORTS_SHARED_LIBRARIES)" "true"
+	$(INSTALL_PROG) $(LIBNAME).cmxs "$(INSTALL_LIBDIR_LIBNAME)"
+ifeq "$(SUFFIXING)" "false"
+	$(INSTALL_PROG) dll$(CLIBNAME_NATIVE)$(EXT_DLL) "$(INSTALL_STUBLIBDIR)"
+endif
+endif
 ifneq "$(STUBSLIB_NATIVE)" ""
 	$(INSTALL_DATA) $(STUBSLIB_NATIVE) "$(INSTALL_LIBDIR)/"
 endif
