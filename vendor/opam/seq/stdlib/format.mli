@@ -1417,11 +1417,14 @@ val eprintf : ('a, formatter, unit) format -> 'a
 *)
 
 val sprintf : ('a, unit, string) format -> 'a
-(** Same as [printf] above, but instead of printing on a formatter,
+(** Same as {!printf} above, but instead of printing on a formatter,
   returns a string containing the result of formatting the arguments.
   Note that the pretty-printer queue is flushed at the end of {e each
-  call} to [sprintf]. Note that if your format string contains a [%a],
-  you should use [asprintf].
+  call} to [sprintf]. Note that you should most likely use {!asprintf}, which
+  has better support for [%a]. [sprintf] is compatible with [%a] conversions,
+  but it expects values with a different type than when using [%a] with
+  {!printf} or {!fprintf}, where {!asprintf} is compatible with the other [Format]
+  functions. [sprintf] is kept only for backward compatibility.
 
   In case of multiple and related calls to [sprintf] to output
   material on a single string, you should consider using [fprintf]
@@ -1431,11 +1434,6 @@ val sprintf : ('a, unit, string) format -> 'a
   Alternatively, you can use [Format.fprintf] with a formatter writing to a
   buffer of your own: flushing the formatter and the buffer at the end of
   pretty-printing returns the desired string.
-
-  [sprintf] still exists despite the existence of [asprintf], because it is
-  still possible to use [%a], but the expected values have a different type than
-  if using [fprintf] or [printf]. Removing [sprintf] or making it the same type
-  as [asprintf] would break existing code.
 *)
 
 val asprintf : ('a, formatter, unit, string) format4 -> 'a
