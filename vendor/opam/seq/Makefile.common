@@ -382,7 +382,8 @@ INSTALL_DESPATCH_opam_BEGIN = \
 # Munge opam-bin, opam-lib, opam-libexec and opam-man into a .install file and
 # then munge clone-* and create-symlinks into the fixup script.
 INSTALL_DESPATCH_opam_END = \
-  tools/opam/generate-install.sh $(OPAM_PACKAGE_NAME) $(UNIX_OR_WIN32) '$(LN)'
+  $(OCAMLRUN) ./ocaml$(EXE) $(STDLIBFLAGS) \
+    tools/opam/generate.ml $(INSTALL_MODE) $(OPAM_PACKAGE_NAME) '$(LN)'
 
 # Generate $(OPAM_PACKAGE_NAME)-clone.sh (INSTALL_MODE=clone)
 
@@ -412,8 +413,7 @@ INSTALL_DESPATCH_clone_MKDIR =
 
 INSTALL_DESPATCH_clone_BEGIN = rm -f clone-* create-symlinks
 
-INSTALL_DESPATCH_clone_END = \
-  tools/opam/generate-clone.sh $(OPAM_PACKAGE_NAME) $(UNIX_OR_WIN32) '$(LN)'
+INSTALL_DESPATCH_clone_END = $(INSTALL_DESPATCH_opam_END)
 
 FLEXDLL_SUBMODULE_PRESENT := $(wildcard $(ROOTDIR)/flexdll/Makefile)
 
