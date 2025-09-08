@@ -30,6 +30,9 @@ Working version
   to reduce latent-garbage delay and therefore improve GC performance.
   (Stephen Dolan and Nick Barnes, review by KC Sivaramakrishnan)
 
+- #14123: Fix integer-overflow problems in heap compaction.
+  (Nick Barnes, review by Antonin Décimo).
+
 - #14035: Fix the alignment of _Atomic long long unsigned int fields
   before GCC 11.1 on i686. Silence GCC note on newer versions.
   (Antonin Décimo, review by Sadiq Jaffer)
