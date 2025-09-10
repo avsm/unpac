@@ -249,13 +249,12 @@ jobs:
         run: |
           DIR="$HOME/android/$TOOLDIR"
           set -x
-          # Hack around the fact that pthread_cancel isn't available on Android
-          # So the result program should _not_ be run with cleanup on exit
-          # (so no `c=1` in `OCAMLRUNPARAM`)
+          # `pthread_cancel` isn't available on Android, so the result
+          # program should _not_ be run with cleanup on exit (so no
+          # `c=1` in `OCAMLRUNPARAM`)
           ./configure --prefix="$HOME/cross" --target=$TARGET \
               TARGET_LIBDIR="/dummy/directory" \
               CC="$DIR/clang --target=$TARGET" \
-              CPPFLAGS='-Dpthread_cancel=assert' \
               AR="$DIR/llvm-ar" \
               PARTIALLD="$DIR/ld -r" \
               RANLIB="$DIR/llvm-ranlib" \

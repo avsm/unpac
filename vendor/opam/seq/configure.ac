@@ -2611,6 +2611,9 @@ AC_LINK_IFELSE(
     AC_DEFINE([HAS_BSD_GETAFFINITY_NP], [1])],
     [AC_MSG_RESULT([pthread_getaffinity_np not found])])])
 
+# pthread_cancel isn't implemented on Android Bionic libc
+AC_CHECK_FUNCS([pthread_cancel])
+
 ## prctl
 AC_CHECK_FUNCS(
   [prctl],
