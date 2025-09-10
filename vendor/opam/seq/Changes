@@ -224,6 +224,13 @@ Working version
   e.g. `< foo : int; .. as $0>` when $0 is introduced by a GADT constructor
   (Stefan Muenzel, review by Jacques Garrigue and Florian Angeletti)
 
+- #14225: do not raise unused-constructor warning on private
+  constructor in type implementations, for example
+  `type safe = private Safe`, which are typically used to
+  create new fresh/generative types (here `safe`) to be used
+  as GADT indices.
+  (Gabriel Scherer, review by Nicolás Ojeda Bär and Florian Angeletti,
+   report by Kate Deplaix)
 
 
 ### Internal/compiler-libs changes:
