@@ -263,7 +263,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: config
     container:
-      image: debian:12
+      image: debian:13
       options: --platform linux/i386 --user root
     steps:
       - name: OS Dependencies
