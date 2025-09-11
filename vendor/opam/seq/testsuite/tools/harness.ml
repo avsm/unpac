@@ -78,7 +78,7 @@ let files_for ?(source_and_cmi = true) mode name files =
   |> add_if source_and_cmi (name ^ ".ml")
 
 let fail_because fmt =
-  Format.ksprintf (fun s -> prerr_endline s; exit 1) fmt
+  Format.ksprintf (fun s -> flush stdout; prerr_endline s; exit 1) fmt
 
 (* ocamlc cannot be directly executed after renaming the prefix if native
    compilation is disabled (because ocamlc will be ocamlc.byte, since ocamlc.opt

@@ -35,7 +35,7 @@ let run config env =
   let exec_magic =
     Environment.run_process env ocamlrun ["-M"]
   in
-  let test_binary binary =
+  let test_binary failed binary =
     if String.starts_with ~prefix:"ocaml" binary
        || String.starts_with ~prefix:"flexlink" binary then
       let program = Filename.concat bindir binary in
@@ -64,7 +64,7 @@ let run config env =
                 Harness.fail_because "%s: expected only one line of output"
                                      program
               end;
-              let runtime =
+              let failed, runtime =
                 let compiled_by_boot_ocamlc =
                   let name =
                     if Filename.extension binary = ".exe" then
@@ -82,13 +82,13 @@ let run config env =
                       Harness.fail_because "%s: unexpected -custom runtime"
                                            program
                     else
-                      "compiled with -custom"
+                      failed, "compiled with -custom"
                 | Tendered {runtime; header; _} ->
-                    let is_expected_runtime =
+                    let expected_runtime =
                       if Sys.win32 then
-                        runtime = "ocamlrun"
+                        "ocamlrun"
                       else
-                        runtime = ocamlrun
+                        ocamlrun
                     in
                     let expected_launch_mode =
                       if Config.shebangscripts then
@@ -96,18 +96,29 @@ let run config env =
                       else
                         Header_exe
                     in
-                    if is_expected_runtime then
-                      if header = expected_launch_mode then
-                        runtime
+                    let pp_launch f = function
+                    | Header_shebang -> Format.pp_print_string f "shebang"
+                    | Header_exe -> Format.pp_print_string f "executable"
+                    in
+                    let check expected actual description print failed =
+                      if expected = actual then
+                        failed
                       else
-                        Harness.fail_because "%s: unexpected launch mode"
-                                             program
-                    else
-                      Harness.fail_because "%s: unexpected runtime %S"
-                                           program runtime
+                        Format.kfprintf (Fun.const true) Format.err_formatter
+                          "  *** Unexpected %s (Expected: %a; got %a)\n%!"
+                          description print expected print actual
+                    in
+                    let failed =
+                      failed
+                      |> check expected_runtime runtime
+                               "runtime" Format.pp_print_string
+                      |> check expected_launch_mode header
+                               "launch mode" pp_launch
+                    in
+                    failed, runtime
               in
               Printf.printf "  Runtime: %s\n  Output: %s\n" runtime output;
-              if Sys.win32 && Filename.extension binary = ".exe" then
+              if Sys.win32 && Filename.extension binary = ".exe" then begin
                 (* This additional part of the test ensures that the executable
                    launcher on Windows can correctly hand-over to ocamlrun on
                    Windows. The check is that a binary named ocamlc.byte.exe
@@ -143,10 +154,21 @@ let run config env =
                     else () (* Expected outcome was the exec magic number *)
                   else () (* Expected outcome is a zero exit code *)
                 else () (* Expected outcome is a non-zero exit code *)
+              end;
+              failed
           | _ ->
               if not fails then
                 Harness.fail_because "%s: not expected to have failed" program
+              else
+                failed
+        else
+          failed
+      else
+        failed
+    else
+      failed
   in
   let binaries = Sys.readdir bindir in
   Array.sort String.compare binaries;
-  Array.iter test_binary binaries
+  if Array.fold_left test_binary false binaries then
+    Harness.fail_because "Binaries didn't all match expectation"
