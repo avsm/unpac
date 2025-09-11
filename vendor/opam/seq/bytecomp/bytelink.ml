@@ -365,12 +365,19 @@ let find_bin_sh () =
   let output_file = Filename.temp_file "caml_bin_sh" "" in
   let result =
   try
-    let cmd =
-      Filename.quote_command ~stdout:output_file "command" ["-p"; "-v"; "sh"]
+    let run command args =
+      let cmd =
+        Filename.quote_command ~stdout:output_file command args
+      in
+      if !Clflags.verbose then
+        Printf.eprintf "+ %s\n" cmd;
+      (Sys.command cmd = 0)
     in
-    if !Clflags.verbose then
-      Printf.eprintf "+ %s\n" cmd;
-    if Sys.command cmd = 0 then
+    (* While [command -v] and [command -p] are long-standing Posix commands,
+       the ability to combine them as [command -p -v] is actually Posix Issue 7
+       and so of course Solaris does not support it *)
+    if run "command" ["-p"; "-v"; "sh"] ||
+       run "sh" ["-c"; "PATH=\"`getconf PATH`\" command -v sh"] then
       In_channel.with_open_text output_file input_line
     else
       ""
