@@ -1072,9 +1072,6 @@ AS_CASE([$target],
     [flexdll_chain='msvc64'
     flexlink_flags='-merge-manifest -stack 33554432'],
   [flexdll_chain=''])
-AS_IF([test -n "$FLEXLINKFLAGS"], [
-  flexlink_flags="${flexlink_flags:+$flexlink_flags }$FLEXLINKFLAGS"
-])
 
 AS_IF([test x"$supports_shared_libraries" != 'xfalse'], [
   AC_MSG_CHECKING([for flexdll sources])

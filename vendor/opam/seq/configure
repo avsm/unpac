@@ -15445,12 +15445,6 @@ case $target in #(
   *) :
     flexdll_chain='' ;;
 esac
-if test -n "$FLEXLINKFLAGS"
-then :
-
-  flexlink_flags="${flexlink_flags:+$flexlink_flags }$FLEXLINKFLAGS"
-
-fi
 
 if test x"$supports_shared_libraries" != 'xfalse'
 then :
