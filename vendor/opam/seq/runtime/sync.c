@@ -41,6 +41,7 @@ CAMLexport value caml_check_error_exn(int retcode, char const * msg)
   char * err = caml_strerror(retcode, buf, sizeof(buf));
   size_t msglen = strlen(msg);
   size_t errlen = strlen(err);
+  /* Never raises if msglen <= 1000 */
   value str = caml_alloc_string(msglen + 2 + errlen);
   memcpy (&Byte(str, 0), msg, msglen);
   memcpy (&Byte(str, msglen), ": ", 2);

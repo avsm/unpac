@@ -1333,8 +1333,8 @@ static void sync_result(value term_sync, value res)
   CAMLreturn0;
 }
 
-static void terminate_domain(struct domain_ml_values *ml_values,
-                             caml_result res)
+static void sync_and_terminate(struct domain_ml_values *ml_values,
+                               caml_result res)
 {
   /* Allocate the result value. */
   value v = make_finished(res);
@@ -1383,7 +1383,7 @@ static void* domain_thread_func(void* v)
 
   value exn = install_backup_thread_exn(domain_self);
   if (Is_exception_result(exn)) {
-    terminate_domain(ml_values, Result_exception(exn));
+    sync_and_terminate(ml_values, Result_exception(exn));
     goto out2;
   }
 
@@ -1393,7 +1393,7 @@ static void* domain_thread_func(void* v)
 
   exn = caml_domain_initialize_hook_exn();
   if (Is_exception_result(exn)) {
-    terminate_domain(ml_values, Result_exception(exn));
+    sync_and_terminate(ml_values, Result_exception(exn));
     goto out2;
   }
 
@@ -1402,7 +1402,7 @@ static void* domain_thread_func(void* v)
   value unrooted_callback = ml_values->callback;
   caml_modify_generational_global_root(&ml_values->callback, Val_unit);
   caml_result res = caml_callback_res(unrooted_callback, Val_unit);
-  terminate_domain(ml_values, res);
+  sync_and_terminate(ml_values, res);
   /* fall through */
 
  out2:
@@ -1410,11 +1410,11 @@ static void* domain_thread_func(void* v)
   caml_free_signal_stack(signal_stack);
  out1:
 #endif
-  /* [ml_values] must be freed after unlocking [mut]. This ensures
-     that [term_sync] is only removed from the root set after [mut] is
-     unlocked. Otherwise, there is a risk of [mut] being destroyed by
-     [caml_mutex_finalize] finaliser while it remains locked, leading
-     to undefined behaviour. */
+  /* [ml_values] must be freed after unlocking its [term_sync] mutex.
+     This ensures that the [term_sync] field is only removed from the
+     root set after the mutex is unlocked. Otherwise, there is a risk
+     of it being destroyed by [caml_mutex_finalize] while it remains
+     locked, leading to undefined behaviour. */
   free_domain_ml_values(ml_values);
   return NULL;
 }

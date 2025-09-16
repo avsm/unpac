@@ -689,7 +689,7 @@ static void thread_init_current(caml_thread_t th)
 {
   st_tls_set(caml_thread_key, th);
   restore_runtime_state(th);
-  /* FIXME: deal with errors */
+  /* FIXME: deal with NULL error case */
   th->signal_stack = caml_init_signal_stack();
 }
 
