@@ -1,12 +1,12 @@
-(lang dune 3.6)
+(lang dune 3.19)
 (name iomux)
 (generate_opam_files true)
 (source
- (github haesbaert/ocaml-iomux))
+ (github ocaml-multicore/ocaml-iomux))
 (authors "Christiano Haesbaert")
-(maintainers "Christiano Haesbaert")
+(maintainers "OCaml Multicore Team")
 (license ISC)
-(documentation https://haesbaert.github.io/ocaml-iomux)
+(documentation https://ocaml-multicore.github.io/ocaml-iomux)
 
 (package
  (name iomux)

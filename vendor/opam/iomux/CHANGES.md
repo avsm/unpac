@@ -2,6 +2,7 @@
 
 * Clamp max open files to 2^19, as macOS sometimes returns
   2^32-1 (#7 @avsm).
+* Upgrade to dune 3.19 and move to ocaml-multicore organisation (@avsm).
 
 ## v0.3 (2023-03-10)
 

@@ -3,16 +3,16 @@ opam-version: "2.0"
 synopsis: "IO Multiplexer bindings"
 description:
   "Low level bindings for Unix IO Multiplexers (poll/ppoll/kevent/epoll)"
-maintainer: ["Christiano Haesbaert"]
+maintainer: ["OCaml Multicore Team"]
 authors: ["Christiano Haesbaert"]
 license: "ISC"
 tags: ["io" "multiplexing" "poll" "ppoll" "epoll" "kevent" "kqueue"]
-homepage: "https://github.com/haesbaert/ocaml-iomux"
-doc: "https://haesbaert.github.io/ocaml-iomux"
-bug-reports: "https://github.com/haesbaert/ocaml-iomux/issues"
+homepage: "https://github.com/ocaml-multicore/ocaml-iomux"
+doc: "https://ocaml-multicore.github.io/ocaml-iomux"
+bug-reports: "https://github.com/ocaml-multicore/ocaml-iomux/issues"
 depends: [
   "ocaml" {>= "4.08"}
-  "dune" {>= "3.6"}
+  "dune" {>= "3.19"}
   "dune-configurator"
   "alcotest" {with-test}
   "odoc" {with-doc}
@@ -31,4 +31,5 @@ build: [
     "@doc" {with-doc}
   ]
 ]
-dev-repo: "git+https://github.com/haesbaert/ocaml-iomux.git"
+dev-repo: "git+https://github.com/ocaml-multicore/ocaml-iomux.git"
+x-maintenance-intent: ["(latest)"]
