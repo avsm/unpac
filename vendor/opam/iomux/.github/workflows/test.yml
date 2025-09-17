@@ -9,17 +9,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ocaml-version: ["5.0.0", "4.14.1", "4.13.1", "4.12.1", "4.11.2", "4.10.2", "4.09.1", "4.08.1"]
+        ocaml-version: ["5.3.0", "4.14.2"]
         operating-system: [macos-latest, ubuntu-latest]
 
     runs-on: ${{ matrix.operating-system }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v5
 
       - name: Use OCaml ${{ matrix.ocaml-version }}
-        uses: ocaml/setup-ocaml@v2
+        uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: ${{ matrix.ocaml-version }}
 
