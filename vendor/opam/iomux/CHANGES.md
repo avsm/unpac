@@ -1,7 +1,7 @@
-## v0.4
+## v0.4 (2025-09-17)
 
 * Clamp max open files to 2^19, as macOS sometimes returns
-  2^32-1.
+  2^32-1 (#7 @avsm).
 
 ## v0.3 (2023-03-10)
 
@@ -11,9 +11,9 @@
 
 ## v0.2 (2023-02-27)
 
-* Narrowed the type of Util.fd_of_unix (@reynir)
-* Use older school uerror instead of caml_uerror (@reynir)
-* Added c_standard to dune build flags (@reynir)
+* Narrowed the type of `Util.fd_of_unix` (@reynir)
+* Use older school uerror instead of `caml_uerror` (@reynir)
+* Added `c_standard` to dune build flags (@reynir)
 * Addded ppoll(2) discoverability and a mini compat layer (@haesbaert)
 * Improved tests (@haesbaert)
 * Re-added macos support (@haesbaert)
