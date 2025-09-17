@@ -209,6 +209,10 @@ Working version
   environments.
   (Yukai Chou, review by Nicolás Ojeda Bär)
 
+- #14248: Added documentation about the way `Domain.join` triggers a
+  `Thread.join` on the domain's systhreads.
+  (Raphaël Proust, review by Gabriel Scherer)
+
 ### Compiler user-interface and warnings:
 
 - #12628: Improved error message for unsafe values: print out the full path for
