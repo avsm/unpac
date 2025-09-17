@@ -1,5 +1,5 @@
 module Raw = struct
-  external max_open_files : unit -> int = "caml_iomux_poll_max_open_files" [@@noalloc]
+  external max_open_files : unit -> int = "caml_iomux_poll_max_open_files"
 end
 
 let max_open_files = Raw.max_open_files

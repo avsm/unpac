@@ -150,8 +150,14 @@ caml_iomux_poll_get_fd(value v_fds, value v_index)
  * Util
  */
 
-value /* noalloc */
+value
 caml_iomux_poll_max_open_files(value v_unit)
 {
-	return (Val_int(sysconf(_SC_OPEN_MAX)));
+        CAMLparam1(v_unit);
+        long r = sysconf(_SC_OPEN_MAX);
+        if (r == -1) /* this allocs */
+                uerror("poll_max_open_files", Nothing);
+        else if (r > 524288)
+                r = 524288;
+	CAMLreturn (Val_int(r));
 }
