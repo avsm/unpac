@@ -209,7 +209,7 @@ and transl_exp0 ~in_new_scope ~scopes e =
       transl_ident (of_location ~scopes e.exp_loc)
         e.exp_env e.exp_type path desc
   | Texp_constant cst ->
-      Lconst(Const_base cst)
+      Lambda.lambda_of_const cst
   | Texp_let(rec_flag, pat_expr_list, body) ->
       transl_let ~scopes rec_flag pat_expr_list
         (event_before ~scopes body (transl_exp ~scopes body))

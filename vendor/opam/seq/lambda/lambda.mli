@@ -386,6 +386,8 @@ val const_unit: structured_constant
 val const_int : int -> structured_constant
 val lambda_unit: lambda
 
+val lambda_of_const : Asttypes.constant -> lambda
+
 (** [dummy_constant] produces a plecholder value with a recognizable
     bit pattern (currently 0xBBBB in its tagged form) *)
 val dummy_constant: lambda

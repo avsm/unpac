@@ -2575,7 +2575,7 @@ let rec do_tests_fail loc fail tst arg = function
   | [] -> fail
   | (c, act) :: rem ->
       Lifthenelse
-        ( Lprim (tst, [ arg; Lconst (Const_base c) ], loc),
+        ( Lprim (tst, [ arg; lambda_of_const c ], loc),
           do_tests_fail loc fail tst arg rem,
           act )
 
@@ -2584,7 +2584,7 @@ let rec do_tests_nofail loc tst arg = function
   | [ (_, act) ] -> act
   | (c, act) :: rem ->
       Lifthenelse
-        ( Lprim (tst, [ arg; Lconst (Const_base c) ], loc),
+        ( Lprim (tst, [ arg; lambda_of_const c ], loc),
           do_tests_nofail loc tst arg rem,
           act )
 
@@ -2605,7 +2605,7 @@ let make_test_sequence loc fail tst lt_tst arg const_lambda_list =
       rev_split_at (List.length const_lambda_list / 2) const_lambda_list
     in
     Lifthenelse
-      ( Lprim (lt_tst, [ arg; Lconst (Const_base (fst (List.hd list2))) ], loc),
+      ( Lprim (lt_tst, [ arg; lambda_of_const (fst (List.hd list2)) ], loc),
         make_test_sequence list1,
         make_test_sequence list2 )
   in

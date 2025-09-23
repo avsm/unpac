@@ -375,6 +375,16 @@ let const_unit = const_int 0
 
 let dummy_constant = Lconst (const_int (0xBBBB / 2))
 
+let lambda_of_const (c : Asttypes.constant) =
+  match c with
+  | Const_int n -> Lconst (Const_base (Const_int n))
+  | Const_char c -> Lconst (Const_base (Const_char c))
+  | Const_float f -> Lconst (Const_base (Const_float f))
+  | Const_int32 n -> Lconst (Const_base (Const_int32 n))
+  | Const_int64 n -> Lconst (Const_base (Const_int64 n))
+  | Const_nativeint n -> Lconst (Const_base (Const_nativeint n))
+  | Const_string (s, _, _) -> Lconst (Const_immstring s)
+
 let max_arity () =
   if !Clflags.native_code then 126 else max_int
   (* 126 = 127 (the maximal number of parameters supported in C--)
