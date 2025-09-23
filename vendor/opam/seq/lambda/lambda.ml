@@ -214,6 +214,14 @@ let equal_value_kind x y =
   | (Pgenval | Pfloatval | Pboxedintval _ | Pintval), _ -> false
 
 
+type constant =
+    Const_int of int
+  | Const_char of char
+  | Const_float of string
+  | Const_int32 of int32
+  | Const_int64 of int64
+  | Const_nativeint of nativeint
+
 type structured_constant =
     Const_base of constant
   | Const_block of int * structured_constant list
@@ -444,8 +452,6 @@ let make_key e =
         try Ident.find_same id env
         with Not_found -> e
       end
-    | Lconst (Const_base (Const_string (s, _, _))) ->
-        Lconst (Const_base (Const_string (s, Location.none, None)))
     | Lconst _ -> e
     | Lapply ap ->
         Lapply {ap with ap_func = tr_rec env ap.ap_func;

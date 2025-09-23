@@ -914,8 +914,6 @@ let rec close ({ backend; fenv; cenv ; mutable_vars } as env) lam =
             str (Uconst_float_array (List.map float_of_string sl))
         | Const_immstring s ->
             str (Uconst_string s)
-        | Const_base (Const_string (s, _, _)) ->
-            str (Uconst_string s)
         | Const_base(Const_float x) -> str (Uconst_float (float_of_string x))
         | Const_base(Const_int32 x) -> str (Uconst_int32 x)
         | Const_base(Const_int64 x) -> str (Uconst_int64 x)

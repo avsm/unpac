@@ -3105,12 +3105,12 @@ let combine_constant loc arg cst partial ctx def
     (const_lambda_list, total, _pats) =
   let fail, local_jumps = mk_failaction_neg partial ctx def in
   let lambda1 =
-    match cst with
+    match (cst : Asttypes.constant) with
     | Const_int _ ->
         let int_lambda_list =
           List.map
             (function
-              | Const_int n, l -> (n, l)
+              | Asttypes.Const_int n, l -> (n, l)
               | _ -> assert false)
             const_lambda_list
         in
@@ -3119,7 +3119,7 @@ let combine_constant loc arg cst partial ctx def
         let int_lambda_list =
           List.map
             (function
-              | Const_char c, l -> (Char.code c, l)
+              | Asttypes.Const_char c, l -> (Char.code c, l)
               | _ -> assert false)
             const_lambda_list
         in

@@ -207,7 +207,6 @@ const char * const caml_names_of_builtin_cprim[] = {
 let rec transl_const = function
     Const_base(Const_int i) -> Obj.repr i
   | Const_base(Const_char c) -> Obj.repr c
-  | Const_base(Const_string (s, _, _)) -> Obj.repr s
   | Const_base(Const_float f) -> Obj.repr (float_of_string f)
   | Const_base(Const_int32 i) -> Obj.repr i
   | Const_base(Const_int64 i) -> Obj.repr i
