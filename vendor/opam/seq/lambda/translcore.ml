@@ -69,7 +69,7 @@ let transl_extension_constructor ~scopes env path ext =
   match ext.ext_kind with
     Text_decl _ ->
       Lprim (Pmakeblock (Obj.object_tag, Immutable, None),
-        [Lconst (Const_base (Const_string (name, ext.ext_loc, None)));
+        [Lconst (Const_immstring name);
          Lprim (prim_fresh_oo_id, [Lconst (const_int 0)], loc)],
         loc)
   | Text_rebind(path, _lid) ->
@@ -122,7 +122,7 @@ let assert_failed loc ~scopes exp =
     (Lprim(Pmakeblock(0, Immutable, None),
           [slot;
            Lconst(Const_block(0,
-              [Const_base(Const_string (fname, exp.exp_loc, None));
+              [Const_immstring fname;
                Const_base(Const_int line);
                Const_base(Const_int char)]))], loc))], loc)
 

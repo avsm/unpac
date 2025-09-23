@@ -238,7 +238,7 @@ let init () =
       let c = slot_for_setglobal global in
       let cst = Const_block
           (Obj.object_tag,
-           [Const_base(Const_string (name, Location.none,None));
+           [Const_immstring name;
             Const_base(Const_int (-i-1))
            ])
       in

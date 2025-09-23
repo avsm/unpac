@@ -4010,7 +4010,7 @@ let failure_handler ~scopes loc ~failer () =
                 Lconst
                   (Const_block
                      ( 0,
-                       [ Const_base (Const_string (fname, loc, None));
+                       [ Const_immstring fname;
                          Const_base (Const_int line);
                          Const_base (Const_int char)
                        ] ))
