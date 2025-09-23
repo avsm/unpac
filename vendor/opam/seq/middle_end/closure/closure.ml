@@ -905,8 +905,8 @@ let rec close ({ backend; fenv; cenv ; mutable_vars } as env) lam =
         Uconst_ref (name, Some cst)
       in
       let rec transl = function
-        | Const_base(Const_int n) -> Uconst_int n
-        | Const_base(Const_char c) -> Uconst_int (Char.code c)
+        | Const_int n -> Uconst_int n
+        | Const_char c -> Uconst_int (Char.code c)
         | Const_block (tag, fields) ->
             str (Uconst_block (tag, List.map transl fields))
         | Const_float_array sl ->
@@ -914,10 +914,10 @@ let rec close ({ backend; fenv; cenv ; mutable_vars } as env) lam =
             str (Uconst_float_array (List.map float_of_string sl))
         | Const_immstring s ->
             str (Uconst_string s)
-        | Const_base(Const_float x) -> str (Uconst_float (float_of_string x))
-        | Const_base(Const_int32 x) -> str (Uconst_int32 x)
-        | Const_base(Const_int64 x) -> str (Uconst_int64 x)
-        | Const_base(Const_nativeint x) -> str (Uconst_nativeint x)
+        | Const_float x -> str (Uconst_float (float_of_string x))
+        | Const_int32 x -> str (Uconst_int32 x)
+        | Const_int64 x -> str (Uconst_int64 x)
+        | Const_nativeint x -> str (Uconst_nativeint x)
       in
       make_const (transl cst)
   | Lfunction funct ->

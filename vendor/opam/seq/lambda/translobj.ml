@@ -43,12 +43,12 @@ let method_cache = ref lambda_unit
 let method_count = ref 0
 let method_table = ref []
 
-let meth_tag s = Lconst(Const_base(Const_int(Btype.hash_variant s)))
+let meth_tag s = Lconst(Const_int(Btype.hash_variant s))
 
 let next_cache tag =
   let n = !method_count in
   incr method_count;
-  (tag, [!method_cache; Lconst(Const_base(Const_int n))])
+  (tag, [!method_cache; Lconst(Const_int n)])
 
 let rec is_path = function
     Lvar _ | Lprim (Pgetglobal _, [], _) | Lconst _ -> true
@@ -81,7 +81,7 @@ let reset_labels () =
 
 (* Insert labels *)
 
-let int n = Lconst (Const_base (Const_int n))
+let int n = Lconst (Const_int n)
 
 let prim_makearray =
   Primitive.simple ~name:"caml_array_make" ~arity:2 ~alloc:true

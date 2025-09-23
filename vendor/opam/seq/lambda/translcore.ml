@@ -84,7 +84,7 @@ let extract_constant = function
   | _ -> raise Not_constant
 
 let extract_float = function
-    Const_base(Const_float f) -> f
+    Const_float f -> f
   | _ -> fatal_error "Translcore.extract_float"
 
 (* Insertion of debugging events *)
@@ -123,8 +123,8 @@ let assert_failed loc ~scopes exp =
           [slot;
            Lconst(Const_block(0,
               [Const_immstring fname;
-               Const_base(Const_int line);
-               Const_base(Const_int char)]))], loc))], loc)
+               Const_int line;
+               Const_int char]))], loc))], loc)
 
 (* In cases where we're careful to preserve syntactic arity, we disable
    the arity fusion attempted by simplif.ml *)
@@ -1082,7 +1082,7 @@ and transl_atomic_loc ~scopes arg lbl =
           "Translcore.transl_atomic_loc: atomic field in unboxed record"
     | Record_extension _ -> 1
   in
-  let lbl = Lconst (Const_base (Const_int (lbl.lbl_pos + offset))) in
+  let lbl = Lconst (Const_int (lbl.lbl_pos + offset)) in
   (arg, lbl)
 
 and transl_match ~scopes e arg pat_expr_list partial =
@@ -1245,7 +1245,7 @@ and transl_handler ~scopes e body val_caselist exn_caselist eff_caselist =
        (lfunction ~kind:Curried ~params:[param, Pgenval] ~return:Pgenval
                   ~attr:default_function_attribute ~loc:Loc_unknown
                   ~body,
-        Lconst(Const_base(Const_int 0)))
+        Lconst(Const_int 0))
   in
   let alloc_stack =
     Lprim(prim_alloc_stack, [val_fun; exn_fun; eff_fun], Loc_unknown)

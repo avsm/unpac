@@ -213,16 +213,13 @@ val equal_value_kind : value_kind -> value_kind -> bool
 
 val equal_boxed_integer : boxed_integer -> boxed_integer -> bool
 
-type constant =
+type structured_constant =
     Const_int of int
   | Const_char of char
   | Const_float of string
   | Const_int32 of int32
   | Const_int64 of int64
   | Const_nativeint of nativeint
-
-type structured_constant =
-    Const_base of constant
   | Const_block of int * structured_constant list
   | Const_float_array of string list
   | Const_immstring of string
