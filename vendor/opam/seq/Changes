@@ -372,6 +372,10 @@ Working version
   in an unbounded number of labeled or optional arguments.
   (Stefan Muenzel, report by Samuel Vivien, review by Florian Angeletti)
 
+- #14255: Fix TSan bug with C calls that take many arguments
+  (Olivier Nicole and Miod Vallat, report by Nathan Taylor, review by Gabriel
+   Scherer)
+
 - #14230 : ocamltest fails to link test program with -custom in some cases
   (Damien Doligez, review by David Allsopp)
 
