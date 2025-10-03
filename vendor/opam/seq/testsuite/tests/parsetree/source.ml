@@ -7493,8 +7493,11 @@ let mmod = M.\#mod
 type tmod = M.\#mod
 type tlet = M.\#let
 type ttrue = M.\#true
+type t = { \#mod:int }
+let f ({\#mod=_} as x) = x.\#mod, {\#mod}
+let f x = x#\#mod
 
-class \#mod = object end
+class \#mod = object val mutable \#mod=0  method \#mod = \#mod<- 1; (mod) end
 let f: #M.\#mod -> _ =  new \#mod, new M.\#mod
 
 class type \#mod = object end
