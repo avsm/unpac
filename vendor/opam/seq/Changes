@@ -349,6 +349,9 @@ Working version
   the printed source wherever possible.
   (Florian Angeletti, review by Gabriel Scherer)
 
+- #14287: Bugfix for GC root mishandling in memprof.c
+  (Stephen Dolan, review by Leo White)
+
 OCaml 5.4.0
 ---------------
 
