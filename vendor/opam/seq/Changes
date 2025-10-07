@@ -345,6 +345,10 @@ Working version
 - #14230 : ocamltest fails to link test program with -custom in some cases
   (Damien Doligez, review by David Allsopp)
 
+- #14279: -dsource, preserve (mod) and other escaped infix keyword operators in
+  the printed source wherever possible.
+  (Florian Angeletti, review by Gabriel Scherer)
+
 OCaml 5.4.0
 ---------------
 
