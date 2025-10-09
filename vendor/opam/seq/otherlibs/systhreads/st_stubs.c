@@ -82,8 +82,8 @@ SetThreadDescription(HANDLE hThread, PCWSTR lpThreadDescription);
 #include "caml/memprof.h"
 
 /* "caml/threads.h" is *not* included since it contains the _external_
-   declarations for the caml_c_thread_register and caml_c_thread_unregister
-   functions. */
+   declarations for the caml_c_thread_register, caml_c_thread_register_in_domain
+   and caml_c_thread_unregister functions. */
 
 /* Max computation time before rescheduling, in milliseconds */
 #define Thread_timeout_msec 50
@@ -449,9 +449,12 @@ static caml_thread_t thread_alloc_and_add(void)
    and free its resources. */
 static void thread_remove_and_free(caml_thread_t th)
 {
-  if (th->next == th)
-    reset_active(); /* last OCaml thread exiting */
-  else if (Active_thread == th)
+  /* The main domain thread does not go through
+     [thread_remove_and_free]. There is always one more thread in
+     the chain at this point in time. */
+  CAMLassert(th->next != th);
+
+  if (Active_thread == th)
     restore_runtime_state(th->next); /* PR#5295 */
   th->next->prev = th->prev;
   th->prev->next = th->next;
@@ -532,6 +535,11 @@ static void caml_thread_domain_stop_hook(void) {
     while (Active_thread->next != Active_thread) {
       caml_thread_join(Active_thread->next->descr);
     }
+
+    /* Note: The rest of this function must not release the domain/thread lock:
+     * The domain has joined with all active threads and no new ones
+     * may be allowed to register at this point.
+     */
 
     /* another domain thread may be joining on this domain's descriptor */
     caml_threadstatus_terminate(Terminated(Active_thread->descr));
@@ -668,10 +676,6 @@ static void thread_detach_from_runtime(void)
 {
   caml_thread_t th = This_thread;
   CAMLassert(th == Active_thread);
-  /* The main domain thread does not go through
-     [thread_detach_from_runtime]. There is always one more thread in
-     the chain at this point in time. */
-  CAMLassert(th->next != th);
   /* Signal that the thread has terminated */
   caml_threadstatus_terminate(Terminated(th->descr));
   /* Undo thread_init_current */
@@ -830,22 +834,42 @@ CAMLprim value caml_thread_new(value clos)
 
 /* Register a thread already created from C */
 
-#define Dom_c_threads 0
-
-/* the thread lock is not held when entering */
-CAMLexport int caml_c_thread_register(void)
+/* Once the domain/thread lock for the given domain index has been taken,
+ * the unique ID of that domain index will be compared to [expected_unique_id].
+ * If they are different, the function will return with error code 0. */
+/* The thread lock is not held when entering */
+int caml_c_thread_register_in_domain_index(uintnat domain_index,
+                                           uintnat expected_unique_id)
 {
   /* Systhreads initialized? */
   if (!threads_initialized) return 0;
   /* Already registered? */
   if (This_thread != NULL) return 0;
+  /* Has the domain never been initialized? */
+  st_masterlock *m = Thread_lock(domain_index);
+  if (!m->init) return 0;
 
   /* At this point we should not hold any domain lock */
   CAMLassert(Caml_state_opt == NULL);
 
   /* Acquire lock of domain */
-  caml_init_domain_self(Dom_c_threads);
-  thread_lock_acquire(Dom_c_threads);
+  caml_init_domain_self(domain_index);
+  thread_lock_acquire(domain_index);
+
+  /* Check that domain is currently active */
+  if (Active_thread == NULL) goto out_err;
+  /* Check that domain unique ID is as expected:
+     - We got the domain we requested (given the inherently racy
+       nature of [caml_find_index_of_running_domain]).
+     - We were not previously registered on a different domain (to
+       allow C programs to store domain-specific data in thread-local
+       storage) */
+  static _Thread_local uintnat previous_domain_id = -1;
+  if (Caml_state->unique_id != expected_unique_id ||
+      (previous_domain_id != -1 &&
+       previous_domain_id != expected_unique_id)) {
+      goto out_err;
+  }
 
   /* Create tick thread if not already done */
   st_retcode err = create_tick_thread();
@@ -862,6 +886,8 @@ CAMLexport int caml_c_thread_register(void)
   if (Is_exception_result(res)) goto out_err2;
   th->descr = res;
 
+  previous_domain_id = expected_unique_id;
+
   /* Release the domain lock the regular way. Note: we cannot receive
      an exception here. */
   caml_enter_blocking_section_no_pending();
@@ -871,13 +897,24 @@ CAMLexport int caml_c_thread_register(void)
   thread_destroy_current(th);
   thread_remove_and_free(th);
  out_err:
-  thread_lock_release(Dom_c_threads);
+  thread_lock_release(domain_index);
   /* Note: we cannot raise an exception here. */
   return 0;
 }
 
+CAMLexport int caml_c_thread_register_in_domain(uintnat dom_unique_id) {
+  intnat domain_index = caml_find_index_of_running_domain(dom_unique_id);
+  if (domain_index < 0) return 0;
+
+  return caml_c_thread_register_in_domain_index(domain_index, dom_unique_id);
+}
+
+CAMLexport int caml_c_thread_register(void) {
+  return caml_c_thread_register_in_domain_index(0L, 0L);
+}
+
 /* Unregister a thread that was created from C and registered with
-   the function above */
+   the two functions above */
 
 /* the thread lock is not held when entering */
 CAMLexport int caml_c_thread_unregister(void)
