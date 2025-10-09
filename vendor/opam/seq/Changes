@@ -72,6 +72,14 @@ Working version
   (Guillaume Munch-Maccagnoni, review by Gabriel Scherer, B. Szilvasy,
    Miod Vallat)
 
+- #14275: Add function caml_c_thread_register_in_domain, which makes it
+  possible to register "C threads" in another domain than 0 (which is
+  what caml_c_thread_register does). The function takes a domain unique
+  ID in which to register the thread. The domain must be running
+  when the function is called.
+  (Jack Nørskov Jørgensen, review by Gabriel Scherer,
+   Guillaume Munch-Maccagnoni)
+
 ### Code generation and optimizations:
 
 ### Standard library:
