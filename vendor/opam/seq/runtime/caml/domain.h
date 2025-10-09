@@ -92,6 +92,11 @@ CAMLextern uintnat caml_minor_heap_max_wsz;
 
 CAMLextern atomic_uintnat caml_num_domains_running;
 
+/*  Given domain unique id, return the index of the domain.
+ *  If the domain unique id is unknown, return -1.
+*/
+CAMLextern intnat caml_find_index_of_running_domain(uintnat dom_unique_id);
+
 /* When [caml_domain_alone()] is true, there is a single domain
    running. In particular, if the test passes while holding the domain
    lock, then we know that no other domain is running concurrently,

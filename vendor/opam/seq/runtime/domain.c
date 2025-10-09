@@ -166,7 +166,8 @@ struct interruptor {
   int running;
   int terminating;
   /* unlike the domain ID, this ID number is not reused */
-  uintnat unique_id;
+  /* Synchronised with [caml_find_index_of_running_domain] */
+  atomic_uintnat unique_id;
 
   /* indicates whether there is an interrupt pending */
   atomic_uintnat interrupt_pending;
@@ -1956,6 +1957,29 @@ void caml_interrupt_all_signal_safe(void)
     if (interrupt_word == NULL) return;
     interrupt_domain(&d->interruptor);
   }
+}
+
+/*  This function can be called from arbitrary code, possibly running
+    concurrently with the OCaml runtime, as long as it synchronized
+    with the runtime startup which initialized [all_domains] and
+    [caml_params].
+    Returns [-1] on failure -- if the provided unique id is
+    not assigned to a currently-running domain.
+*/
+intnat caml_find_index_of_running_domain(uintnat dom_unique_id)
+{
+  for (int i = 0; i < caml_params->max_domains; i++) {
+    dom_internal *d = &all_domains[i];
+
+    /* See [caml_interrupt_all_signal_safe] above for synchronization
+       and early-exit comments. */
+    atomic_uintnat * interrupt_word =
+      atomic_load_acquire(&d->interruptor.interrupt_word);
+    if (interrupt_word == NULL) return -1;
+
+    if (d->interruptor.unique_id == dom_unique_id) return i;
+  }
+  return -1;
 }
 
 /* To avoid any risk of forgetting an action through a race,
