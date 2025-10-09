@@ -15,7 +15,7 @@ Working version
   (Nicolás Ojeda Bär, review by Gabriel Scherer)
 
 - #14029: Recognize `%identity` as nonexpansive
-  (Stephen Dolan and Olivier Nicole, review by Hugo Heuzard, Jacques Guarrigue,
+  (Stephen Dolan and Olivier Nicole, review by Hugo Heuzard, Jacques Garrigue,
   Jeremy Yallop,  and Gabriel Scherer)
 
 * #13712: Introduce a new kind `Type_external` and syntax
@@ -24,7 +24,14 @@ Working version
   past behavior of discriminating abstract types defined in the current module.
   (Takafumi Saikawa, Jacques Garrigue, review by Richard Eisenberg)
 
+- #13806 Enable the use of function parameters with polymorphic types.
+  (Ulysse Gérard, Leo White, review by Florian Angeletti, Samuel Vivien, Gabriel
+  Scherer and Jacques Garrigue)
+
 ### Runtime system:
+
+- #13616: Change free list representation in shared heap
+  (Sadiq Jaffer, review by Damien Doligez)
 
 - #13580: Introduce sweep-only phase at start of major GC cycle,
   to reduce latent-garbage delay and therefore improve GC performance.
@@ -58,10 +65,6 @@ Working version
   reported as being per-domain.
   (Tim McGilchrist, review by Nick Barnes, Sadiq Jaffer and
   Gabriel Scherer)
-
-- #14238: Fix certain variadic macros in misc.h which could trigger C warnings
-  under certain conditions.
-  (Antonin Décimo, review by Nicolás Ojeda Bär)
 
 - #12269, #12410, #13063: Fix unsafety, deadlocks, and/or leaks should
   rare errors happen during domain creation and thread
@@ -190,6 +193,10 @@ Working version
 
 ### Manual and documentation:
 
+- #13747: Document support for native debugging with GDB and LLDB.
+   (Tim McGilchrist, review by Daniel Bünzli, Samuel Hym, Olivier Nicole
+   and Antonin Décimo)
+
 * #13975: documented the `[@remove_aliases]` built-in attribute for signatures
   (introduced by #1652 in 2018). Small refactor of the code that fetches the
   attribute.
@@ -311,6 +318,13 @@ Working version
 
 ### Bug fixes:
 
+- #14065: Fix function signature mismatch of `__tsan_func_exit` with GCC 15.
+  Check in the configure step if the TSan provided internal builtins are the
+  same as what we expect, introduce `caml_tsan_*` wrappers for the `__tsan_*`
+  functions we use.
+  (Hari Hara Naveen S, report by Hari Hara Naveen S,
+  review by Gabriel Scherer, Antonin Décimo, Olivier Nicole)
+
 - #14071: Fix exception name in Dynlink.Error printer.
   (Etienne Millon, review by Nicolás Ojeda Bär)
 
@@ -338,10 +352,6 @@ Working version
   in an unbounded number of labeled or optional arguments.
   (Stefan Muenzel, report by Samuel Vivien, review by Florian Angeletti)
 
-- #14061, #14209: fix a memory-ordering bug in Weak.set that could
-  result in uninitialized memory seen by Weak.get on another domain.
-  (Damien Doligez, review by Gabriel Scherer)
-
 - #14230 : ocamltest fails to link test program with -custom in some cases
   (Damien Doligez, review by David Allsopp)
 
@@ -349,11 +359,8 @@ Working version
   the printed source wherever possible.
   (Florian Angeletti, review by Gabriel Scherer)
 
-- #14287: Bugfix for GC root mishandling in memprof.c
-  (Stephen Dolan, review by Leo White)
-
-OCaml 5.4.0
----------------
+OCaml 5.4.0 (9 October 2025)
+----------------------------
 
 (Changes that can break existing programs are marked with a "*")
 
@@ -381,10 +388,6 @@ OCaml 5.4.0
     `Atomic.Loc.fetch_and_add [%atomic.loc data.readers] 1`
   (Clément Allain and Gabriel Scherer, review by KC Sivaramakrishnan,
    Basile Clément and Olivier Nicole)
-
-- #13806 Enable the use of function parameters with polymorphic types.
-  (Ulysse Gérard, Leo White, review by Florian Angeletti, Samuel Vivien, Gabriel
-  Scherer and Jacques Garrigue)
 
 ### Standard library:
 
@@ -525,6 +528,7 @@ OCaml 5.4.0
   (Tim McGilchrist, review by Nick Barnes, Antonin Décimo,
    Stephen Dolan and Miod Vallat)
 
+
 - #13675: Make Unix.map_file memory show up in Gc.Memprof.
   (Stephen Dolan, review by Guillaume Munch-Maccagnoni and Gabriel Scherer)
 
@@ -544,9 +548,6 @@ OCaml 5.4.0
   returning of NULL (the behaviour of caml_stat_strdup_to_os was inconsistent
   between Unix/Windows).
   (David Allsopp, review by Nick Barnes, Antonin Décimo and Miod Vallat)
-
-- #13616: Change free list representation in shared heap
-  (Sadiq Jaffer, review by Damien Doligez)
 
 - #13352: Concurrency refactors and cleanups.
   (Antonin Décimo, review by Gabriel Scherer, David Allsopp, and Miod Vallat)
@@ -763,10 +764,6 @@ OCaml 5.4.0
   Before, it was succeeding with `module N : sig module type T end`, now it
   fails. Similarly for anonymous functor calls (of the form `F(struct ... end))
   (Clement Blaudeau, review by Gabriel Scherer)
-
-- #13747: Document support for native debugging with GDB and LLDB.
-   (Tim McGilchrist, review by Daniel Bünzli, Samuel Hym, Olivier Nicole
-   and Antonin Décimo)
 
 ### Compiler user-interface and warnings:
 
@@ -1099,10 +1096,21 @@ OCaml 5.4.0
 - #14200, #14202 : bad variance check with private aliases
   (Jacques Garrigue, report and review by Stephen Dolan)
 
+- #14061, #14209: fix a memory-ordering bug in Weak.set that could
+  result in uninitialized memory seen by Weak.get on another domain.
+  (Damien Doligez, review by Gabriel Scherer)
+
 - #14214, #14221: fix a confused error message for module inclusions,
   functor error messages were missing some type equalities potentially leading
   to nonsensical "type t is not compatible with type t" submessage
   (Florian Angeletti, report by Basile Clément, review by Gabriel Scherer)
+
+- #14238: Fix certain variadic macros in misc.h which could trigger C warnings
+  under certain conditions in prerelease versions of OCaml 5.4.
+  (Antonin Décimo, review by Nicolás Ojeda Bär)
+
+- #14287: Bugfix for GC root mishandling in memprof.c
+  (Stephen Dolan, review by Leo White)
 
 OCaml 5.3.0 (8 January 2025)
 ----------------------------
@@ -2498,13 +2506,6 @@ OCaml 5.2.0 (13 May 2024)
   (Antonin Décimo, review by Miod Vallat and Sébastien Hinderer)
 
 ### Bug fixes:
-
-- #14065: Fix function signature mismatch of `__tsan_func_exit` with GCC 15.
-  Check in the configure step if the TSan provided internal builtins are the
-  same as what we expect, introduce `caml_tsan_*` wrappers for the `__tsan_*`
-  functions we use.
-  (Hari Hara Naveen S, report by Hari Hara Naveen S,
-  review by Gabriel Scherer, Antonin Décimo, Olivier Nicole)
 
 - #10652, #12720: fix evaluation order in presence of optional arguments
   (Jacques Garrigue, report by Leo White, review by Vincent Laviron)
