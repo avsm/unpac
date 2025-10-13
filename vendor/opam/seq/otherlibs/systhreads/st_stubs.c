@@ -864,12 +864,7 @@ int caml_c_thread_register_in_domain_index(uintnat domain_index,
      - We were not previously registered on a different domain (to
        allow C programs to store domain-specific data in thread-local
        storage) */
-  static _Thread_local uintnat previous_domain_id = -1;
-  if (Caml_state->unique_id != expected_unique_id ||
-      (previous_domain_id != -1 &&
-       previous_domain_id != expected_unique_id)) {
-      goto out_err;
-  }
+  if (!caml_thread_running_on_expected_domain(expected_unique_id)) goto out_err;
 
   /* Create tick thread if not already done */
   st_retcode err = create_tick_thread();
@@ -886,7 +881,7 @@ int caml_c_thread_register_in_domain_index(uintnat domain_index,
   if (Is_exception_result(res)) goto out_err2;
   th->descr = res;
 
-  previous_domain_id = expected_unique_id;
+  caml_thread_record_domain_id(expected_unique_id);
 
   /* Release the domain lock the regular way. Note: we cannot receive
      an exception here. */

@@ -367,6 +367,21 @@ CAMLexport caml_domain_state* caml_get_domain_state(void)
 }
 #endif
 
+static CAMLthread_local uintnat previous_domain_id = -1;
+
+CAMLexport
+bool caml_thread_running_on_expected_domain(uintnat expected_unique_id)
+{
+  return (Caml_state->unique_id == expected_unique_id &&
+          (previous_domain_id == -1 ||
+            previous_domain_id == expected_unique_id));
+}
+
+CAMLexport void caml_thread_record_domain_id(uintnat domain_id)
+{
+  previous_domain_id = domain_id;
+}
+
 Caml_inline void interrupt_domain(struct interruptor* s)
 {
   atomic_uintnat * interrupt_word = atomic_load_relaxed(&s->interrupt_word);

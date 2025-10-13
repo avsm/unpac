@@ -26,6 +26,10 @@
 #include "mlvalues.h"
 #include "domain_state.h"
 
+/* See caml_c_thread_register_in_domain_index */
+CAMLextern bool caml_thread_running_on_expected_domain(uintnat);
+CAMLextern void caml_thread_record_domain_id(uintnat);
+
 #ifdef ARCH_SIXTYFOUR
 #define Max_domains_def 128
 #else
