@@ -541,8 +541,7 @@ module Timestamp : sig
 
         Also note that the precision of the underlying clock may be coarser than
         nanoseconds: events may have equal timestamp if they are emitted within
-        the coarseness of the clock. Thus the differences only matter to a
-        point. *)
+        the coarseness of the clock. *)
 
     val get_current : unit -> t
     (** Access the current timestamp.
