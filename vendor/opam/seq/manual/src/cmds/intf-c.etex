@@ -2619,6 +2619,14 @@ system.  The following functions are declared in the include file
 run-time system.  Returns 1 on success, 0 on error.  Registering an
 already-registered thread does nothing and returns 0.
 \item
+"caml_c_thread_register_in_domain(uintnat dom_unique_id)" registers the
+calling thread with the OCaml run-time system in the domain with
+identifier "dom_unique_id" as provided by "Domain.self" and "Domain.get_id".
+The domain must be running when this function is called.  Registering an
+already-registered thread does nothing and returns 0, even if it was previously
+registered in another domain. It is an error to register in one domain,
+unregister, and then later register in another domain.
+\item
 "caml_c_thread_unregister()"  must be called before the thread
   terminates, to unregister it from the OCaml run-time system.
 Returns 1 on success, 0 on error.  If the calling thread was not
