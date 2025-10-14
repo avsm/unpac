@@ -115,7 +115,7 @@ let runtime_lib () =
 (* First pass: determine which units are needed *)
 
 type file =
-  | Unit of string * unit_infos * Digest.t
+  | Unit of string * unit_infos * Digest.BLAKE128.t
   | Library of string * library_infos
 
 let object_file_name_of_file = function

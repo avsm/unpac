@@ -311,6 +311,9 @@ Working version
   representations for string constants
   (Vincent Laviron, review by Nicolás Ojeda Bär and Gabriel Scherer)
 
+- #13913: Use Blake128 as the hash function for the compiler's CRCs
+  (Vincent Laviron, review by Xavier Leroy and Gabriel Scherer)
+
 ### Build system:
 
 - #13810: Support build of cross compilers to native freestanding targets

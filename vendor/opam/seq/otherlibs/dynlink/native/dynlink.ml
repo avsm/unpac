@@ -26,8 +26,8 @@ module DT = Dynlink_types
 
 type global_map = {
   name : string;
-  crc_intf : Digest.t option;
-  crc_impl : Digest.t option;
+  crc_intf : Digest.BLAKE128.t option;
+  crc_impl : Digest.BLAKE128.t option;
   syms : string list
 }
 
