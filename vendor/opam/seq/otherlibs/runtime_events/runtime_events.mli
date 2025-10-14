@@ -531,13 +531,15 @@ type cursor
 
 module Timestamp : sig
     type t
-    (** Type for the int64 timestamp to allow for future changes. *)
+    (** Abstract timestamp included in events. *)
 
     val to_int64 : t -> int64
+    (** Convert a timestamp to a number of nanosecond. The starting point for
+        timestamps in unspecified but the difference between two timestamps is
+        the number of nanoseconds ellapsed between them. *)
 
     val get_current : unit -> t
-    (** Access the current timestamp. The timestamp is incremented by one
-        every nanosecond, but the starting point is unspecified.
+    (** Access the current timestamp.
         @since 5.4 *)
 end
 
