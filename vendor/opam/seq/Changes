@@ -191,6 +191,9 @@ Working version
   sources of installed packages.
   (Pierre Boutillier, review by Gabriel Scherer)
 
+- #14032, #14034: Update to and require FlexDLL 0.44.
+  (Jan Midtgaard, Antonin Décimo, review by David Allsopp)
+
 ### Manual and documentation:
 
 - #14293: Improve documentation of Runtime_events.Timestamp (Raphaël Proust,
