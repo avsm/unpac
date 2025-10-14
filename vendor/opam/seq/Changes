@@ -193,6 +193,9 @@ Working version
 
 ### Manual and documentation:
 
+- #14293: Improve documentation of Runtime_events.Timestamp (Raphaël Proust,
+  review by Gabriel Scherer)
+
 - #13747: Document support for native debugging with GDB and LLDB.
    (Tim McGilchrist, review by Daniel Bünzli, Samuel Hym, Olivier Nicole
    and Antonin Décimo)
