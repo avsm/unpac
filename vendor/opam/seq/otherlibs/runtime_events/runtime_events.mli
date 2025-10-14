@@ -534,9 +534,15 @@ module Timestamp : sig
     (** Abstract timestamp included in events. *)
 
     val to_int64 : t -> int64
-    (** Convert a timestamp to a number of nanosecond. The starting point for
-        timestamps in unspecified but the difference between two timestamps is
-        the number of nanoseconds ellapsed between them. *)
+    (** Convert a timestamp to a number of nanosecond.
+
+        Note that the starting point for timestamps in unspecified: the absolute
+        value is meaningless, only differences matter.
+
+        Also note that the precision of the underlying clock may be coarser than
+        nanoseconds: events may have equal timestamp if they are emitted within
+        the coarseness of the clock. Thus the differences only matter to a
+        point. *)
 
     val get_current : unit -> t
     (** Access the current timestamp.
