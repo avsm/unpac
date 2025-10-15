@@ -2623,9 +2623,10 @@ already-registered thread does nothing and returns 0.
 calling thread with the OCaml run-time system in the domain with
 identifier "dom_unique_id" as provided by "Domain.self" and "Domain.get_id".
 The domain must be running when this function is called.  Registering an
-already-registered thread does nothing and returns 0, even if it was previously
-registered in another domain. It is an error to register in one domain,
-unregister, and then later register in another domain.
+already-registered thread does nothing and returns 0, even if it was
+previously registered in another domain. Registering a thread in one
+domain, unregistering it, and then registering it later in a different
+domain is not supported.
 \item
 "caml_c_thread_unregister()"  must be called before the thread
   terminates, to unregister it from the OCaml run-time system.

@@ -66,10 +66,8 @@ CAMLextern int caml_c_thread_unregister(void);
    Both functions return 1 on success, 0 on error.
    Threads registered by [caml_c_thread_register_in_domain] belong to
    the domain given by the unique id which must be running when calling this
-   function. It is an error to call [caml_c_thread_unregister] on a
-   thread registered in a domain and later call
-   [caml_c_thread_register_in_domain] to register it with a different
-   domain.
+   function. After a call to [caml_c_thread_unregister], it is unsupported to
+   call [caml_c_thread_register_in_domain] with a different domain.
    The function [caml_c_thread_register] is an alias for
    [caml_c_thread_register_in_domain(0)] (where 0 is the identifier
    of the main domain).
