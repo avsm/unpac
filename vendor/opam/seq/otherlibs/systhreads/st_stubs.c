@@ -861,9 +861,9 @@ int caml_c_thread_register_in_domain_index(uintnat domain_index,
   /* Check that domain unique ID is as expected:
      - We got the domain we requested (given the inherently racy
        nature of [caml_find_index_of_running_domain]).
-     - We were not previously registered on a different domain (to
-       allow C programs to store domain-specific data in thread-local
-       storage) */
+     - We were not previously registered on a different domain (for
+       programs that currently store domain-specific data in
+       thread-local storage). */
   if (!caml_thread_running_on_expected_domain(expected_unique_id)) goto out_err;
 
   /* Create tick thread if not already done */
