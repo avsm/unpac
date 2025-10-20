@@ -269,7 +269,7 @@ jobs:
       - name: OS Dependencies
         run: |
           apt-get update -y
-          apt-get install -y git gcc make parallel
+          apt-get install -y git gcc g++ make parallel
           adduser --disabled-password --gecos '' ocaml
       - name: Checkout
         # See https://github.com/actions/checkout/issues/334
