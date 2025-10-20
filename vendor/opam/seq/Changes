@@ -557,7 +557,8 @@ OCaml 5.4.0 (9 October 2025)
   (Stephen Dolan, review by Guillaume Munch-Maccagnoni and Gabriel Scherer)
 
 - #13785: Add `Runtime_events.Timestamp.get_current`.
-  (Simon Cruanes)
+  (Simon Cruanes, review by Gabriel Scherer, David Allsopp, Antonin Décimo, Tim
+  McGilchrist, Sadiq Jaffer, Vincent Laviron)
 
 - #13774: Fix for inaccurate live blocks/words stats in compaction.
   (Sadiq Jaffer, report by KC Sivaramakrishnan and Jan Midtgaard, review by
