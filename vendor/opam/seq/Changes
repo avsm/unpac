@@ -531,7 +531,7 @@ OCaml 5.4.0 (9 October 2025)
   type alias for signal int, signal_to_string to convert OCaml signal numbers
   to their POSIX equivalent names, and signal_of_int/signal_to_int for
   converting between OCaml and platform signal numbers. (Reported in #13825)
-  (Tim McGilchrist, review by David Allsopp, Nicolás Ojeda Bär, Daniel Bünzli
+  (Tim McGilchrist, review by David Allsopp, Nicolás Ojeda Bär, Daniel Bünzli,
    Jan Midtgaard and Miod Vallat)
 
 ### Runtime system:
@@ -730,7 +730,7 @@ OCaml 5.4.0 (9 October 2025)
 
 - #13686: Fix Python debugger extensions (for LLDB and GDB) to restore
   functionality broken by #13272 in 5.3.
-  (Nick Barnes, review by Tim McGilchrist Gabriel Scherer)
+  (Nick Barnes, review by Tim McGilchrist and Gabriel Scherer)
 
 - #12019: ocamlc: add `align_double` and `align_int64` to `ocamlc -config`
   output.
