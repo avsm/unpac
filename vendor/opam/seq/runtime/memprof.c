@@ -2213,7 +2213,7 @@ CAMLexport void caml_memprof_enter_thread(memprof_thread_t thread)
 CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
 {
   CAMLparam3(lv, szv, tracker);
-  CAMLlocal2(one_log1m_lambda_v, config);
+  CAMLlocal3(lambda_v, one_log1m_lambda_v, config);
 
   double lambda = Double_val(lv);
   intnat sz = Long_val(szv);
@@ -2233,7 +2233,11 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
     one_log1m_lambda = MIN_ONE_LOG1M_LAMBDA; /* negative infinity */
   }
 
-  one_log1m_lambda_v = caml_copy_double(one_log1m_lambda);
+  lambda_v = caml_alloc_shr(Double_wosize, Double_tag);
+  Store_double_val(lambda_v, lambda);
+
+  one_log1m_lambda_v = caml_alloc_shr(Double_wosize, Double_tag);
+  Store_double_val(one_log1m_lambda_v, one_log1m_lambda);
 
   config = caml_alloc_shr(CONFIG_FIELDS, 0);
   caml_initialize(&Field(config, CONFIG_FIELD_STATUS),

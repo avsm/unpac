@@ -383,6 +383,10 @@ Working version
   the printed source wherever possible.
   (Florian Angeletti, review by Gabriel Scherer)
 
+- #14300, #14304: fix a race between memprof and the minor GC, detected by TSan
+  (Gabriel Scherer, review by Stephen Dolan and Nick Barnes,
+   report by Olivier Nicole)
+
 OCaml 5.4.0 (9 October 2025)
 ----------------------------
 
