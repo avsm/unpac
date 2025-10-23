@@ -2242,7 +2242,7 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
   config = caml_alloc_shr(CONFIG_FIELDS, 0);
   caml_initialize(&Field(config, CONFIG_FIELD_STATUS),
                   Val_int(CONFIG_STATUS_SAMPLING));
-  caml_initialize(&Field(config, CONFIG_FIELD_LAMBDA), lv);
+  caml_initialize(&Field(config, CONFIG_FIELD_LAMBDA), lambda_v);
   caml_initialize(&Field(config, CONFIG_FIELD_1LOG1ML), one_log1m_lambda_v);
   caml_initialize(&Field(config, CONFIG_FIELD_STACK_FRAMES), szv);
   for (int i = CONFIG_FIELD_FIRST_CALLBACK;
