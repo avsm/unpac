@@ -33,6 +33,8 @@ let cflags = {@QS@|@common_cflags@|@QS@}
 
 let ccomp_type = {@QS@|@ccomp_type@|@QS@}
 
+let c_compiler_vendor = {@QS@|@ocaml_cc_vendor@|@QS@}
+
 let target_os_type = {@QS@|@target_os_type@|@QS@}
 
 let diff = {@QS@|@DIFF@|@QS@}
