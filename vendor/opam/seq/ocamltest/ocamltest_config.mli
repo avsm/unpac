@@ -39,6 +39,9 @@ val cflags : string
 val ccomp_type : string
 (** Type of C compiler (msvc, cc, etc.) *)
 
+val c_compiler_vendor: string
+(** The vendor and version of the C compiler (see {!Config.c_compiler_vendor} *)
+
 val target_os_type : string
 (** The value of Sys.os_type for the target (cf. Config.target_os_type) *)
 

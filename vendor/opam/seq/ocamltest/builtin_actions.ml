@@ -134,6 +134,16 @@ let not_msvc = make
     "not using MSVC / clang-cl"
     "using MSVC / clang-cl")
 
+let is_clang =
+  List.mem "clang" (String.split_on_char '-' Ocamltest_config.c_compiler_vendor)
+
+let not_clang = make
+  ~name:"not-clang"
+  ~description:"Pass if not using clang"
+  (Actions_helpers.pass_or_skip (not is_clang)
+    "not using clang"
+    "using clang")
+
 (* windows _passes_ on Cygwin; target_windows _skips_ for Cygwin *)
 
 let target_windows = make
@@ -405,6 +415,7 @@ let _ =
     windows;
     not_windows;
     not_msvc;
+    not_clang;
     target_windows;
     not_target_windows;
     bsd;
