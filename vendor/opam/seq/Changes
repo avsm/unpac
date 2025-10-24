@@ -202,6 +202,9 @@ Working version
 - #14032, #14034: Update to and require FlexDLL 0.44.
   (Jan Midtgaard, Antonin Décimo, review by David Allsopp)
 
+- #14239: Fix `#show_constructor` when printing non-GADT type parameters
+  (Takafumi Saikawa, Jacques Garrigue, review by Gabriel Scherer)
+
 ### Manual and documentation:
 
 - #14293: Improve documentation of Runtime_events.Timestamp (Raphaël Proust,
