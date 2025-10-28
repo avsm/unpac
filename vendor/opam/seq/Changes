@@ -334,6 +334,11 @@ Working version
 - #14297, #14299: Avoid iterating on hash tables to produce types or terms
   (Vincent Laviron, review by Nicolás Ojeda Bär and Gabriel Scherer)
 
+* #14322: Remove leftover hacks for handling pattern constraints
+  As a side effect, `let rec (_ as x) = ...` is now always rejected instead of
+  being treated as equivalent to `let rec x = ...`
+  (Vincent Laviron, review by Alistair O'Brien and Florian Angeletti)
+
 ### Build system:
 
 - #13810: Support build of cross compilers to native freestanding targets
