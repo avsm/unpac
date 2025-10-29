@@ -310,14 +310,6 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
               Ppat_var name
         end
 
-    (* We transform (_ as x) in x if _ and x have the same location.
-       The compiler transforms (x:t) into (_ as x : t).
-       This avoids transforming a warning 27 into a 26.
-     *)
-    | Tpat_alias ({pat_desc = Tpat_any; pat_loc}, _id, name, _, _ty)
-         when pat_loc = pat.pat_loc ->
-       Ppat_var name
-
     | Tpat_alias (pat, _id, name, _, _ty) ->
         Ppat_alias (sub.pat sub pat, name)
     | Tpat_constant cst -> Ppat_constant (constant cst)
