@@ -850,13 +850,22 @@ and build_as_type_aux (env : Env.t) p =
       newty (Ttuple labeled_tyl)
   | Tpat_construct(_, cstr, pl, vto) ->
       let keep =
-        cstr.cstr_private = Private || cstr.cstr_existentials <> [] ||
+        cstr.cstr_private = Private ||
         vto <> None (* be lazy and keep the type for node constraints *) in
       if keep then p.pat_type else
       let tyl = List.map (build_as_type env) pl in
       let ty_args, ty_res, _ =
-        instance_constructor Keep_existentials_flexible cstr
+        with_level ~level:generic_level
+          (fun () -> instance_constructor Keep_existentials_flexible cstr)
       in
+      (* Lower the lever of [ty_res] to the current level; should never fail *)
+      let tv = newvar () in
+      unify_pat env {p with pat_type = ty_res} tv;
+      (* [p] is a valid result of type inference, and [ty_args] is a generic
+         instance where existentials are variables, with non-escaping ones
+         are at generic level.
+         This means that [tyl] is an instance of [ty_args],
+         and unification should not fail *)
       List.iter2 (fun (p,ty) -> unify_pat env {p with pat_type = ty})
         (List.combine pl tyl) ty_args;
       ty_res
