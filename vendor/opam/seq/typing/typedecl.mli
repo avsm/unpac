@@ -47,9 +47,13 @@ val transl_with_constraint:
 val transl_package_constraint:
   loc:Location.t -> Env.t -> type_expr -> Types.type_declaration
 
-val abstract_type_decl: injective:bool -> int -> type_declaration
+val abstract_type_decl:
+    injective:bool -> explanation:Types.type_origin -> int -> type_declaration
+
+(** Approximate a list of type declarations with abstract types of the
+    given origin. *)
 val approx_type_decl:
-    Parsetree.type_declaration list ->
+    explanation:Types.type_origin -> Parsetree.type_declaration list ->
                                   (Ident.t * type_declaration) list
 
 (** [check_recmod_typedecl ~abs_env env loc recmod_ids path decl]

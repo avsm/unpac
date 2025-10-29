@@ -1890,13 +1890,13 @@ let transl_package_constraint ~loc env ty =
 
 (* Approximate a type declaration: just make all types abstract *)
 
-let abstract_type_decl ~injective arity =
+let abstract_type_decl ~injective ~explanation arity =
   let rec make_params n =
     if n <= 0 then [] else Ctype.newvar() :: make_params (n-1) in
   Ctype.with_local_level_generalize begin fun () ->
     { type_params = make_params arity;
       type_arity = arity;
-      type_kind = Type_abstract Definition;
+      type_kind = Type_abstract explanation;
       type_private = Public;
       type_manifest = None;
       type_variance = Variance.unknown_signature ~injective ~arity;
@@ -1911,13 +1911,14 @@ let abstract_type_decl ~injective arity =
     }
   end
 
-let approx_type_decl sdecl_list =
+let approx_type_decl ~explanation sdecl_list =
   let scope = Ctype.create_scope () in
   List.map
     (fun sdecl ->
       let injective = sdecl.ptype_kind <> Ptype_abstract in
       (Ident.create_scoped ~scope sdecl.ptype_name.txt,
-       abstract_type_decl ~injective (List.length sdecl.ptype_params)))
+       abstract_type_decl ~injective ~explanation
+        (List.length sdecl.ptype_params)))
     sdecl_list
 
 (* Check the well-formedness conditions on type abbreviations defined

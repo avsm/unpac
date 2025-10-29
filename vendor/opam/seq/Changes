@@ -341,6 +341,11 @@ Working version
 
 ### Bug fixes:
 
+- #14036: Fix nontermination of cycle printing in recursive modules with
+  `-short-paths`. Add error message for types considered abstract while
+  checking recursive modules.
+  (Brandon Stride, review by Florian Angeletti)
+
 - #14065: Fix function signature mismatch of `__tsan_func_exit` with GCC 15.
   Check in the configure step if the TSan provided internal builtins are the
   same as what we expect, introduce `caml_tsan_*` wrappers for the `__tsan_*`
