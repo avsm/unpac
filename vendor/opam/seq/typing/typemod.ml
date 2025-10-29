@@ -198,13 +198,13 @@ let type_module_type_of_fwd :
 (* Additional validity checks on type definitions arising from
    recursive modules *)
 
-let check_recmod_typedecls env decls =
+let check_recmod_typedecls ~abs_env env decls =
   let recmod_ids = List.map fst decls in
   List.iter
     (fun (id, md) ->
       List.iter
         (fun path ->
-          Typedecl.check_recmod_typedecl env md.Types.md_loc recmod_ids
+          Typedecl.check_recmod_typedecl ~abs_env env md.Types.md_loc recmod_ids
                                          path (Env.find_type path env))
         (Mtype.type_paths env (Pident id) md.Types.md_type))
     decls
@@ -427,7 +427,9 @@ let check_well_formed_module env loc context mty =
       | Sig_module (id, _, mty, Trec_first, _) :: rem ->
           let (id_mty_l, rem) = extract_next_modules rem in
           begin try
-            check_recmod_typedecls (Lazy.force env) ((id, mty) :: id_mty_l)
+            let forced_env = Lazy.force env in
+            check_recmod_typedecls ~abs_env:forced_env forced_env
+              ((id, mty) :: id_mty_l)
           with Typedecl.Error (_, err) ->
             raise (Error (loc, Lazy.force env,
                           Badly_formed_signature(context, err)))
@@ -2001,13 +2003,13 @@ and transl_recmodule_modtypes env sdecls =
          (id_shape, pmd.pmd_name, md, ()))
       ids sdecls
   in
-  let env0 = make_env init in
+  let abs_env = make_env init in
   let dcl1 =
     Warnings.without_warnings
-      (fun () -> transition env0 init)
+      (fun () -> transition abs_env init)
   in
   let env1 = make_env dcl1 in
-  check_recmod_typedecls env1 (map_mtys dcl1);
+  check_recmod_typedecls ~abs_env env1 (map_mtys dcl1);
   let dcl2 = transition env1 dcl1 in
 (*
   List.iter
@@ -2016,7 +2018,7 @@ and transl_recmodule_modtypes env sdecls =
     dcl2;
 *)
   let env2 = make_env dcl2 in
-  check_recmod_typedecls env2 (map_mtys dcl2);
+  check_recmod_typedecls ~abs_env env2 (map_mtys dcl2);
   let dcl2 =
     List.map2 (fun pmd (id_shape, id_loc, md, mty) ->
       let tmd =

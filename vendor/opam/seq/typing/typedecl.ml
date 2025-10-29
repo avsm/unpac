@@ -1923,12 +1923,15 @@ let approx_type_decl sdecl_list =
 (* Check the well-formedness conditions on type abbreviations defined
    within recursive modules. *)
 
-let check_recmod_typedecl env loc recmod_ids path decl =
+(* [abs_env] is an abstract environment without physical cycles.
+  It is used as a printing environment in the case of cycles.
+  [env] is the main typing environment, which may contain cycles. *)
+let check_recmod_typedecl ~abs_env env loc recmod_ids path decl =
   (* recmod_ids is the list of recursively-defined module idents.
      (path, decl) is the type declaration to be checked. *)
   let to_check path = Path.exists_free recmod_ids path in
-  check_well_founded_decl ~abs_env:env env loc path decl to_check;
-  check_regularity ~abs_env:env env loc path decl to_check;
+  check_well_founded_decl ~abs_env env loc path decl to_check;
+  check_regularity ~abs_env env loc path decl to_check;
   (* additional coherence check, as one might build an incoherent signature,
      and use it to build an incoherent module, cf. #7851 *)
   check_coherence env loc path decl
