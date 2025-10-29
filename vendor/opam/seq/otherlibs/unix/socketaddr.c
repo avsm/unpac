@@ -108,7 +108,7 @@ static value alloc_unix_sockaddr(value path) {
   CAMLreturn(res);
 }
 
-value caml_unix_alloc_sockaddr(struct sockaddr_storage * addr /*in*/,
+value caml_unix_alloc_sockaddr(struct sockaddr * addr /*in*/,
                           socklen_t addr_len, int close_on_error)
 {
   CAMLparam0();
@@ -120,7 +120,7 @@ value caml_unix_alloc_sockaddr(struct sockaddr_storage * addr /*in*/,
     CAMLreturn(alloc_unix_sockaddr(caml_alloc_string(0)));
   }
 
-  switch(addr->ss_family) {
+  switch(addr->sa_family) {
   case AF_UNIX:
     { struct sockaddr_un *s_unix = (struct sockaddr_un *) addr;
       /* Based on recommendation in section BUGS of Linux unix(7). See

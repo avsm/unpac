@@ -44,7 +44,7 @@ static value convert_addrinfo(const struct addrinfo * a)
   len = a->ai_addrlen;
   if (len > sizeof(addr)) len = sizeof(addr);
   memcpy(&addr, a->ai_addr, len);
-  vaddr = caml_unix_alloc_sockaddr(&addr, len, -1);
+  vaddr = caml_unix_alloc_sockaddr((struct sockaddr *) &addr, len, -1);
   vcanonname = caml_copy_string(a->ai_canonname == NULL ? "" : a->ai_canonname);
   vres = caml_alloc_small(5, 0);
   Field(vres, 0) =

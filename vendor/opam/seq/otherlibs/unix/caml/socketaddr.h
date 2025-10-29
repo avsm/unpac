@@ -74,7 +74,7 @@ extern "C" {
 extern void caml_unix_get_sockaddr (value vaddr,
                                struct sockaddr_storage * addr /*out*/,
                                socklen_t * addr_len /*out*/);
-extern value caml_unix_alloc_sockaddr (struct sockaddr_storage * addr /*in*/,
+extern value caml_unix_alloc_sockaddr (struct sockaddr * addr /*in*/,
                                   socklen_t addr_len,
                                   int close_on_error);
 extern value caml_unix_alloc_inet_addr (struct in_addr * inaddr);
@@ -107,7 +107,7 @@ static inline value
 caml_unix_alloc_sockaddr(union sock_addr_union * addr /*in*/,
                          socklen_param_type addr_len,
                          int close_on_error) {
-  return caml_unix_alloc_sockaddr(&addr->s_storage, addr_len, close_on_error);
+  return caml_unix_alloc_sockaddr(&addr->s_gen, addr_len, close_on_error);
 }
 #else
 /* API compatibility between union sock_addr_union and
@@ -124,7 +124,7 @@ caml_unix_alloc_sockaddr(union sock_addr_union * addr /*in*/,
   caml_unix_alloc_sockaddr(                                       \
     _Generic((addr),                                              \
              union sock_addr_union *:                             \
-               &((union sock_addr_union *)(addr))->s_storage,     \
+               &((union sock_addr_union *)(addr))->s_gen,         \
              default: (addr)),                                    \
     (addr_len),                                                   \
     (close_on_error))

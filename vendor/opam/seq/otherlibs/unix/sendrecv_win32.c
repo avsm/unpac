@@ -77,7 +77,7 @@ CAMLprim value caml_unix_recvfrom(value sock, value buff, value ofs, value len,
     caml_uerror("recvfrom", Nothing);
   }
   memmove (&Byte(buff, Long_val(ofs)), iobuf, ret);
-  vaddr = caml_unix_alloc_sockaddr(&addr, addr_len, -1);
+  vaddr = caml_unix_alloc_sockaddr((struct sockaddr *) &addr, addr_len, -1);
   res = caml_alloc_small(2, 0);
   Field(res, 0) = Val_int(ret);
   Field(res, 1) = vaddr;

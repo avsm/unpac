@@ -32,6 +32,6 @@ extern "C" value stubs_new(value vdest)
   socklen_t addr_len;
   caml_unix_get_sockaddr(vdest, &addr, &addr_len);
 
-  vaddr = caml_unix_alloc_sockaddr(&addr, addr_len, -1);
+  vaddr = caml_unix_alloc_sockaddr((struct sockaddr *) &addr, addr_len, -1);
   CAMLreturn(vaddr);
 }
