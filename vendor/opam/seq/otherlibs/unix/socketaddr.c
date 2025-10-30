@@ -163,7 +163,13 @@ value caml_unix_alloc_sockaddr(struct sockaddr * addr /*in*/,
     }
 #endif
   default:
-    if (close_on_error != -1) close (close_on_error);
+    if (close_on_error != -1) {
+#ifdef _WIN32
+      closesocket (close_on_error);
+#else
+      close (close_on_error);
+#endif
+    }
     caml_unix_error(EAFNOSUPPORT, "", Nothing);
   }
   CAMLreturn(res);
