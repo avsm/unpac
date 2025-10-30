@@ -745,7 +745,7 @@ end = struct
                   let prev = String.Map.find_opt constr acc in
                   let prev = Option.value ~default:[] prev in
                   String.Map.add constr (tree_of_path None p :: prev) acc
-              | Definition | Rec_check_regularity -> acc)
+              | Definition | Rec_check_regularity | Approx_recmod -> acc)
         !names String.Map.empty
     in
     String.Map.iter

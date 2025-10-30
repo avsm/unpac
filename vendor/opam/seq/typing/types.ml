@@ -279,6 +279,7 @@ and ('lbl, 'cstr) type_kind =
 and type_origin =
     Definition
   | Rec_check_regularity
+  | Approx_recmod
   | Existential of string
 
 and record_representation =

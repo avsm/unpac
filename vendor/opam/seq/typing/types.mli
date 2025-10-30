@@ -574,6 +574,7 @@ and ('lbl, 'cstr) type_kind =
 and type_origin =
     Definition
   | Rec_check_regularity       (* See Typedecl.transl_type_decl *)
+  | Approx_recmod
   | Existential of string
 
 and record_representation =
