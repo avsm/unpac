@@ -1311,7 +1311,7 @@ let unsafe_to_iarray ~capacity (f : 'a t -> unit) =
       Dummy.Array.prefix arr length
   in
   let values : 'a array =
-    try Dummy.Array.unsafe_nocopy_to_array ~dummy values
+    try Dummy.Array.unsafe_nocopy_to_array values ~dummy
     with Dummy.Array.Dummy_found i -> Error.missing_element ~i ~length
   in
   unsafe_iarray_of_array values
