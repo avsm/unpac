@@ -80,9 +80,6 @@
  (action (copy realpath_unix.c realpath.c))
  (enabled_if (<> %{os_type} "Win32")))
 (rule
- (action (copy rename_unix.c rename.c))
- (enabled_if (<> %{os_type} "Win32")))
-(rule
  (action (copy select_unix.c select.c))
  (enabled_if (<> %{os_type} "Win32")))
 (rule
@@ -163,9 +160,6 @@
  (enabled_if (= %{os_type} "Win32")))
 (rule
  (action (copy realpath_win32.c realpath.c))
- (enabled_if (= %{os_type} "Win32")))
-(rule
- (action (copy rename_win32.c rename.c))
  (enabled_if (= %{os_type} "Win32")))
 (rule
  (action (copy select_win32.c select.c))
