@@ -856,9 +856,13 @@ and build_as_type_aux (env : Env.t) p =
       let tyl = List.map (build_as_type env) pl in
       let ty_args, ty_res, _ =
         instance_constructor Keep_existentials_flexible cstr in
-      (* [p] is a valid result of type inference, and [ty_args] is a generic
-         instance where existentials are variables, with non-escaping ones
-         are at generic level.
+      (* [p] is a valid result of type inference, so the levels inside its
+         types are correct (higher than the scopes). [tyl] is obtained
+         from [pl], which is part of [p], so that all the locally abstract
+         types it contains come from [p].
+         [ty_args] is an instance of the constructor type such that its
+         variables, includinding existentials, are mapped to variables at
+         a level higher than any locally abstract type in [pl], hence [tyl].
          This means that [tyl] is an instance of [ty_args],
          and unification should not fail *)
       List.iter2 (fun (p,ty) -> unify_pat env {p with pat_type = ty})
