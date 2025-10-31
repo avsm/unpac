@@ -810,6 +810,16 @@ let enter_orpat_variables loc env  p1_vs p2_vs =
           raise (Error (loc, env, err)) in
   unify_vars p1_vs p2_vs
 
+(* Create two instances with identical variables but independent structure.
+   NB: [generic_instance] can only be used if the variables of the
+   original type are not at [generic_level], but in the [cty_type] of
+   [build_as_type_extra], they are at at [generic_level].
+   If we used [generic_instance] we would lose the sharing between variables
+   in the returned types. *)
+let instance_unshared ty =
+  let ty = with_local_level_generalize_structure (fun () -> instance ty) in
+  (instance ty, instance ty)
+
 let rec build_as_type (env : Env.t) p =
   build_as_type_extra env p p.pat_extra
 
@@ -829,14 +839,7 @@ and build_as_type_extra_inner env p ty rest =
       (* Otherwise we combine the inferred type for the pattern with
          then non-ground constraint in a non-ambivalent way *)
       let as_ty = build_as_type_extra env p rest in
-      (* We replicate the structure of [ty] into [ty1] and [ty2]
-         sharing type variables between the two.
-         NB: [generic_instance] can only be used if the variables of the
-         original type ([cty.ctyp_type] here) are not at [generic_level],
-         which they are here.  If we used [generic_instance] we would lose
-         the sharing between variables in [ty1] and [ty2]. *)
-      let ty = with_local_level_generalize_structure (fun () -> instance ty) in
-      let ty1 = instance ty and ty2 = instance ty in
+      let ty1, ty2 = instance_unshared ty in
       (* This call to unify may only fail due to missing GADT equations *)
       unify_pat_types p.pat_loc env (instance as_ty) ty1;
       ty2
@@ -916,7 +919,11 @@ and build_as_type_aux (env : Env.t) p =
    Instead of actually nesting [with_local_level_generalize],
    we start with a high enough level, namely [generic_level - 10].
    [build_as_type] does not nest [with_local_level_generalize],
-   hence -10 is enough. *)
+   hence -10 is enough.
+   We could also have used [generic_level] rather than [generic_level - 10],
+   but this requires much care inside [build_as_type], in particular
+   [instance_unshared] would have to be modified.
+ *)
 let solve_Ppat_alias env pat =
   with_local_level_generalize (fun () ->
     with_level ~level:(generic_level - 10) (fun () -> build_as_type env pat))
