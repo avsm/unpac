@@ -175,23 +175,27 @@ let proper_abbrevs tl abbrev =
 let current_level = s_ref 0
 let nongen_level = s_ref 0
 let global_level = s_ref 0
-let saved_level = s_ref []
+let saved_levels = s_ref []
 
 let get_current_level () = !current_level
-let init_def level = current_level := level; nongen_level := level
+let init_def level =
+  assert (level <= generic_level);
+  current_level := level; nongen_level := level
+let save_levels () =
+  saved_levels := (!current_level, !nongen_level) :: !saved_levels
 let begin_def () =
-  saved_level := (!current_level, !nongen_level) :: !saved_level;
-  incr current_level; nongen_level := !current_level
+  assert (!current_level < generic_level);
+  save_levels (); incr current_level; nongen_level := !current_level
 let begin_class_def () =
-  saved_level := (!current_level, !nongen_level) :: !saved_level;
-  incr current_level
+  assert (!current_level < generic_level);
+  save_levels (); incr current_level
 let raise_nongen_level () =
-  saved_level := (!current_level, !nongen_level) :: !saved_level;
-  nongen_level := !current_level
+  save_levels (); nongen_level := !current_level
 let end_def () =
-  let (cl, nl) = List.hd !saved_level in
-  saved_level := List.tl !saved_level;
-  current_level := cl; nongen_level := nl
+  match !saved_levels with
+  |  (cl, nl) :: levels ->
+      saved_levels := levels; current_level := cl; nongen_level := nl
+  | [] -> fatal_error "Ctype.end_def"
 let create_scope () =
   let level = !current_level + 1 in
   init_def level;
@@ -289,7 +293,7 @@ let with_local_level_if_principal f ~post =
 let with_local_level_iter_if_principal f ~post =
   with_local_level_iter_if !Clflags.principal f ~post
 let with_level ~level f =
-  begin_def (); init_def level;
+  save_levels (); init_def level;
   wrap_end_def f
 let with_level_if cond ~level f =
   if cond then with_level ~level f else f ()
