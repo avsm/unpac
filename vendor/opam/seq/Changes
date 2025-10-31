@@ -339,6 +339,9 @@ Working version
   being treated as equivalent to `let rec x = ...`
   (Vincent Laviron, review by Alistair O'Brien and Florian Angeletti)
 
+- #14331: Enforce current_level <= generic_level, and explain create_scope
+  (Jacques Garrigue and Takafumi Saikawa, review by Gabriel Scherer)
+
 ### Build system:
 
 - #13810: Support build of cross compilers to native freestanding targets

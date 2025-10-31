@@ -82,7 +82,18 @@ val increase_global_level: unit -> int
 val restore_global_level: int -> unit
         (* This pair of functions is only used in Typetexp *)
 
-val create_scope : unit -> int
+val create_scope: unit -> int
+        (* Return a level higher than all previous levels.
+           When used as scope in [Ident.create_scoped], this guarantees
+           that the correspondind type cannot escape to a previous
+           environment.
+           Practically, this is done by returning the current level
+           after raising it.
+           Contrary to [with_local_level*], the end of the scope is not
+           specified by [create_scope]. If there is an enclosing
+           [with_local_level*], the scope will end there. Otherwise
+           the scope continues until the end of the compilation unit
+           or toplevel session. *)
 
 val newty: type_desc -> type_expr
 val new_scoped_ty: int -> type_desc -> type_expr
