@@ -152,6 +152,10 @@ Working version
   any wellformedness check.
   (Clement Blaudeau and Ryan Tjoa, review by Florian Angeletti)
 
+- #14327: Allow retyping as-patterns that contain existentials
+  (completing #14229)
+  (Jacques Garrigue and Takafumi Saikawa, reported by Olivier Nicole,
+   review by Gabriel Scherer)
 
 ### Other libraries:
 
