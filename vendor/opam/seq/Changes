@@ -339,8 +339,8 @@ Working version
   being treated as equivalent to `let rec x = ...`
   (Vincent Laviron, review by Alistair O'Brien and Florian Angeletti)
 
-- Enforce current_level <= generic_level, and explain create_scope
-  (Jacques Garrigue and Takafumi Saikawa, review by ?)
+- #14331: Enforce current_level <= generic_level, and explain create_scope
+  (Jacques Garrigue and Takafumi Saikawa, review by Gabriel Scherer)
 
 ### Build system:
 
