@@ -1595,7 +1595,7 @@ static void verify_pool(pool* a, sizeclass sz, struct mem_stats* s) {
 
 static void verify_large(large_alloc* a, struct mem_stats* s) {
   for (; a; a = a->next) {
-    header_t hd = *(header_t*)((char*)a + LARGE_ALLOC_HEADER_SZ);
+    header_t hd = Hd_hp((char*)a + LARGE_ALLOC_HEADER_SZ);
     CAMLassert (!Has_status_hd(hd, caml_global_heap_state.GARBAGE));
     s->allocated += Wsize_bsize(LARGE_ALLOC_HEADER_SZ) + Whsize_hd(hd);
     s->overhead += Wsize_bsize(LARGE_ALLOC_HEADER_SZ);
