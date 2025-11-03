@@ -903,7 +903,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->dependent_size = 0;
   domain_state->dependent_allocated = 0;
 
-  domain_state->major_work_done_between_slices = 0;
+  domain_state->sweep_work_done_between_slices = 0;
+  domain_state->mark_work_done_between_slices = 0;
 
   /* the minor heap arena will be initialized by
      [allocate_minor_heap_arena] below. */
