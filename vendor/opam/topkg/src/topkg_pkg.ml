@@ -306,6 +306,7 @@ let clean p os =
   let file = install_file p in
   let build_dir = build_dir p in
   Topkg_os.File.delete file
+  >>= fun () -> Topkg_os.File.delete "pkg.itarget"
   >>= fun () -> (Topkg_build.clean p.build) os ~build_dir
   >>= fun () -> Ok 0
 
