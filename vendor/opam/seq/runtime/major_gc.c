@@ -230,6 +230,24 @@ Caml_inline void prefetch_block(value v)
 }
 
 /*******************************************************************************
+ * Handling work counters
+ ******************************************************************************/
+
+static uintnat mark_work_done_between_slices(void)
+{
+  uintnat work = Caml_state->mark_work_done_between_slices;
+  Caml_state->mark_work_done_between_slices = 0;
+  return work;
+}
+
+static uintnat sweep_work_done_between_slices(void)
+{
+  uintnat work = Caml_state->sweep_work_done_between_slices;
+  Caml_state->sweep_work_done_between_slices = 0;
+  return work;
+}
+
+/*******************************************************************************
  * Ephemerons
  ******************************************************************************/
 
@@ -381,7 +399,6 @@ static intnat ephe_mark (intnat budget, uintnat for_cycle,
         }
       }
     }
-    budget -= Whsize_wosize(i);
 
     bool keep;
     if (data == caml_ephe_none || Is_long(data)) {
@@ -409,6 +426,7 @@ static intnat ephe_mark (intnat budget, uintnat for_cycle,
       *prev_linkp = todo;
     }
     marked++;
+    budget -= mark_work_done_between_slices();
   }
 
   caml_gc_log ("Mark Ephemeron: %s. Ephemeron cycle=%" CAML_PRIdNAT " "
@@ -738,20 +756,6 @@ void caml_reset_major_pacing(void)
     res = (atomic_compare_exchange_strong(&alloc_counter, &alloc, target) &&
            atomic_compare_exchange_strong(&work_counter, &work, target));
   } while (!res);
-}
-
-static uintnat mark_work_done_between_slices(void)
-{
-  uintnat work = Caml_state->mark_work_done_between_slices;
-  Caml_state->mark_work_done_between_slices = 0;
-  return work;
-}
-
-static uintnat sweep_work_done_between_slices(void)
-{
-  uintnat work = Caml_state->sweep_work_done_between_slices;
-  Caml_state->sweep_work_done_between_slices = 0;
-  return work;
 }
 
 /* The [log_events] parameter is used to disable writing to the ring for two
@@ -2060,8 +2064,6 @@ mark_again:
                (budget = get_major_slice_work(mode)) > 0) {
           intnat left = ephe_mark(budget, saved_ephe_cycle, EPHE_MARK_DEFAULT);
           intnat work_done = budget - left;
-          /* caml_darken is called by ephe_mark, so count the work it does */
-          work_done += mark_work_done_between_slices();
           commit_major_slice_work (work_done);
 
           // FIXME: Can we delete this?
