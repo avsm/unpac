@@ -43,7 +43,9 @@ let with_dir b dir = { b with dir }
 let nop = fun _ -> Ok ()
 
 let cmd c os files =
-  Topkg_os.Cmd.run @@ Topkg_cmd.(build_cmd c os %% of_list files)
+  let targets = String.concat "\n" files in
+  Topkg_os.File.write "pkg.itarget" targets >>= fun () ->
+  Topkg_os.Cmd.run @@ Topkg_cmd.(build_cmd c os % "pkg.otarget")
 
 let clean os ~build_dir =
   Topkg_os.Cmd.run @@ clean_cmd os ~build_dir

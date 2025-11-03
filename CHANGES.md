@@ -1,3 +1,11 @@
+
+- Support for large package builds. On build generate a `pkg.itarget`
+  at the root with the files to build and invoke `ocamlbuild` with
+  `pkg.otarget` rather than the explicit list of files. The
+  `pkg.itarget` file can be ignored by your VCS as it is generated on
+  the fly on each build. As a side effect, improves error reporting on
+  build failures.
+
 v1.1.0 2025-07-23 Zagreb
 ------------------------
 
