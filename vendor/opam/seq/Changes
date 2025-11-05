@@ -80,6 +80,10 @@ Working version
   (Jack Nørskov Jørgensen, review by Gabriel Scherer,
    Guillaume Munch-Maccagnoni)
 
+- #14337: Fix potential segfault due to the C callback mechanism dropping
+  continuations without calling `caml_continuation_use`.
+  (Max Slater, review by Nick Barnes and Stephen Dolan)
+
 ### Code generation and optimizations:
 
 ### Standard library:
