@@ -29,15 +29,14 @@ CAMLprim value caml_unix_string_of_inet_addr(value a)
 #ifdef _WIN32
   char buffer[64];
   struct sockaddr_storage addr;
-  int len;
+  socklen_t len;
   int retcode;
+  memset(&addr, 0, sizeof(struct sockaddr_storage));
   if (caml_string_length(a) == 16) {
-    memset(&addr, 0, sizeof(struct sockaddr_storage));
     addr.ss_family = AF_INET6;
     ((struct sockaddr_in6 *) &addr)->sin6_addr = GET_INET6_ADDR(a);
     len = sizeof(struct sockaddr_in6);
   } else {
-    memset(&addr, 0, sizeof(struct sockaddr_storage));
     addr.ss_family = AF_INET;
     ((struct sockaddr_in *) &addr)->sin_addr = GET_INET_ADDR(a);
     len = sizeof(struct sockaddr_in);
