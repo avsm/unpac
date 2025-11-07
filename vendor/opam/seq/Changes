@@ -178,6 +178,10 @@ Working version
   instead of ENOENT if the command string is not a valid C string.
   (Antonin Décimo, review by Gabriel Scherer and Nicolás Ojeda Bär)
 
+- #14310: Deprecate union sock_addr_union for struct sockaddr_storage
+  and socklen_param_type for socklen_t.
+  (Antonin Décimo, review by Nicolás Ojeda Bär, David Allsopp and Samuel Hym)
+
 ### Tools:
 
 - #14055: Invert BUILD_PATH_PREFIX_MAP in directories loaded at startup
