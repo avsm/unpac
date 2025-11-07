@@ -18,10 +18,10 @@
 #ifndef CAML_OSDEPS_H
 #define CAML_OSDEPS_H
 
-#ifdef CAML_INTERNALS
-
 #include "misc.h"
 #include "memory.h"
+
+#ifdef CAML_INTERNALS
 
 /* Read at most [n] bytes from file descriptor [fd] into buffer [buf].
    [flags] indicates whether [fd] is a socket
