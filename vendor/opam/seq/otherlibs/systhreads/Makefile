@@ -94,8 +94,8 @@ ifeq "$(COMPUTE_DEPS)" "true"
 # MSVC doesn't emit usable dependency information, but if GCC is available
 # then it can instead be called in order to generate the .d file.
 ifneq "$(CC)" "$(DEP_CC)"
-	$(V_CCDEPS)$(DEP_CC) $(OC_CPPFLAGS) $(CPPFLAGS) $< -MM -MT $@ \
-   -MF $(DEPDIR)/$(@:.$(O)=.$(D))
+	$(V_CCDEPS)$(DEP_CC) $(DEP_CPPFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) $< \
+   -MM -MT $@ -MF $(DEPDIR)/$(@:.$(O)=.$(D))
 endif # ifneq "$(CC)" "$(DEP_CC)"
 endif # ifeq "$(COMPUTE_DEPS)" "true"
 

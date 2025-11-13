@@ -132,6 +132,7 @@ AC_SUBST([LINEAR_MAGIC_NUMBER], [LINEAR__MAGIC_NUMBER])
 AC_SUBST([CC])
 AC_SUBST([ocaml_cc_vendor])
 AC_SUBST([DEP_CC])
+AC_SUBST([DEP_CPPFLAGS])
 AC_SUBST([DEP_CC_PREFIX])
 AC_SUBST([SAK_BUILD])
 AC_SUBST([SAK])
@@ -855,8 +856,11 @@ AS_CASE([$host],
       DEP_CC_PREFIX='/clang:'],
       [AC_CHECK_TOOLS(
         [DEP_CC],
-        [$DEP_CC gcc cc x86_64-w64-mingw32-gcc i686-w64-mingw32-gcc],
-        [false])])],
+        [$DEP_CC x86_64-w64-mingw32-gcc i686-w64-mingw32-gcc gcc cc],
+        [false])
+        # The C compiler may not be targetting Windows, so explicitly include
+        # the _WIN32 define
+        DEP_CPPFLAGS=-D_WIN32])],
   [DEP_CC="$CC"])
 
 AS_CASE([$enable_dependency_generation],

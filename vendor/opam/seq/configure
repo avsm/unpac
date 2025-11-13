@@ -951,6 +951,7 @@ encode_C_literal
 SAK
 SAK_BUILD
 DEP_CC_PREFIX
+DEP_CPPFLAGS
 DEP_CC
 ocaml_cc_vendor
 CC
@@ -3464,6 +3465,7 @@ CMXS_MAGIC_NUMBER=Caml1999D037
 CMT_MAGIC_NUMBER=Caml1999T037
 
 LINEAR_MAGIC_NUMBER=Caml1999L037
+
 
 
 
@@ -15025,7 +15027,7 @@ case $host in #(
       DEP_CC_PREFIX='/clang:' ;; #(
   *) :
     if test -n "$ac_tool_prefix"; then
-  for ac_prog in $DEP_CC gcc cc x86_64-w64-mingw32-gcc i686-w64-mingw32-gcc
+  for ac_prog in $DEP_CC x86_64-w64-mingw32-gcc i686-w64-mingw32-gcc gcc cc
   do
     # Extract the first word of "$ac_tool_prefix$ac_prog", so it can be a program name with args.
 set dummy $ac_tool_prefix$ac_prog; ac_word=$2
@@ -15074,7 +15076,7 @@ fi
 fi
 if test -z "$DEP_CC"; then
   ac_ct_DEP_CC=$DEP_CC
-  for ac_prog in $DEP_CC gcc cc x86_64-w64-mingw32-gcc i686-w64-mingw32-gcc
+  for ac_prog in $DEP_CC x86_64-w64-mingw32-gcc i686-w64-mingw32-gcc gcc cc
 do
   # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
@@ -15133,7 +15135,10 @@ esac
     DEP_CC=$ac_ct_DEP_CC
   fi
 fi
- ;;
+
+        # The C compiler may not be targetting Windows, so explicitly include
+        # the _WIN32 define
+        DEP_CPPFLAGS=-D_WIN32 ;;
 esac ;; #(
   *) :
     DEP_CC="$CC" ;;
