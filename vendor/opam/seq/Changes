@@ -88,6 +88,9 @@ Working version
 
 ### Standard library:
 
+- #14352: Add String.{drop,take,cut}_{first,last}.
+  (Daniel Bünzli, review by David Allsopp, Vincent Laviron)
+
 - #14185: List.split_map
   (Jeremy Yallop, review by Daniel Bünzli, Nicolás Ojeda Bär and Damien Doligez)
 
