@@ -88,6 +88,10 @@ Working version
 
 ### Standard library:
 
+- #13372: New Format and Printf printf-like functions that accept a
+   heterogeneous list as arguments.
+  (Leonardo Santos, review by Florian Angeletti and Gabriel Scherer)
+
 - #14352: Add String.{drop,take,cut}_{first,last}.
   (Daniel Bünzli, review by David Allsopp, Vincent Laviron)
 
