@@ -1259,7 +1259,9 @@ static void terminate_backup_thread(dom_internal *di)
   if (backup_thread_running(di)) {
     atomic_store_release(&di->backup_thread_msg, BT_TERMINATE);
     /* Wakeup backup thread if it is sleeping */
+    caml_plat_lock_blocking(&di->interruptor.lock);
     caml_plat_broadcast(&di->interruptor.cond);
+    caml_plat_unlock(&di->interruptor.lock);
     caml_plat_signal(&di->domain_cond);
   }
 }
