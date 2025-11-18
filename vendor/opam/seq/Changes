@@ -88,6 +88,12 @@ Working version
 
 ### Standard library:
 
+- #14363: Preserve the backtrace at exceptional domain termination. Domain.join
+  on an exceptionally terminated domain re-raises the exception with the
+  backtrace.
+  (KC Sivaramakrishnan, report by Nathan Taylor, review by Gabriel Scherer,
+  David Allsopp)
+
 - #13372: New Format and Printf printf-like functions that accept a
    heterogeneous list as arguments.
   (Leonardo Santos, review by Florian Angeletti and Gabriel Scherer)
