@@ -1189,6 +1189,10 @@ OCaml 5.4.0 (9 October 2025)
 - #14287: Bugfix for GC root mishandling in memprof.c
   (Stephen Dolan, review by Leo White)
 
+- #14368: Bugfix for Simplif substituting under lambda
+  (Stephen Dolan, review by Vincent Laviron
+   and Gabriel Scherer)
+
 OCaml 5.3.0 (8 January 2025)
 ----------------------------
 
