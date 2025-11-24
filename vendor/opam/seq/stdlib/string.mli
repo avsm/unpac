@@ -230,6 +230,44 @@ val cut_last : int -> string -> string * string
 
     @since 5.5 *)
 
+(** {2:splitting_preds Splitting with predicates} *)
+
+val take_first_while : (char -> bool) -> string -> string
+(** [take_first_while p s] is the first consecutive bytes of [s]
+    satisfying the predicate [p].
+
+    @since 5.5 *)
+
+val take_last_while : (char -> bool) -> string -> string
+(** [take_last_while p s] is the last consecutive bytes of [s]
+    satisfying the predicate [p].
+
+    @since 5.5 *)
+
+val drop_first_while : (char -> bool) -> string -> string
+(** [drop_first_while p s] is [s] without the first consecutive bytes of [s]
+    satisfying the predicate [p].
+
+    @since 5.5 *)
+
+val drop_last_while : (char -> bool) -> string -> string
+(** [drop_last_while p s] is [s] without the last consecutive bytes of [s]
+    satisfying the predicate [p].
+
+    @since 5.5 *)
+
+val cut_first_while : (char -> bool) -> string -> string * string
+(** [cut_first_while p s] is
+    [(take_first_while p s, drop_first_while p s)].
+
+    @since 5.5 *)
+
+val cut_last_while : (char -> bool) -> string -> string * string
+(** [cut_last_while p s] is
+    [(drop_last_while p s, take_last_while p s)].
+
+    @since 5.5 *)
+
 (** {2:splitting_sep Splitting with separators} *)
 
 val split_on_char : char -> string -> string list
