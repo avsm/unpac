@@ -218,6 +218,7 @@ let jsont : t Jsont.t =
   |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
   |> Jsont.Object.finish
 
+(*
 let to_json t =
   match Jsont.Json.encode jsont t with
   | Ok json -> json
@@ -227,6 +228,7 @@ let of_json json =
   match Jsont.Json.decode jsont json with
   | Ok t -> t
   | Error msg -> raise (Invalid_argument ("Options.of_json: " ^ msg))
+*)
 
 let pp fmt t =
   Fmt.pf fmt "@[<v>Options {@ \

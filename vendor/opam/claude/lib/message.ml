@@ -59,7 +59,13 @@ module User = struct
   (* Encode content to json value *)
   let encode_content = function
     | String s -> Jsont.String (s, Jsont.Meta.none)
-    | Blocks blocks -> Jsont.Array (List.map Content_block.to_json blocks, Jsont.Meta.none)
+    | Blocks blocks ->
+        let jsons = List.map (fun b ->
+          match Jsont.Json.encode Content_block.jsont b with
+          | Ok j -> j
+          | Error msg -> failwith ("encode_content: " ^ msg)
+        ) blocks in
+        Jsont.Array (jsons, Jsont.Meta.none)
 
   let jsont : t Jsont.t =
     Jsont.Object.map ~kind:"User" (fun json_content unknown ->
@@ -70,19 +76,36 @@ module User = struct
     |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
     |> Jsont.Object.finish
 
+  (** Wire-format codec for outgoing user messages.
+      Format: {"type": "user", "message": {"role": "user", "content": ...}} *)
+  module Wire = struct
+    type inner = { role : string; content : Jsont.json }
+    type outer = { type_ : string; message : inner }
+
+    let inner_jsont : inner Jsont.t =
+      let make role content = { role; content } in
+      Jsont.Object.map ~kind:"UserMessageInner" make
+      |> Jsont.Object.mem "role" Jsont.string ~enc:(fun r -> r.role)
+      |> Jsont.Object.mem "content" Jsont.json ~enc:(fun r -> r.content)
+      |> Jsont.Object.finish
+
+    let outer_jsont : outer Jsont.t =
+      let make type_ message = { type_; message } in
+      Jsont.Object.map ~kind:"UserMessageOuter" make
+      |> Jsont.Object.mem "type" Jsont.string ~enc:(fun r -> r.type_)
+      |> Jsont.Object.mem "message" inner_jsont ~enc:(fun r -> r.message)
+      |> Jsont.Object.finish
+  end
+
   let to_json t =
-    let content_json = match t.content with
-      | String s -> Jsont.String (s, Jsont.Meta.none)
-      | Blocks blocks ->
-          Jsont.Array (List.map Content_block.to_json blocks, Jsont.Meta.none)
-    in
-    Jsont.Object ([
-      (Jsont.Json.name "type", Jsont.String ("user", Jsont.Meta.none));
-      (Jsont.Json.name "message", Jsont.Object ([
-        (Jsont.Json.name "role", Jsont.String ("user", Jsont.Meta.none));
-        (Jsont.Json.name "content", content_json);
-      ], Jsont.Meta.none));
-    ], Jsont.Meta.none)
+    let content_json = encode_content t.content in
+    let wire = Wire.{
+      type_ = "user";
+      message = { role = "user"; content = content_json }
+    } in
+    match Jsont.Json.encode Wire.outer_jsont wire with
+    | Ok json -> json
+    | Error msg -> failwith ("User.to_json: " ^ msg)
 
   (* Jsont codec for parsing incoming user messages from CLI *)
   let incoming_jsont : t Jsont.t =
@@ -215,19 +238,51 @@ module Assistant = struct
     |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
     |> Jsont.Object.finish
 
+  let encode_content_blocks blocks =
+    let jsons = List.map (fun b ->
+      match Jsont.Json.encode Content_block.jsont b with
+      | Ok j -> j
+      | Error msg -> failwith ("encode_content_blocks: " ^ msg)
+    ) blocks in
+    Jsont.Array (jsons, Jsont.Meta.none)
+
+  (** Wire-format codec for outgoing assistant messages. *)
+  module Wire = struct
+    type inner = {
+      wire_content : Jsont.json;
+      wire_model : string;
+      wire_error : string option;
+    }
+    type outer = { wire_type : string; wire_message : inner }
+
+    let inner_jsont : inner Jsont.t =
+      let make wire_content wire_model wire_error = { wire_content; wire_model; wire_error } in
+      Jsont.Object.map ~kind:"AssistantMessageInner" make
+      |> Jsont.Object.mem "content" Jsont.json ~enc:(fun r -> r.wire_content)
+      |> Jsont.Object.mem "model" Jsont.string ~enc:(fun r -> r.wire_model)
+      |> Jsont.Object.opt_mem "error" Jsont.string ~enc:(fun r -> r.wire_error)
+      |> Jsont.Object.finish
+
+    let outer_jsont : outer Jsont.t =
+      let make wire_type wire_message = { wire_type; wire_message } in
+      Jsont.Object.map ~kind:"AssistantMessageOuter" make
+      |> Jsont.Object.mem "type" Jsont.string ~enc:(fun r -> r.wire_type)
+      |> Jsont.Object.mem "message" inner_jsont ~enc:(fun r -> r.wire_message)
+      |> Jsont.Object.finish
+  end
+
   let to_json t =
-    let msg_fields = [
-      (Jsont.Json.name "content", Jsont.Array (List.map Content_block.to_json t.content, Jsont.Meta.none));
-      (Jsont.Json.name "model", Jsont.String (t.model, Jsont.Meta.none));
-    ] in
-    let msg_fields = match t.error with
-      | Some err -> (Jsont.Json.name "error", Jsont.String (error_to_string err, Jsont.Meta.none)) :: msg_fields
-      | None -> msg_fields
-    in
-    Jsont.Object ([
-      (Jsont.Json.name "type", Jsont.String ("assistant", Jsont.Meta.none));
-      (Jsont.Json.name "message", Jsont.Object (msg_fields, Jsont.Meta.none));
-    ], Jsont.Meta.none)
+    let wire = Wire.{
+      wire_type = "assistant";
+      wire_message = {
+        wire_content = encode_content_blocks t.content;
+        wire_model = t.model;
+        wire_error = Option.map error_to_string t.error;
+      }
+    } in
+    match Jsont.Json.encode Wire.outer_jsont wire with
+    | Ok json -> json
+    | Error msg -> failwith ("Assistant.to_json: " ^ msg)
 
   (* Jsont codec for parsing incoming assistant messages from CLI *)
   let incoming_jsont : t Jsont.t =
@@ -448,15 +503,6 @@ module Result = struct
         Fmt.(option int) t.cache_creation_input_tokens
         Fmt.(option int) t.cache_read_input_tokens
 
-    let to_json t =
-      match Jsont.Json.encode jsont t with
-      | Ok json -> json
-      | Error msg -> failwith ("Usage.to_json: " ^ msg)
-
-    let of_json json =
-      match Jsont.Json.decode jsont json with
-      | Ok v -> v
-      | Error msg -> raise (Invalid_argument ("Usage.of_json: " ^ msg))
   end
 
   type t = {
@@ -510,33 +556,65 @@ module Result = struct
     |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
     |> Jsont.Object.finish
 
+  (** Wire-format codec for outgoing result messages (adds "type" field). *)
+  module Wire = struct
+    type wire = {
+      type_ : string;
+      subtype : string;
+      duration_ms : int;
+      duration_api_ms : int;
+      is_error : bool;
+      num_turns : int;
+      session_id : string;
+      total_cost_usd : float option;
+      usage : Jsont.json option;
+      result : string option;
+      structured_output : Jsont.json option;
+    }
+
+    let jsont : wire Jsont.t =
+      let make type_ subtype duration_ms duration_api_ms is_error num_turns
+               session_id total_cost_usd usage result structured_output =
+        { type_; subtype; duration_ms; duration_api_ms; is_error; num_turns;
+          session_id; total_cost_usd; usage; result; structured_output }
+      in
+      Jsont.Object.map ~kind:"ResultWire" make
+      |> Jsont.Object.mem "type" Jsont.string ~enc:(fun r -> r.type_)
+      |> Jsont.Object.mem "subtype" Jsont.string ~enc:(fun r -> r.subtype)
+      |> Jsont.Object.mem "duration_ms" Jsont.int ~enc:(fun r -> r.duration_ms)
+      |> Jsont.Object.mem "duration_api_ms" Jsont.int ~enc:(fun r -> r.duration_api_ms)
+      |> Jsont.Object.mem "is_error" Jsont.bool ~enc:(fun r -> r.is_error)
+      |> Jsont.Object.mem "num_turns" Jsont.int ~enc:(fun r -> r.num_turns)
+      |> Jsont.Object.mem "session_id" Jsont.string ~enc:(fun r -> r.session_id)
+      |> Jsont.Object.opt_mem "total_cost_usd" Jsont.number ~enc:(fun r -> r.total_cost_usd)
+      |> Jsont.Object.opt_mem "usage" Jsont.json ~enc:(fun r -> r.usage)
+      |> Jsont.Object.opt_mem "result" Jsont.string ~enc:(fun r -> r.result)
+      |> Jsont.Object.opt_mem "structured_output" Jsont.json ~enc:(fun r -> r.structured_output)
+      |> Jsont.Object.finish
+  end
+
   let to_json t =
-    let fields = [
-      (Jsont.Json.name "type", Jsont.String ("result", Jsont.Meta.none));
-      (Jsont.Json.name "subtype", Jsont.String (t.subtype, Jsont.Meta.none));
-      (Jsont.Json.name "duration_ms", Jsont.Number (float_of_int t.duration_ms, Jsont.Meta.none));
-      (Jsont.Json.name "duration_api_ms", Jsont.Number (float_of_int t.duration_api_ms, Jsont.Meta.none));
-      (Jsont.Json.name "is_error", Jsont.Bool (t.is_error, Jsont.Meta.none));
-      (Jsont.Json.name "num_turns", Jsont.Number (float_of_int t.num_turns, Jsont.Meta.none));
-      (Jsont.Json.name "session_id", Jsont.String (t.session_id, Jsont.Meta.none));
-    ] in
-    let fields = match t.total_cost_usd with
-      | Some cost -> (Jsont.Json.name "total_cost_usd", Jsont.Number (cost, Jsont.Meta.none)) :: fields
-      | None -> fields
-    in
-    let fields = match t.usage with
-      | Some usage -> (Jsont.Json.name "usage", Usage.to_json usage) :: fields
-      | None -> fields
-    in
-    let fields = match t.result with
-      | Some result -> (Jsont.Json.name "result", Jsont.String (result, Jsont.Meta.none)) :: fields
-      | None -> fields
-    in
-    let fields = match t.structured_output with
-      | Some output -> (Jsont.Json.name "structured_output", output) :: fields
-      | None -> fields
-    in
-    Jsont.Object (fields, Jsont.Meta.none)
+    let usage_json = Option.map (fun u ->
+      match Jsont.Json.encode Usage.jsont u with
+      | Ok j -> j
+      | Error msg -> failwith ("Result.to_json: usage: " ^ msg)
+    ) t.usage in
+    let wire = Wire.{
+      type_ = "result";
+      subtype = t.subtype;
+      duration_ms = t.duration_ms;
+      duration_api_ms = t.duration_api_ms;
+      is_error = t.is_error;
+      num_turns = t.num_turns;
+      session_id = t.session_id;
+      total_cost_usd = t.total_cost_usd;
+      usage = usage_json;
+      result = t.result;
+      structured_output = t.structured_output;
+    } in
+    match Jsont.Json.encode Wire.jsont wire with
+    | Ok json -> json
+    | Error msg -> failwith ("Result.to_json: " ^ msg)
 
   let of_json json =
     match Jsont.Json.decode jsont json with

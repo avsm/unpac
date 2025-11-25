@@ -269,12 +269,6 @@ module Result : sig
 
     val pp : Format.formatter -> t -> unit
     (** [pp fmt t] pretty-prints the usage statistics. *)
-
-    val to_json : t -> Jsont.json
-    (** [to_json t] converts to JSON representation. Internal use only. *)
-
-    val of_json : Jsont.json -> t
-    (** [of_json json] parses from JSON. Internal use only. *)
   end
 
   type t

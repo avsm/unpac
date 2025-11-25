@@ -20,16 +20,6 @@ module Text = struct
     |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
     |> Jsont.Object.finish
 
-  let to_json t =
-    match Jsont.Json.encode jsont t with
-    | Ok json -> json
-    | Error msg -> failwith ("Text.to_json: " ^ msg)
-
-  let of_json json =
-    match Jsont.Json.decode jsont json with
-    | Ok v -> v
-    | Error msg -> raise (Invalid_argument ("Text.of_json: " ^ msg))
-
   let pp fmt t =
     if String.length t.text > 60 then
       let truncated = String.sub t.text 0 57 in
@@ -74,8 +64,6 @@ module Tool_use = struct
       | Jsont.Object (members, _) -> List.map (fun ((name, _), _) -> name) members
       | _ -> []
 
-    let to_json t = t
-    let of_json json = json
   end
 
   type t = {
@@ -100,16 +88,6 @@ module Tool_use = struct
     |> Jsont.Object.mem "input" Input.jsont ~enc:input
     |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
     |> Jsont.Object.finish
-
-  let to_json t =
-    match Jsont.Json.encode jsont t with
-    | Ok json -> json
-    | Error msg -> failwith ("Tool_use.to_json: " ^ msg)
-
-  let of_json json =
-    match Jsont.Json.decode jsont json with
-    | Ok v -> v
-    | Error msg -> raise (Invalid_argument ("Tool_use.of_json: " ^ msg))
 
   let pp fmt t =
     let keys = Input.keys t.input in
@@ -146,16 +124,6 @@ module Tool_result = struct
     |> Jsont.Object.opt_mem "is_error" Jsont.bool ~enc:is_error
     |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
     |> Jsont.Object.finish
-
-  let to_json t =
-    match Jsont.Json.encode jsont t with
-    | Ok json -> json
-    | Error msg -> failwith ("Tool_result.to_json: " ^ msg)
-
-  let of_json json =
-    match Jsont.Json.decode jsont json with
-    | Ok v -> v
-    | Error msg -> raise (Invalid_argument ("Tool_result.of_json: " ^ msg))
 
   let pp fmt t =
     match t.is_error, t.content with
@@ -194,16 +162,6 @@ module Thinking = struct
     |> Jsont.Object.mem "signature" Jsont.string ~enc:signature
     |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
     |> Jsont.Object.finish
-
-  let to_json t =
-    match Jsont.Json.encode jsont t with
-    | Ok json -> json
-    | Error msg -> failwith ("Thinking.to_json: " ^ msg)
-
-  let of_json json =
-    match Jsont.Json.decode jsont json with
-    | Ok v -> v
-    | Error msg -> raise (Invalid_argument ("Thinking.of_json: " ^ msg))
 
   let pp fmt t =
     if String.length t.thinking > 50 then
@@ -252,16 +210,6 @@ let jsont : t Jsont.t =
   |> Jsont.Object.case_mem "type" Jsont.string ~enc:Fun.id ~enc_case cases
       ~tag_to_string:Fun.id ~tag_compare:String.compare
   |> Jsont.Object.finish
-
-let to_json t =
-  match Jsont.Json.encode jsont t with
-  | Ok json -> json
-  | Error msg -> failwith ("Content_block.to_json: " ^ msg)
-
-let of_json json =
-  match Jsont.Json.decode jsont json with
-  | Ok v -> v
-  | Error msg -> raise (Invalid_argument ("Content_block.of_json: " ^ msg))
 
 let pp fmt = function
   | Text t -> Text.pp fmt t

@@ -14,7 +14,6 @@ type t = {
   stdin : Eio.Flow.sink_ty r;
   stdin_close : [`Close | `Flow] r;
   stdout : Eio.Buf_read.t;
-  sw : Switch.t;
 }
 
 let setting_source_to_string = function
@@ -162,7 +161,7 @@ let create ~sw ~process_mgr ~options () =
   in
   let stdout = Eio.Buf_read.of_flow ~max_size (stdout_r :> Eio.Flow.source_ty r) in
 
-  { process = P process; stdin; stdin_close; stdout; sw }
+  { process = P process; stdin; stdin_close; stdout }
 
 let send t json =
   let data = match Jsont_bytesrw.encode_string' Jsont.json json with
@@ -191,17 +190,35 @@ let receive_line t =
       Log.err (fun m -> m "Failed to receive message: %s" (Printexc.to_string exn));
       raise (Connection_error (Printf.sprintf "Failed to receive message: %s" (Printexc.to_string exn)))
 
+(** Wire codec for interrupt response messages. *)
+module Interrupt_wire = struct
+  type inner = { subtype : string; request_id : string }
+  type t = { type_ : string; response : inner }
+
+  let inner_jsont : inner Jsont.t =
+    let make subtype request_id = { subtype; request_id } in
+    Jsont.Object.map ~kind:"InterruptInner" make
+    |> Jsont.Object.mem "subtype" Jsont.string ~enc:(fun r -> r.subtype)
+    |> Jsont.Object.mem "request_id" Jsont.string ~enc:(fun r -> r.request_id)
+    |> Jsont.Object.finish
+
+  let jsont : t Jsont.t =
+    let make type_ response = { type_; response } in
+    Jsont.Object.map ~kind:"InterruptOuter" make
+    |> Jsont.Object.mem "type" Jsont.string ~enc:(fun r -> r.type_)
+    |> Jsont.Object.mem "response" inner_jsont ~enc:(fun r -> r.response)
+    |> Jsont.Object.finish
+
+  let encode () =
+    let wire = { type_ = "control_response"; response = { subtype = "interrupt"; request_id = "" } } in
+    match Jsont.Json.encode jsont wire with
+    | Ok json -> json
+    | Error msg -> failwith ("Interrupt_wire.encode: " ^ msg)
+end
+
 let interrupt t =
   Log.info (fun m -> m "Sending interrupt signal");
-  let interrupt_msg =
-    Jsont.Json.object' [
-      Jsont.Json.mem (Jsont.Json.name "type") (Jsont.Json.string "control_response");
-      Jsont.Json.mem (Jsont.Json.name "response") (Jsont.Json.object' [
-        Jsont.Json.mem (Jsont.Json.name "subtype") (Jsont.Json.string "interrupt");
-        Jsont.Json.mem (Jsont.Json.name "request_id") (Jsont.Json.string "");
-      ])
-    ]
-  in
+  let interrupt_msg = Interrupt_wire.encode () in
   send t interrupt_msg
 
 let close t =
