@@ -20,56 +20,61 @@ let run env =
 
   (* Consume initial messages *)
   let messages = Client.receive_all client in
-  List.iter (function
-    | Message.Assistant msg ->
-        List.iter (function
-          | Content_block.Text t ->
-              traceln "Assistant: %s" (Content_block.Text.text t)
-          | _ -> ()
-        ) (Message.Assistant.content msg)
-    | _ -> ()
-  ) messages;
+  List.iter
+    (function
+      | Message.Assistant msg ->
+          List.iter
+            (function
+              | Content_block.Text t ->
+                  traceln "Assistant: %s" (Content_block.Text.text t)
+              | _ -> ())
+            (Message.Assistant.content msg)
+      | _ -> ())
+    messages;
 
   traceln "\n2. Getting server info...";
   (try
-    let info = Client.get_server_info client in
-    traceln "Server version: %s" (Sdk_control.Server_info.version info);
-    traceln "Capabilities: [%s]"
-      (String.concat ", " (Sdk_control.Server_info.capabilities info));
-    traceln "Commands: [%s]"
-      (String.concat ", " (Sdk_control.Server_info.commands info));
-    traceln "Output styles: [%s]"
-      (String.concat ", " (Sdk_control.Server_info.output_styles info));
-  with
+     let info = Client.get_server_info client in
+     traceln "Server version: %s" (Sdk_control.Server_info.version info);
+     traceln "Capabilities: [%s]"
+       (String.concat ", " (Sdk_control.Server_info.capabilities info));
+     traceln "Commands: [%s]"
+       (String.concat ", " (Sdk_control.Server_info.commands info));
+     traceln "Output styles: [%s]"
+       (String.concat ", " (Sdk_control.Server_info.output_styles info))
+   with
   | Failure msg -> traceln "Failed to get server info: %s" msg
   | exn -> traceln "Error getting server info: %s" (Printexc.to_string exn));
 
   traceln "\n3. Switching to a different model (if available)...";
   (try
-    Client.set_model_string client "claude-sonnet-4";
-    traceln "Model switched successfully";
+     Client.set_model client (Model.of_string "claude-sonnet-4");
+     traceln "Model switched successfully";
 
-    (* Query with new model *)
-    Client.query client "Confirm your model again please.";
-    let messages = Client.receive_all client in
-    List.iter (function
-      | Message.Assistant msg ->
-          List.iter (function
-            | Content_block.Text t ->
-                traceln "Assistant (new model): %s" (Content_block.Text.text t)
-            | _ -> ()
-          ) (Message.Assistant.content msg)
-      | _ -> ()
-    ) messages;
-  with
+     (* Query with new model *)
+     Client.query client "Confirm your model again please.";
+     let messages = Client.receive_all client in
+     List.iter
+       (function
+         | Message.Assistant msg ->
+             List.iter
+               (function
+                 | Content_block.Text t ->
+                     traceln "Assistant (new model): %s"
+                       (Content_block.Text.text t)
+                 | _ -> ())
+               (Message.Assistant.content msg)
+         | _ -> ())
+       messages
+   with
   | Failure msg -> traceln "Failed to switch model: %s" msg
   | exn -> traceln "Error switching model: %s" (Printexc.to_string exn));
 
   traceln "\n4. Changing permission mode...";
   (try
-    Client.set_permission_mode client Permissions.Mode.Accept_edits;
-    traceln "Permission mode changed to Accept_edits";
-  with
+     Client.set_permission_mode client Permissions.Mode.Accept_edits;
+     traceln "Permission mode changed to Accept_edits"
+   with
   | Failure msg -> traceln "Failed to change permission mode: %s" msg
   | exn -> traceln "Error changing permission mode: %s" (Printexc.to_string exn));
 
@@ -78,9 +83,7 @@ let run env =
 
 let () =
   Eio_main.run @@ fun env ->
-  try
-    run env
-  with
+  try run env with
   | Transport.CLI_not_found msg ->
       traceln "Error: %s" msg;
       traceln "Make sure the 'claude' CLI is installed and authenticated.";

@@ -1,7 +1,7 @@
 (** Incoming messages from the Claude CLI.
 
-    This module defines a discriminated union of all possible message types
-    that can be received from the Claude CLI, with a single jsont codec.
+    This module defines a discriminated union of all possible message types that
+    can be received from the Claude CLI, with a single jsont codec.
 
     The codec uses the "type" field to discriminate between message types:
     - "user", "assistant", "system", "result" -> Message variant
@@ -39,8 +39,8 @@ module Control_request : sig
     | Hook_callback of Hook_callback.t
     | Unknown of string * Jsont.json
 
-  (** Full control request message *)
   type t
+  (** Full control request message *)
 
   val request_id : t -> string
   val request : t -> request
@@ -54,5 +54,5 @@ type t =
   | Control_request of Control_request.t
 
 val jsont : t Jsont.t
-(** Codec for incoming messages. Uses the "type" field to discriminate.
-    Use [Jsont.pp_value jsont ()] for pretty-printing. *)
+(** Codec for incoming messages. Uses the "type" field to discriminate. Use
+    [Jsont.pp_value jsont ()] for pretty-printing. *)

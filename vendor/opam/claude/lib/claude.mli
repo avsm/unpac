@@ -17,8 +17,10 @@
 
     The library is structured into several focused modules:
 
-    - {!Content_block}: Defines content blocks (text, tool use, tool results, thinking)
-    - {!Message}: Messages exchanged with Claude (user, assistant, system, result)
+    - {!Content_block}: Defines content blocks (text, tool use, tool results,
+      thinking)
+    - {!Message}: Messages exchanged with Claude (user, assistant, system,
+      result)
     - {!Control}: Control flow messages for session management
     - {!Permissions}: Fine-grained permission system for tool usage
     - {!Options}: Configuration options for Claude sessions
@@ -29,23 +31,25 @@
 
     {[
       open Claude
-      
+
       (* Create a simple query *)
       let query_claude ~sw env prompt =
         let options = Options.default in
         Client.query ~sw env ~options prompt
-      
+
       (* Process streaming responses *)
       let process_response messages =
-        Seq.iter (function
-          | Message.Assistant msg ->
-              List.iter (function
-                | Content_block.Text t ->
-                    print_endline (Content_block.Text.text t)
-                | _ -> ()
-              ) (Message.Assistant.content msg)
-          | _ -> ()
-        ) messages
+        Seq.iter
+          (function
+            | Message.Assistant msg ->
+                List.iter
+                  (function
+                    | Content_block.Text t ->
+                        print_endline (Content_block.Text.text t)
+                    | _ -> ())
+                  (Message.Assistant.content msg)
+            | _ -> ())
+          messages
     ]}
 
     {1 Advanced Features}
@@ -55,9 +59,9 @@
     Control which tools Claude can use and how:
 
     {[
-      let options = 
+      let options =
         Options.default
-        |> Options.with_allowed_tools ["Read"; "Write"; "Bash"]
+        |> Options.with_allowed_tools [ "Read"; "Write"; "Bash" ]
         |> Options.with_permission_mode Permissions.Mode.Accept_edits
     ]}
 
@@ -69,10 +73,10 @@
       let my_callback ~tool_name ~input ~context =
         if tool_name = "Bash" then
           Permissions.Result.deny ~message:"Bash not allowed" ~interrupt:false
-        else
-          Permissions.Result.allow ()
-      
-      let options = Options.default |> Options.with_permission_callback my_callback
+        else Permissions.Result.allow ()
+
+      let options =
+        Options.default |> Options.with_permission_callback my_callback
     ]}
 
     {2 System Prompts}
@@ -80,24 +84,25 @@
     Customize Claude's behavior with system prompts:
 
     {[
-      let options = 
+      let options =
         Options.default
-        |> Options.with_system_prompt "You are a helpful OCaml programming assistant."
+        |> Options.with_system_prompt
+             "You are a helpful OCaml programming assistant."
         |> Options.with_append_system_prompt "Always use Jane Street style."
     ]}
 
     {1 Logging}
 
-    The library uses the Logs library for structured logging. Each module has its
-    own log source (e.g., "claude.message", "claude.transport") allowing fine-grained
-    control over logging verbosity:
+    The library uses the Logs library for structured logging. Each module has
+    its own log source (e.g., "claude.message", "claude.transport") allowing
+    fine-grained control over logging verbosity:
 
     {[
       (* Enable debug logging for message handling *)
       Logs.Src.set_level Message.src (Some Logs.Debug);
-      
+
       (* Enable info logging for transport layer *)
-      Logs.Src.set_level Transport.src (Some Logs.Info);
+      Logs.Src.set_level Transport.src (Some Logs.Info)
     ]}
 
     {1 Error Handling}
@@ -111,39 +116,37 @@
 
     {[
       let run_claude_session ~sw env =
-        let options = 
-          Options.create
-            ~allowed_tools:["Read"; "Write"]
+        let options =
+          Options.create ~allowed_tools:[ "Read"; "Write" ]
             ~permission_mode:Permissions.Mode.Accept_edits
-            ~system_prompt:"You are an OCaml expert."
-            ~max_thinking_tokens:10000
+            ~system_prompt:"You are an OCaml expert." ~max_thinking_tokens:10000
             ()
         in
-        
+
         let prompt = "Write a function to calculate fibonacci numbers" in
         let messages = Client.query ~sw env ~options prompt in
-        
-        Seq.iter (fun msg ->
-          Message.log_received msg;
-          match msg with
-          | Message.Assistant assistant ->
-              Printf.printf "Claude: %s\n" 
-                (Message.Assistant.model assistant);
-              List.iter (function
-                | Content_block.Text t ->
-                    print_endline (Content_block.Text.text t)
-                | Content_block.Tool_use t ->
-                    Printf.printf "Using tool: %s\n" 
-                      (Content_block.Tool_use.name t)
-                | _ -> ()
-              ) (Message.Assistant.content assistant)
-          | Message.Result result ->
-              Printf.printf "Session complete. Duration: %dms\n"
-                (Message.Result.duration_ms result)
-          | _ -> ()
-        ) messages
-    ]}
-*)
+
+        Seq.iter
+          (fun msg ->
+            Message.log_received msg;
+            match msg with
+            | Message.Assistant assistant ->
+                Printf.printf "Claude: %s\n" (Message.Assistant.model assistant);
+                List.iter
+                  (function
+                    | Content_block.Text t ->
+                        print_endline (Content_block.Text.text t)
+                    | Content_block.Tool_use t ->
+                        Printf.printf "Using tool: %s\n"
+                          (Content_block.Tool_use.name t)
+                    | _ -> ())
+                  (Message.Assistant.content assistant)
+            | Message.Result result ->
+                Printf.printf "Session complete. Duration: %dms\n"
+                  (Message.Result.duration_ms result)
+            | _ -> ())
+          messages
+    ]} *)
 
 (** {1 Modules} *)
 

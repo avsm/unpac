@@ -4,18 +4,19 @@
     received from Claude, including user input, assistant responses, system
     messages, and result metadata. *)
 
-(** The log source for message operations *)
 val src : Logs.Src.t
+(** The log source for message operations *)
 
 (** {1 User Messages} *)
 
 module User : sig
   (** Messages sent by the user. *)
 
+  (** The content of a user message. *)
   type content =
     | String of string  (** Simple text message *)
-    | Blocks of Content_block.t list  (** Complex message with multiple content blocks *)
-  (** The content of a user message. *)
+    | Blocks of Content_block.t list
+        (** Complex message with multiple content blocks *)
 
   type t
   (** The type of user messages. *)
@@ -30,16 +31,15 @@ module User : sig
   (** [create_blocks blocks] creates a user message with content blocks. *)
 
   val create_with_tool_result :
-    tool_use_id:string ->
-    content:string ->
-    ?is_error:bool ->
-    unit -> t
-  (** [create_with_tool_result ~tool_use_id ~content ?is_error ()] creates a user
-      message containing a tool result. *)
+    tool_use_id:string -> content:string -> ?is_error:bool -> unit -> t
+  (** [create_with_tool_result ~tool_use_id ~content ?is_error ()] creates a
+      user message containing a tool result. *)
 
-  val create_mixed : text:string option -> tool_results:(string * string * bool option) list -> t
-  (** [create_mixed ?text ~tool_results] creates a user message with optional text
-      and tool results. Each tool result is (tool_use_id, content, is_error). *)
+  val create_mixed :
+    text:string option -> tool_results:(string * string * bool option) list -> t
+  (** [create_mixed ?text ~tool_results] creates a user message with optional
+      text and tool results. Each tool result is (tool_use_id, content,
+      is_error). *)
 
   val content : t -> content
   (** [content t] returns the content of the user message. *)
@@ -48,10 +48,12 @@ module User : sig
   (** [unknown t] returns the unknown fields preserved from JSON. *)
 
   val as_text : t -> string option
-  (** [as_text t] returns the text content if the message is a simple string, None otherwise. *)
+  (** [as_text t] returns the text content if the message is a simple string,
+      None otherwise. *)
 
   val get_blocks : t -> Content_block.t list
-  (** [get_blocks t] returns the content blocks, or a single text block if it's a string message. *)
+  (** [get_blocks t] returns the content blocks, or a single text block if it's
+      a string message. *)
 
   val to_json : t -> Jsont.json
   (** [to_json t] converts the user message to its JSON representation. *)
@@ -66,21 +68,21 @@ end
 module Assistant : sig
   (** Messages from Claude assistant. *)
 
-  type error = [
-    | `Authentication_failed  (** Authentication with Claude API failed *)
-    | `Billing_error         (** Billing or account issue *)
-    | `Rate_limit            (** Rate limit exceeded *)
-    | `Invalid_request       (** Request was invalid *)
-    | `Server_error          (** Internal server error *)
-    | `Unknown               (** Unknown error type *)
-  ]
+  type error =
+    [ `Authentication_failed  (** Authentication with Claude API failed *)
+    | `Billing_error  (** Billing or account issue *)
+    | `Rate_limit  (** Rate limit exceeded *)
+    | `Invalid_request  (** Request was invalid *)
+    | `Server_error  (** Internal server error *)
+    | `Unknown  (** Unknown error type *) ]
   (** The type of assistant message errors based on Python SDK error types. *)
 
   val error_to_string : error -> string
   (** [error_to_string err] converts an error to its string representation. *)
 
   val error_of_string : string -> error
-  (** [error_of_string s] parses an error string. Unknown strings become [`Unknown]. *)
+  (** [error_of_string s] parses an error string. Unknown strings become
+      [`Unknown]. *)
 
   type t
   (** The type of assistant messages. *)
@@ -88,7 +90,8 @@ module Assistant : sig
   val jsont : t Jsont.t
   (** [jsont] is the Jsont codec for assistant messages. *)
 
-  val create : content:Content_block.t list -> model:string -> ?error:error -> unit -> t
+  val create :
+    content:Content_block.t list -> model:string -> ?error:error -> unit -> t
   (** [create ~content ~model ?error ()] creates an assistant message.
       @param content List of content blocks in the response
       @param model The model identifier used for the response
@@ -101,7 +104,8 @@ module Assistant : sig
   (** [model t] returns the model identifier. *)
 
   val error : t -> error option
-  (** [error t] returns the optional error that occurred during message generation. *)
+  (** [error t] returns the optional error that occurred during message
+      generation. *)
 
   val unknown : t -> Unknown.t
   (** [unknown t] returns the unknown fields preserved from JSON. *)
@@ -116,7 +120,8 @@ module Assistant : sig
   (** [get_thinking t] extracts all thinking blocks from the message. *)
 
   val has_tool_use : t -> bool
-  (** [has_tool_use t] returns true if the message contains any tool use blocks. *)
+  (** [has_tool_use t] returns true if the message contains any tool use blocks.
+  *)
 
   val combined_text : t -> string
   (** [combined_text t] concatenates all text blocks into a single string. *)
@@ -147,23 +152,16 @@ module System : sig
   }
   (** Init message fields. *)
 
-  type error = {
-    error : string;
-    unknown : Unknown.t;
-  }
+  type error = { error : string; unknown : Unknown.t }
   (** Error message fields. *)
 
-  type other = {
-    subtype : string;
-    unknown : Unknown.t;
-  }
+  type other = { subtype : string; unknown : Unknown.t }
   (** Unknown subtype fields. *)
 
   type t =
     | Init of init
     | Error of error
-    | Other of other
-  (** The type of system messages. *)
+    | Other of other  (** The type of system messages. *)
 
   val jsont : t Jsont.t
   (** [jsont] is the Jsont codec for system messages. *)
@@ -229,9 +227,11 @@ module Result : sig
       ?total_tokens:int ->
       ?cache_creation_input_tokens:int ->
       ?cache_read_input_tokens:int ->
-      unit -> t
-    (** [create ?input_tokens ?output_tokens ?total_tokens ?cache_creation_input_tokens
-        ?cache_read_input_tokens ()] creates usage statistics. *)
+      unit ->
+      t
+    (** [create ?input_tokens ?output_tokens ?total_tokens
+         ?cache_creation_input_tokens ?cache_read_input_tokens ()] creates usage
+        statistics. *)
 
     val input_tokens : t -> int option
     (** [input_tokens t] returns the number of input tokens used. *)
@@ -252,11 +252,14 @@ module Result : sig
     (** [unknown t] returns the unknown fields preserved from JSON. *)
 
     val effective_input_tokens : t -> int
-    (** [effective_input_tokens t] returns input tokens minus cached tokens, or 0 if not available. *)
+    (** [effective_input_tokens t] returns input tokens minus cached tokens, or
+        0 if not available. *)
 
-    val total_cost_estimate : t -> input_price:float -> output_price:float -> float option
-    (** [total_cost_estimate t ~input_price ~output_price] estimates the cost based on token
-        prices per million tokens. Returns None if token counts are not available. *)
+    val total_cost_estimate :
+      t -> input_price:float -> output_price:float -> float option
+    (** [total_cost_estimate t ~input_price ~output_price] estimates the cost
+        based on token prices per million tokens. Returns None if token counts
+        are not available. *)
   end
 
   type t
@@ -276,9 +279,10 @@ module Result : sig
     ?usage:Usage.t ->
     ?result:string ->
     ?structured_output:Jsont.json ->
-    unit -> t
+    unit ->
+    t
   (** [create ~subtype ~duration_ms ~duration_api_ms ~is_error ~num_turns
-      ~session_id ?total_cost_usd ?usage ?result ()] creates a result message.
+       ~session_id ?total_cost_usd ?usage ?result ()] creates a result message.
       @param subtype The subtype of the result
       @param duration_ms Total duration in milliseconds
       @param duration_api_ms API duration in milliseconds
@@ -338,7 +342,8 @@ type t =
   | Assistant of Assistant.t
   | System of System.t
   | Result of Result.t
-(** The type of messages, which can be user, assistant, system, or result. *)
+      (** The type of messages, which can be user, assistant, system, or result.
+      *)
 
 val jsont : t Jsont.t
 (** [jsont] is the Jsont codec for messages. *)
@@ -349,15 +354,23 @@ val user_string : string -> t
 val user_blocks : Content_block.t list -> t
 (** [user_blocks blocks] creates a user message with content blocks. *)
 
-val user_with_tool_result : tool_use_id:string -> content:string -> ?is_error:bool -> unit -> t
-(** [user_with_tool_result ~tool_use_id ~content ?is_error ()] creates a user message
-    containing a tool result. *)
+val user_with_tool_result :
+  tool_use_id:string -> content:string -> ?is_error:bool -> unit -> t
+(** [user_with_tool_result ~tool_use_id ~content ?is_error ()] creates a user
+    message containing a tool result. *)
 
-val assistant : content:Content_block.t list -> model:string -> ?error:Assistant.error -> unit -> t
+val assistant :
+  content:Content_block.t list ->
+  model:string ->
+  ?error:Assistant.error ->
+  unit ->
+  t
 (** [assistant ~content ~model ?error ()] creates an assistant message. *)
 
-val assistant_text : text:string -> model:string -> ?error:Assistant.error -> unit -> t
-(** [assistant_text ~text ~model ?error ()] creates an assistant message with only text content. *)
+val assistant_text :
+  text:string -> model:string -> ?error:Assistant.error -> unit -> t
+(** [assistant_text ~text ~model ?error ()] creates an assistant message with
+    only text content. *)
 
 val system_init : session_id:string -> t
 (** [system_init ~session_id] creates a system init message. *)
@@ -376,9 +389,10 @@ val result :
   ?usage:Result.Usage.t ->
   ?result:string ->
   ?structured_output:Jsont.json ->
-  unit -> t
+  unit ->
+  t
 (** [result ~subtype ~duration_ms ~duration_api_ms ~is_error ~num_turns
-    ~session_id ?total_cost_usd ?usage ?result ()] creates a result message. *)
+     ~session_id ?total_cost_usd ?usage ?result ()] creates a result message. *)
 
 val to_json : t -> Jsont.json
 (** [to_json t] converts any message to its JSON representation. *)
@@ -414,7 +428,8 @@ val extract_tool_uses : t -> Content_block.Tool_use.t list
 (** [extract_tool_uses t] extracts tool use blocks from assistant messages. *)
 
 val get_session_id : t -> string option
-(** [get_session_id t] extracts the session ID from system or result messages. *)
+(** [get_session_id t] extracts the session ID from system or result messages.
+*)
 
 (** {1 Logging} *)
 
@@ -426,4 +441,3 @@ val log_sending : t -> unit
 
 val log_error : string -> t -> unit
 (** [log_error msg t] logs an error with the given message and context. *)
-
