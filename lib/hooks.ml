@@ -435,18 +435,29 @@ let result_to_json result =
   | Ok json -> json
   | Error msg -> failwith ("result_to_json: " ^ msg)
 
+(** Wire codec for hook matcher in protocol format *)
+module Protocol_matcher_wire = struct
+  type t = { matcher : string option; callbacks : Jsont.json list }
+
+  let jsont : t Jsont.t =
+    let make matcher callbacks = { matcher; callbacks } in
+    Jsont.Object.map ~kind:"ProtocolMatcher" make
+    |> Jsont.Object.opt_mem "matcher" Jsont.string ~enc:(fun r -> r.matcher)
+    |> Jsont.Object.mem "callbacks" (Jsont.list Jsont.json) ~enc:(fun r -> r.callbacks)
+    |> Jsont.Object.finish
+
+  let encode m =
+    match Jsont.Json.encode jsont m with
+    | Ok json -> json
+    | Error msg -> failwith ("Protocol_matcher_wire.encode: " ^ msg)
+end
+
 let config_to_protocol_format config =
   let hooks_dict = List.map (fun (event, matchers) ->
     let event_name = event_to_string event in
     let matchers_json = List.map (fun m ->
       (* matcher and hookCallbackIds will be filled in by client *)
-      let mems = [
-        Jsont.Json.mem (Jsont.Json.name "matcher") (match m.matcher with
-           | Some p -> Jsont.Json.string p
-           | None -> Jsont.Json.null ());
-        Jsont.Json.mem (Jsont.Json.name "callbacks") (Jsont.Json.list []);  (* Placeholder, filled by client *)
-      ] in
-      Jsont.Json.object' mems
+      Protocol_matcher_wire.encode { matcher = m.matcher; callbacks = [] }
     ) matchers in
     Jsont.Json.mem (Jsont.Json.name event_name) (Jsont.Json.list matchers_json)
   ) config in

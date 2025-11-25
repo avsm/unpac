@@ -356,13 +356,6 @@ val with_output_format : Structured_output.t -> t -> t
 val jsont : t Jsont.t
 (** [jsont] is the Jsont codec for Options.t *)
 
-val to_json : t -> Jsont.json
-(** [to_json t] converts options to JSON representation. *)
-
-val of_json : Jsont.json -> t
-(** [of_json json] parses options from JSON.
-    @raise Invalid_argument if the JSON is not valid options. *)
-
 val pp : Format.formatter -> t -> unit
 (** [pp fmt t] pretty-prints the options. *)
 

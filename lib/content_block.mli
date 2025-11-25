@@ -24,14 +24,8 @@ module Text : sig
   (** [unknown t] returns any unknown fields from JSON parsing. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for text blocks. *)
-
-  val to_json : t -> Jsont.json
-  (** [to_json t] converts the text block to its JSON representation. *)
-
-  val of_json : Jsont.json -> t
-  (** [of_json json] parses a text block from JSON.
-      @raise Invalid_argument if the JSON is not a valid text block. *)
+  (** [jsont] is the Jsont codec for text blocks.
+      Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization. *)
 
   val pp : Format.formatter -> t -> unit
   (** [pp fmt t] pretty-prints the text block. *)
@@ -72,11 +66,6 @@ module Tool_use : sig
     val keys : t -> string list
     (** [keys t] returns all keys in the input. *)
 
-    val to_json : t -> Jsont.json
-    (** [to_json t] converts to JSON representation. Internal use only. *)
-
-    val of_json : Jsont.json -> t
-    (** [of_json json] parses from JSON. Internal use only. *)
   end
 
   type t
@@ -101,14 +90,8 @@ module Tool_use : sig
   (** [unknown t] returns any unknown fields from JSON parsing. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for tool use blocks. *)
-
-  val to_json : t -> Jsont.json
-  (** [to_json t] converts the tool use block to its JSON representation. *)
-
-  val of_json : Jsont.json -> t
-  (** [of_json json] parses a tool use block from JSON.
-      @raise Invalid_argument if the JSON is not a valid tool use block. *)
+  (** [jsont] is the Jsont codec for tool use blocks.
+      Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization. *)
 
   val pp : Format.formatter -> t -> unit
   (** [pp fmt t] pretty-prints the tool use block. *)
@@ -141,14 +124,8 @@ module Tool_result : sig
   (** [unknown t] returns any unknown fields from JSON parsing. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for tool result blocks. *)
-
-  val to_json : t -> Jsont.json
-  (** [to_json t] converts the tool result block to its JSON representation. *)
-
-  val of_json : Jsont.json -> t
-  (** [of_json json] parses a tool result block from JSON.
-      @raise Invalid_argument if the JSON is not a valid tool result block. *)
+  (** [jsont] is the Jsont codec for tool result blocks.
+      Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization. *)
 
   val pp : Format.formatter -> t -> unit
   (** [pp fmt t] pretty-prints the tool result block. *)
@@ -177,14 +154,8 @@ module Thinking : sig
   (** [unknown t] returns any unknown fields from JSON parsing. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for thinking blocks. *)
-
-  val to_json : t -> Jsont.json
-  (** [to_json t] converts the thinking block to its JSON representation. *)
-
-  val of_json : Jsont.json -> t
-  (** [of_json json] parses a thinking block from JSON.
-      @raise Invalid_argument if the JSON is not a valid thinking block. *)
+  (** [jsont] is the Jsont codec for thinking blocks.
+      Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization. *)
 
   val pp : Format.formatter -> t -> unit
   (** [pp fmt t] pretty-prints the thinking block. *)
@@ -212,14 +183,8 @@ val thinking : thinking:string -> signature:string -> t
 (** [thinking ~thinking ~signature] creates a thinking content block. *)
 
 val jsont : t Jsont.t
-(** [jsont] is the Jsont codec for content blocks. *)
-
-val to_json : t -> Jsont.json
-(** [to_json t] converts any content block to its JSON representation. *)
-
-val of_json : Jsont.json -> t
-(** [of_json json] parses a content block from JSON.
-    @raise Invalid_argument if the JSON is not a valid content block. *)
+(** [jsont] is the Jsont codec for content blocks.
+    Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization. *)
 
 val pp : Format.formatter -> t -> unit
 (** [pp fmt t] pretty-prints any content block. *)

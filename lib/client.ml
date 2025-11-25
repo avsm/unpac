@@ -1,27 +1,21 @@
 let src = Logs.Src.create "claude.client" ~doc:"Claude client"
 module Log = (val Logs.src_log src : Logs.LOG)
 
-(** Control response builders using jsont *)
+(** Control response builders using Sdk_control codecs *)
 module Control_response = struct
   let success ~request_id ~response =
-    Jsont.Json.object' [
-      Jsont.Json.mem (Jsont.Json.name "type") (Jsont.Json.string "control_response");
-      Jsont.Json.mem (Jsont.Json.name "response") (Jsont.Json.object' [
-        Jsont.Json.mem (Jsont.Json.name "subtype") (Jsont.Json.string "success");
-        Jsont.Json.mem (Jsont.Json.name "request_id") (Jsont.Json.string request_id);
-        Jsont.Json.mem (Jsont.Json.name "response") response;
-      ]);
-    ]
+    let resp = Sdk_control.Response.success ~request_id ?response () in
+    let ctrl = Sdk_control.create_response ~response:resp () in
+    match Jsont.Json.encode Sdk_control.jsont ctrl with
+    | Ok json -> json
+    | Error msg -> failwith ("Control_response.success: " ^ msg)
 
   let error ~request_id ~message =
-    Jsont.Json.object' [
-      Jsont.Json.mem (Jsont.Json.name "type") (Jsont.Json.string "control_response");
-      Jsont.Json.mem (Jsont.Json.name "response") (Jsont.Json.object' [
-        Jsont.Json.mem (Jsont.Json.name "subtype") (Jsont.Json.string "error");
-        Jsont.Json.mem (Jsont.Json.name "request_id") (Jsont.Json.string request_id);
-        Jsont.Json.mem (Jsont.Json.name "error") (Jsont.Json.string message);
-      ]);
-    ]
+    let resp = Sdk_control.Response.error ~request_id ~error:message () in
+    let ctrl = Sdk_control.create_response ~response:resp () in
+    match Jsont.Json.encode Sdk_control.jsont ctrl with
+    | Ok json -> json
+    | Error msg -> failwith ("Control_response.error: " ^ msg)
 end
 
 (* Helper functions for JSON manipulation using jsont *)
@@ -30,24 +24,71 @@ let json_to_string json =
   | Ok s -> s
   | Error err -> failwith (Jsont.Error.to_string err)
 
-(* JSON construction helpers using jsont *)
-let json_string s = Jsont.Json.string s
-let json_null () = Jsont.Json.null ()
+(** Wire-level codec for permission responses to CLI.
+    Uses camelCase field names as expected by the CLI protocol. *)
+module Permission_wire = struct
+  type allow = { allow_behavior : string; allow_updated_input : Jsont.json }
+  type deny = { deny_behavior : string; deny_message : string }
 
-let json_object pairs =
-  Jsont.Json.object' (List.map (fun (k, v) -> Jsont.Json.mem (Jsont.Json.name k) v) pairs)
+  let allow_jsont : allow Jsont.t =
+    let make allow_behavior allow_updated_input = { allow_behavior; allow_updated_input } in
+    Jsont.Object.map ~kind:"AllowWire" make
+    |> Jsont.Object.mem "behavior" Jsont.string ~enc:(fun r -> r.allow_behavior)
+    |> Jsont.Object.mem "updatedInput" Jsont.json ~enc:(fun r -> r.allow_updated_input)
+    |> Jsont.Object.finish
+
+  let deny_jsont : deny Jsont.t =
+    let make deny_behavior deny_message = { deny_behavior; deny_message } in
+    Jsont.Object.map ~kind:"DenyWire" make
+    |> Jsont.Object.mem "behavior" Jsont.string ~enc:(fun r -> r.deny_behavior)
+    |> Jsont.Object.mem "message" Jsont.string ~enc:(fun r -> r.deny_message)
+    |> Jsont.Object.finish
+
+  let encode_allow ~updated_input =
+    match Jsont.Json.encode allow_jsont { allow_behavior = "allow"; allow_updated_input = updated_input } with
+    | Ok json -> json
+    | Error msg -> failwith ("Permission_wire.encode_allow: " ^ msg)
+
+  let encode_deny ~message =
+    match Jsont.Json.encode deny_jsont { deny_behavior = "deny"; deny_message = message } with
+    | Ok json -> json
+    | Error msg -> failwith ("Permission_wire.encode_deny: " ^ msg)
+end
+
+(** Wire-level codec for hook matcher configuration sent to CLI. *)
+module Hook_matcher_wire = struct
+  type t = {
+    matcher : string option;
+    hook_callback_ids : string list;
+  }
+
+  let jsont : t Jsont.t =
+    let make matcher hook_callback_ids = { matcher; hook_callback_ids } in
+    Jsont.Object.map ~kind:"HookMatcherWire" make
+    |> Jsont.Object.opt_mem "matcher" Jsont.string ~enc:(fun r -> r.matcher)
+    |> Jsont.Object.mem "hookCallbackIds" (Jsont.list Jsont.string) ~enc:(fun r -> r.hook_callback_ids)
+    |> Jsont.Object.finish
+
+  let encode matchers =
+    Jsont.Json.list (List.map (fun m ->
+      match Jsont.Json.encode jsont m with
+      | Ok json -> json
+      | Error msg -> failwith ("Hook_matcher_wire.encode: " ^ msg)
+    ) matchers)
+end
 
 type t = {
   transport : Transport.t;
   permission_callback : Permissions.callback option;
   permission_log : Permissions.Rule.t list ref option;
   hook_callbacks : (string, Hooks.callback) Hashtbl.t;
-  mutable next_callback_id : int;
   mutable session_id : string option;
   control_responses : (string, Jsont.json) Hashtbl.t;
   control_mutex : Eio.Mutex.t;
   control_condition : Eio.Condition.t;
 }
+
+let session_id t = t.session_id
 
 let handle_control_request t (ctrl_req : Incoming.Control_request.t) =
   let request_id = Incoming.Control_request.request_id ctrl_req in
@@ -76,21 +117,15 @@ let handle_control_request t (ctrl_req : Incoming.Control_request.t) =
          | Permissions.Result.Allow _ -> "ALLOW"
          | Permissions.Result.Deny _ -> "DENY"));
 
-      (* Convert permission result to CLI format *)
+      (* Convert permission result to CLI format using wire codec *)
       let response_data = match result with
         | Permissions.Result.Allow { updated_input; updated_permissions = _; unknown = _ } ->
             let updated_input = Option.value updated_input ~default:input in
-            json_object [
-              ("behavior", json_string "allow");
-              ("updatedInput", updated_input);
-            ]
+            Permission_wire.encode_allow ~updated_input
         | Permissions.Result.Deny { message; interrupt = _; unknown = _ } ->
-            json_object [
-              ("behavior", json_string "deny");
-              ("message", json_string message);
-            ]
+            Permission_wire.encode_deny ~message
       in
-      let response = Control_response.success ~request_id ~response:response_data in
+      let response = Control_response.success ~request_id ~response:(Some response_data) in
       Log.info (fun m -> m "Sending control response: %s" (json_to_string response));
       Transport.send t.transport response
 
@@ -109,7 +144,7 @@ let handle_control_request t (ctrl_req : Incoming.Control_request.t) =
           | Ok j -> j
           | Error msg -> failwith ("Failed to encode hook result: " ^ msg)
         in
-        let response = Control_response.success ~request_id ~response:result_json in
+        let response = Control_response.success ~request_id ~response:(Some result_json) in
         Log.info (fun m -> m "Hook callback succeeded, sending response");
         Transport.send t.transport response
       with
@@ -208,7 +243,6 @@ let create ?(options = Options.default) ~sw ~process_mgr () =
     permission_callback = Options.permission_callback options;
     permission_log = None;
     hook_callbacks;
-    next_callback_id = 0;
     session_id = None;
     control_responses = Hashtbl.create 16;
     control_mutex = Eio.Mutex.create ();
@@ -220,10 +254,10 @@ let create ?(options = Options.default) ~sw ~process_mgr () =
   | Some hooks_config ->
       Log.info (fun m -> m "Registering hooks...");
 
-      (* Build hooks configuration with callback IDs *)
-      let hooks_json = List.fold_left (fun acc (event, matchers) ->
+      (* Build hooks configuration with callback IDs as (string * Jsont.json) list *)
+      let hooks_list = List.map (fun (event, matchers) ->
         let event_name = Hooks.event_to_string event in
-        let matchers_json = List.map (fun matcher ->
+        let matcher_wires = List.map (fun matcher ->
           let callback_ids = List.map (fun callback ->
             let callback_id = Printf.sprintf "hook_%d" !next_callback_id in
             incr next_callback_id;
@@ -231,28 +265,20 @@ let create ?(options = Options.default) ~sw ~process_mgr () =
             Log.debug (fun m -> m "Registered callback: %s for event: %s" callback_id event_name);
             callback_id
           ) matcher.Hooks.callbacks in
-          json_object [
-            "matcher", (match matcher.Hooks.matcher with
-              | Some p -> json_string p
-              | None -> json_null ());
-            "hookCallbackIds", Jsont.Json.list (List.map (fun id -> json_string id) callback_ids);
-          ]
+          Hook_matcher_wire.{ matcher = matcher.Hooks.matcher; hook_callback_ids = callback_ids }
         ) matchers in
-        (event_name, Jsont.Json.list matchers_json) :: acc
-      ) [] hooks_config in
+        (event_name, Hook_matcher_wire.encode matcher_wires)
+      ) hooks_config in
 
-      (* Send initialize control request *)
-      let initialize_msg = json_object [
-        "type", json_string "control_request";
-        "request_id", json_string "init_hooks";
-        "request", json_object [
-          "subtype", json_string "initialize";
-          "hooks", json_object hooks_json;
-        ]
-      ] in
+      (* Create initialize request using Sdk_control codec *)
+      let request = Sdk_control.Request.initialize ~hooks:hooks_list () in
+      let ctrl_req = Sdk_control.create_request ~request_id:"init_hooks" ~request () in
+      let initialize_msg = match Jsont.Json.encode Sdk_control.jsont ctrl_req with
+        | Ok json -> json
+        | Error msg -> failwith ("Failed to encode initialize request: " ^ msg)
+      in
       Log.info (fun m -> m "Sending hooks initialize request");
-      Transport.send t.transport initialize_msg;
-      t.next_callback_id <- !next_callback_id
+      Transport.send t.transport initialize_msg
   | None -> ());
 
   t

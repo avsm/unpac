@@ -47,6 +47,11 @@ val src : Logs.Src.t
 type t
 (** The type of Claude clients. *)
 
+val session_id : t -> string option
+(** [session_id t] returns the session ID if one has been received from Claude.
+    The session ID is provided in system init messages and uniquely identifies
+    the current conversation session. *)
+
 val create :
   ?options:Options.t ->
   sw:Eio.Switch.t ->
