@@ -1,11 +1,10 @@
-type t = [
-  | `Sonnet_4_5
+type t =
+  [ `Sonnet_4_5
   | `Sonnet_4
   | `Sonnet_3_5
   | `Opus_4
   | `Haiku_4
-  | `Custom of string
-]
+  | `Custom of string ]
 
 let to_string = function
   | `Sonnet_4_5 -> "claude-sonnet-4-5"

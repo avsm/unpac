@@ -2,19 +2,17 @@
 
     This module provides a type and utilities for preserving unknown/extra
     fields when parsing JSON objects with jsont. Use with
-    [Jsont.Object.keep_unknown] to capture fields not explicitly defined
-    in your codec. *)
+    [Jsont.Object.keep_unknown] to capture fields not explicitly defined in your
+    codec. *)
 
 type t = Jsont.json
 (** The type of unknown fields - stored as raw JSON. *)
 
-let empty = Jsont.Object ([], Jsont.Meta.none)
 (** An empty unknown fields value (empty JSON object). *)
+let empty = Jsont.Object ([], Jsont.Meta.none)
 
-let is_empty = function
-  | Jsont.Object ([], _) -> true
-  | _ -> false
 (** [is_empty t] returns [true] if there are no unknown fields. *)
+let is_empty = function Jsont.Object ([], _) -> true | _ -> false
 
-let jsont = Jsont.json
 (** Codec for unknown fields. *)
+let jsont = Jsont.json

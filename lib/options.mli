@@ -17,11 +17,12 @@
 
     {2 Builder Pattern}
 
-    Options use a functional builder pattern - each [with_*] function returns
-    a new options value with the specified field updated:
+    Options use a functional builder pattern - each [with_*] function returns a
+    new options value with the specified field updated:
 
     {[
-      let options = Options.default
+      let options =
+        Options.default
         |> Options.with_model "claude-sonnet-4-5"
         |> Options.with_max_budget_usd 1.0
         |> Options.with_permission_mode Permissions.Mode.Accept_edits
@@ -32,29 +33,30 @@
     {3 CI/CD: Isolated, Reproducible Builds}
 
     {[
-      let ci_config = Options.default
-        |> Options.with_no_settings           (* Ignore user config *)
-        |> Options.with_max_budget_usd 0.50   (* 50 cent limit *)
-        |> Options.with_permission_mode
-             Permissions.Mode.Bypass_permissions
+      let ci_config =
+        Options.default |> Options.with_no_settings (* Ignore user config *)
+        |> Options.with_max_budget_usd 0.50 (* 50 cent limit *)
+        |> Options.with_permission_mode Permissions.Mode.Bypass_permissions
         |> Options.with_model "claude-haiku-4"
     ]}
 
     {3 Production: Cost Control with Fallback}
 
     {[
-      let prod_config = Options.default
+      let prod_config =
+        Options.default
         |> Options.with_model "claude-sonnet-4-5"
         |> Options.with_fallback_model "claude-haiku-4"
-        |> Options.with_max_budget_usd 10.0   (* $10 daily limit *)
+        |> Options.with_max_budget_usd 10.0 (* $10 daily limit *)
         |> Options.with_max_buffer_size 5_000_000
     ]}
 
     {3 Development: User Settings with Overrides}
 
     {[
-      let dev_config = Options.default
-        |> Options.with_setting_sources [User; Project]
+      let dev_config =
+        Options.default
+        |> Options.with_setting_sources [ User; Project ]
         |> Options.with_max_budget_usd 1.0
         |> Options.with_permission_mode Permissions.Mode.Default
     ]}
@@ -62,18 +64,25 @@
     {3 Structured Output: Type-Safe Responses}
 
     {[
-      let schema = Jsont.json_of_json (`O [
-        ("type", `String "object");
-        ("properties", `O [
-          ("count", `O [("type", `String "integer")]);
-          ("has_tests", `O [("type", `String "boolean")]);
-        ]);
-      ])
+      let schema =
+        Jsont.json_of_json
+          (`O
+             [
+               ("type", `String "object");
+               ( "properties",
+                 `O
+                   [
+                     ("count", `O [ ("type", `String "integer") ]);
+                     ("has_tests", `O [ ("type", `String "boolean") ]);
+                   ] );
+             ])
+
       let format = Structured_output.of_json_schema schema
 
-      let analysis_config = Options.default
+      let analysis_config =
+        Options.default
         |> Options.with_output_format format
-        |> Options.with_allowed_tools ["Read"; "Glob"; "Grep"]
+        |> Options.with_allowed_tools [ "Read"; "Glob"; "Grep" ]
     ]}
 
     {2 Advanced Options}
@@ -90,25 +99,28 @@
     - [User] - ~/.claude/config
     - [Project] - .claude/ in project root
     - [Local] - Current directory settings
-    - [Some \[\]] (via {!with_no_settings}) - No settings, fully isolated
+    - [Some []] (via {!with_no_settings}) - No settings, fully isolated
 
     This is critical for reproducible builds in CI/CD environments.
 
     {3 Model Fallback}
 
-    Use {!with_fallback_model} to specify an alternative model when the
-    primary model is unavailable or overloaded. This improves reliability. *)
+    Use {!with_fallback_model} to specify an alternative model when the primary
+    model is unavailable or overloaded. This improves reliability. *)
 
-(** The log source for options operations *)
 val src : Logs.Src.t
+(** The log source for options operations *)
 
 (** {1 Types} *)
 
-type setting_source = User | Project | Local
-(** Setting source determines which configuration files to load.
-    - [User]: Load user-level settings from ~/.claude/config
-    - [Project]: Load project-level settings from .claude/ in project root
-    - [Local]: Load local settings from current directory *)
+type setting_source =
+  | User
+  | Project
+  | Local
+      (** Setting source determines which configuration files to load.
+          - [User]: Load user-level settings from ~/.claude/config
+          - [Project]: Load project-level settings from .claude/ in project root
+          - [Local]: Load local settings from current directory *)
 
 type t
 (** The type of configuration options. *)
@@ -147,16 +159,18 @@ val create :
   ?user:string ->
   ?output_format:Structured_output.t ->
   ?unknown:Jsont.json ->
-  unit -> t
+  unit ->
+  t
 (** [create ?allowed_tools ?disallowed_tools ?max_thinking_tokens ?system_prompt
-    ?append_system_prompt ?permission_mode ?permission_callback ?model ?cwd ?env
-    ?continue_conversation ?resume ?max_turns ?permission_prompt_tool_name ?settings
-    ?add_dirs ?extra_args ?debug_stderr ?hooks ?max_budget_usd ?fallback_model
-    ?setting_sources ?max_buffer_size ?user ()]
-    creates a new configuration.
+     ?append_system_prompt ?permission_mode ?permission_callback ?model ?cwd
+     ?env ?continue_conversation ?resume ?max_turns ?permission_prompt_tool_name
+     ?settings ?add_dirs ?extra_args ?debug_stderr ?hooks ?max_budget_usd
+     ?fallback_model ?setting_sources ?max_buffer_size ?user ()] creates a new
+    configuration.
     @param allowed_tools List of explicitly allowed tool names
     @param disallowed_tools List of explicitly disallowed tool names
-    @param max_thinking_tokens Maximum tokens for thinking blocks (default: 8000)
+    @param max_thinking_tokens
+      Maximum tokens for thinking blocks (default: 8000)
     @param system_prompt Replace the default system prompt
     @param append_system_prompt Append to the default system prompt
     @param permission_mode Permission mode to use
@@ -213,7 +227,8 @@ val env : t -> (string * string) list
 (** [env t] returns the environment variables. *)
 
 val continue_conversation : t -> bool
-(** [continue_conversation t] returns whether to continue an existing conversation. *)
+(** [continue_conversation t] returns whether to continue an existing
+    conversation. *)
 
 val resume : t -> string option
 (** [resume t] returns the optional session ID to resume. *)
@@ -222,7 +237,8 @@ val max_turns : t -> int option
 (** [max_turns t] returns the optional maximum number of turns. *)
 
 val permission_prompt_tool_name : t -> string option
-(** [permission_prompt_tool_name t] returns the optional tool name for permission prompts. *)
+(** [permission_prompt_tool_name t] returns the optional tool name for
+    permission prompts. *)
 
 val settings : t -> string option
 (** [settings t] returns the optional path to settings file. *)
@@ -258,7 +274,8 @@ val output_format : t -> Structured_output.t option
 (** [output_format t] returns the optional structured output format. *)
 
 val unknown : t -> Jsont.json
-(** [unknown t] returns any unknown JSON fields that were preserved during decoding. *)
+(** [unknown t] returns any unknown JSON fields that were preserved during
+    decoding. *)
 
 (** {1 Builders} *)
 
@@ -287,8 +304,8 @@ val with_model : Model.t -> t -> t
 (** [with_model model t] sets the model override using a typed Model.t. *)
 
 val with_model_string : string -> t -> t
-(** [with_model_string model t] sets the model override from a string.
-    The string is parsed using {!Model.of_string}. *)
+(** [with_model_string model t] sets the model override from a string. The
+    string is parsed using {!Model.of_string}. *)
 
 val with_cwd : Eio.Fs.dir_ty Eio.Path.t -> t -> t
 (** [with_cwd cwd t] sets the working directory. *)
@@ -297,7 +314,8 @@ val with_env : (string * string) list -> t -> t
 (** [with_env env t] sets the environment variables. *)
 
 val with_continue_conversation : bool -> t -> t
-(** [with_continue_conversation continue t] sets whether to continue conversation. *)
+(** [with_continue_conversation continue t] sets whether to continue
+    conversation. *)
 
 val with_resume : string -> t -> t
 (** [with_resume session_id t] sets the session ID to resume. *)
@@ -306,7 +324,8 @@ val with_max_turns : int -> t -> t
 (** [with_max_turns turns t] sets the maximum number of turns. *)
 
 val with_permission_prompt_tool_name : string -> t -> t
-(** [with_permission_prompt_tool_name tool t] sets the permission prompt tool name. *)
+(** [with_permission_prompt_tool_name tool t] sets the permission prompt tool
+    name. *)
 
 val with_settings : string -> t -> t
 (** [with_settings path t] sets the path to settings file. *)
@@ -324,11 +343,12 @@ val with_hooks : Hooks.config -> t -> t
 (** [with_hooks hooks t] sets the hooks configuration. *)
 
 val with_max_budget_usd : float -> t -> t
-(** [with_max_budget_usd budget t] sets the maximum spending limit in USD.
-    The session will terminate if this limit is exceeded. *)
+(** [with_max_budget_usd budget t] sets the maximum spending limit in USD. The
+    session will terminate if this limit is exceeded. *)
 
 val with_fallback_model : Model.t -> t -> t
-(** [with_fallback_model model t] sets the fallback model using a typed Model.t. *)
+(** [with_fallback_model model t] sets the fallback model using a typed Model.t.
+*)
 
 val with_fallback_model_string : string -> t -> t
 (** [with_fallback_model_string model t] sets the fallback model from a string.
@@ -340,10 +360,12 @@ val with_setting_sources : setting_source list -> t -> t
 
 val with_no_settings : t -> t
 (** [with_no_settings t] disables all settings loading (user, project, local).
-    Useful for CI/CD environments where you want isolated, reproducible behavior. *)
+    Useful for CI/CD environments where you want isolated, reproducible
+    behavior. *)
 
 val with_max_buffer_size : int -> t -> t
-(** [with_max_buffer_size size t] sets the maximum stdout buffer size in bytes. *)
+(** [with_max_buffer_size size t] sets the maximum stdout buffer size in bytes.
+*)
 
 val with_user : string -> t -> t
 (** [with_user user t] sets the Unix user for subprocess execution. *)
@@ -354,8 +376,8 @@ val with_output_format : Structured_output.t -> t -> t
 (** {1 Serialization} *)
 
 val jsont : t Jsont.t
-(** [jsont] is the Jsont codec for Options.t
-    Use [Jsont.pp_value jsont ()] for pretty-printing. *)
+(** [jsont] is the Jsont codec for Options.t Use [Jsont.pp_value jsont ()] for
+    pretty-printing. *)
 
 (** {1 Logging} *)
 

@@ -12,30 +12,42 @@ let simple_example env =
   (* Define a simple schema for a person's info *)
   let person_schema =
     let open Jsont in
-    Object ([
-      (("type", Meta.none), String ("object", Meta.none));
-      (("properties", Meta.none), Object ([
-        (("name", Meta.none), Object ([
-          (("type", Meta.none), String ("string", Meta.none))
-        ], Meta.none));
-        (("age", Meta.none), Object ([
-          (("type", Meta.none), String ("integer", Meta.none))
-        ], Meta.none));
-        (("occupation", Meta.none), Object ([
-          (("type", Meta.none), String ("string", Meta.none))
-        ], Meta.none));
-      ], Meta.none));
-      (("required", Meta.none), Array ([
-        String ("name", Meta.none);
-        String ("age", Meta.none);
-        String ("occupation", Meta.none)
-      ], Meta.none))
-    ], Meta.none)
+    Object
+      ( [
+          (("type", Meta.none), String ("object", Meta.none));
+          ( ("properties", Meta.none),
+            Object
+              ( [
+                  ( ("name", Meta.none),
+                    Object
+                      ( [ (("type", Meta.none), String ("string", Meta.none)) ],
+                        Meta.none ) );
+                  ( ("age", Meta.none),
+                    Object
+                      ( [ (("type", Meta.none), String ("integer", Meta.none)) ],
+                        Meta.none ) );
+                  ( ("occupation", Meta.none),
+                    Object
+                      ( [ (("type", Meta.none), String ("string", Meta.none)) ],
+                        Meta.none ) );
+                ],
+                Meta.none ) );
+          ( ("required", Meta.none),
+            Array
+              ( [
+                  String ("name", Meta.none);
+                  String ("age", Meta.none);
+                  String ("occupation", Meta.none);
+                ],
+                Meta.none ) );
+        ],
+        Meta.none )
   in
 
   let output_format = C.Structured_output.of_json_schema person_schema in
 
-  let options = C.Options.default
+  let options =
+    C.Options.default
     |> C.Options.with_output_format output_format
     |> C.Options.with_max_turns 1
   in
@@ -43,30 +55,29 @@ let simple_example env =
   Printf.printf "Asking Claude to provide structured data...\n\n";
 
   Eio.Switch.run @@ fun sw ->
-    let process_mgr = Eio.Stdenv.process_mgr env in
-    let client = C.Client.create ~sw ~process_mgr ~options () in
+  let process_mgr = Eio.Stdenv.process_mgr env in
+  let client = C.Client.create ~sw ~process_mgr ~options () in
 
-    C.Client.query client
-      "Tell me about a famous computer scientist. Provide their name, age, \
-       and occupation in the exact JSON structure I specified.";
+  C.Client.query client
+    "Tell me about a famous computer scientist. Provide their name, age, and \
+     occupation in the exact JSON structure I specified.";
 
-    let messages = C.Client.receive_all client in
-    List.iter (function
-      | C.Message.Result result ->
+  let messages = C.Client.receive_all client in
+  List.iter
+    (function
+      | C.Message.Result result -> (
           Printf.printf "Response received!\n";
-          (match C.Message.Result.structured_output result with
+          match C.Message.Result.structured_output result with
           | Some json ->
               Printf.printf "\nStructured Output:\n%s\n"
                 (Test_json_utils.to_string ~minify:false json)
-          | None ->
-              Printf.printf "No structured output\n")
-      | _ -> ()
-    ) messages
+          | None -> Printf.printf "No structured output\n")
+      | _ -> ())
+    messages
 
 let () =
   Eio_main.run @@ fun env ->
-    try
-      simple_example env
-    with exn ->
-      Printf.eprintf "Error: %s\n" (Printexc.to_string exn);
-      exit 1
+  try simple_example env
+  with exn ->
+    Printf.eprintf "Error: %s\n" (Printexc.to_string exn);
+    exit 1

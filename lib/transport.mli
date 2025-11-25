@@ -1,5 +1,5 @@
-(** The log source for transport operations *)
 val src : Logs.Src.t
+(** The log source for transport operations *)
 
 exception CLI_not_found of string
 exception Process_error of string
@@ -11,7 +11,8 @@ val create :
   sw:Eio.Switch.t ->
   process_mgr:_ Eio.Process.mgr ->
   options:Options.t ->
-  unit -> t
+  unit ->
+  t
 
 val send : t -> Jsont.json -> unit
 val receive_line : t -> string option

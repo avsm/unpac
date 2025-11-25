@@ -4,8 +4,8 @@
     including session control, cancellation requests, and other operational
     commands. *)
 
-(** The log source for control message operations *)
 val src : Logs.Src.t
+(** The log source for control message operations *)
 
 type t
 (** The type of control messages. *)

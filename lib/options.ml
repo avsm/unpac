@@ -1,4 +1,5 @@
 let src = Logs.Src.create "claude.options" ~doc:"Claude configuration options"
+
 module Log = (val Logs.src_log src : Logs.LOG)
 
 type setting_source = User | Project | Local
@@ -32,71 +33,71 @@ type t = {
   unknown : Unknown.t;
 }
 
-let default = {
-  allowed_tools = [];
-  disallowed_tools = [];
-  max_thinking_tokens = 8000;
-  system_prompt = None;
-  append_system_prompt = None;
-  permission_mode = None;
-  permission_callback = Some Permissions.default_allow_callback;
-  model = None;
-  cwd = None;
-  env = [];
-  continue_conversation = false;
-  resume = None;
-  max_turns = None;
-  permission_prompt_tool_name = None;
-  settings = None;
-  add_dirs = [];
-  extra_args = [];
-  debug_stderr = None;
-  hooks = None;
-  max_budget_usd = None;
-  fallback_model = None;
-  setting_sources = None;
-  max_buffer_size = None;
-  user = None;
-  output_format = None;
-  unknown = Unknown.empty;
-}
+let default =
+  {
+    allowed_tools = [];
+    disallowed_tools = [];
+    max_thinking_tokens = 8000;
+    system_prompt = None;
+    append_system_prompt = None;
+    permission_mode = None;
+    permission_callback = Some Permissions.default_allow_callback;
+    model = None;
+    cwd = None;
+    env = [];
+    continue_conversation = false;
+    resume = None;
+    max_turns = None;
+    permission_prompt_tool_name = None;
+    settings = None;
+    add_dirs = [];
+    extra_args = [];
+    debug_stderr = None;
+    hooks = None;
+    max_budget_usd = None;
+    fallback_model = None;
+    setting_sources = None;
+    max_buffer_size = None;
+    user = None;
+    output_format = None;
+    unknown = Unknown.empty;
+  }
 
-let create
-    ?(allowed_tools = [])
-    ?(disallowed_tools = [])
-    ?(max_thinking_tokens = 8000)
-    ?system_prompt
-    ?append_system_prompt
-    ?permission_mode
-    ?permission_callback
-    ?model
-    ?cwd
-    ?(env = [])
-    ?(continue_conversation = false)
-    ?resume
-    ?max_turns
-    ?permission_prompt_tool_name
-    ?settings
-    ?(add_dirs = [])
-    ?(extra_args = [])
-    ?debug_stderr
-    ?hooks
-    ?max_budget_usd
-    ?fallback_model
-    ?setting_sources
-    ?max_buffer_size
-    ?user
-    ?output_format
-    ?(unknown = Unknown.empty)
-    () =
-  { allowed_tools; disallowed_tools; max_thinking_tokens;
-    system_prompt; append_system_prompt; permission_mode;
-    permission_callback; model; cwd; env;
-    continue_conversation; resume; max_turns;
-    permission_prompt_tool_name; settings; add_dirs;
-    extra_args; debug_stderr; hooks;
-    max_budget_usd; fallback_model; setting_sources;
-    max_buffer_size; user; output_format; unknown }
+let create ?(allowed_tools = []) ?(disallowed_tools = [])
+    ?(max_thinking_tokens = 8000) ?system_prompt ?append_system_prompt
+    ?permission_mode ?permission_callback ?model ?cwd ?(env = [])
+    ?(continue_conversation = false) ?resume ?max_turns
+    ?permission_prompt_tool_name ?settings ?(add_dirs = []) ?(extra_args = [])
+    ?debug_stderr ?hooks ?max_budget_usd ?fallback_model ?setting_sources
+    ?max_buffer_size ?user ?output_format ?(unknown = Unknown.empty) () =
+  {
+    allowed_tools;
+    disallowed_tools;
+    max_thinking_tokens;
+    system_prompt;
+    append_system_prompt;
+    permission_mode;
+    permission_callback;
+    model;
+    cwd;
+    env;
+    continue_conversation;
+    resume;
+    max_turns;
+    permission_prompt_tool_name;
+    settings;
+    add_dirs;
+    extra_args;
+    debug_stderr;
+    hooks;
+    max_budget_usd;
+    fallback_model;
+    setting_sources;
+    max_buffer_size;
+    user;
+    output_format;
+    unknown;
+  }
 
 let allowed_tools t = t.allowed_tools
 let disallowed_tools t = t.disallowed_tools
@@ -124,22 +125,33 @@ let max_buffer_size t = t.max_buffer_size
 let user t = t.user
 let output_format t = t.output_format
 let unknown t = t.unknown
-
 let with_allowed_tools tools t = { t with allowed_tools = tools }
 let with_disallowed_tools tools t = { t with disallowed_tools = tools }
 let with_max_thinking_tokens tokens t = { t with max_thinking_tokens = tokens }
 let with_system_prompt prompt t = { t with system_prompt = Some prompt }
-let with_append_system_prompt prompt t = { t with append_system_prompt = Some prompt }
+
+let with_append_system_prompt prompt t =
+  { t with append_system_prompt = Some prompt }
+
 let with_permission_mode mode t = { t with permission_mode = Some mode }
-let with_permission_callback callback t = { t with permission_callback = Some callback }
+
+let with_permission_callback callback t =
+  { t with permission_callback = Some callback }
+
 let with_model model t = { t with model = Some model }
 let with_model_string model t = { t with model = Some (Model.of_string model) }
 let with_cwd cwd t = { t with cwd = Some cwd }
 let with_env env t = { t with env }
-let with_continue_conversation continue t = { t with continue_conversation = continue }
+
+let with_continue_conversation continue t =
+  { t with continue_conversation = continue }
+
 let with_resume session_id t = { t with resume = Some session_id }
 let with_max_turns turns t = { t with max_turns = Some turns }
-let with_permission_prompt_tool_name tool t = { t with permission_prompt_tool_name = Some tool }
+
+let with_permission_prompt_tool_name tool t =
+  { t with permission_prompt_tool_name = Some tool }
+
 let with_settings path t = { t with settings = Some path }
 let with_add_dirs dirs t = { t with add_dirs = dirs }
 let with_extra_args args t = { t with extra_args = args }
@@ -147,7 +159,10 @@ let with_debug_stderr sink t = { t with debug_stderr = Some sink }
 let with_hooks hooks t = { t with hooks = Some hooks }
 let with_max_budget_usd budget t = { t with max_budget_usd = Some budget }
 let with_fallback_model model t = { t with fallback_model = Some model }
-let with_fallback_model_string model t = { t with fallback_model = Some (Model.of_string model) }
+
+let with_fallback_model_string model t =
+  { t with fallback_model = Some (Model.of_string model) }
+
 let with_setting_sources sources t = { t with setting_sources = Some sources }
 let with_no_settings t = { t with setting_sources = Some [] }
 let with_max_buffer_size size t = { t with max_buffer_size = Some size }
@@ -156,10 +171,7 @@ let with_output_format format t = { t with output_format = Some format }
 
 (* Helper codec for Model.t *)
 let model_jsont : Model.t Jsont.t =
-  Jsont.map ~kind:"Model"
-    ~dec:Model.of_string
-    ~enc:Model.to_string
-    Jsont.string
+  Jsont.map ~kind:"Model" ~dec:Model.of_string ~enc:Model.to_string Jsont.string
 
 (* Helper codec for env - list of string pairs encoded as object.
    Env is a dynamic object where all values should be strings.
@@ -169,26 +181,35 @@ let env_jsont : (string * string) list Jsont.t =
     ~dec:(fun json ->
       match json with
       | Jsont.Object (members, _) ->
-          List.filter_map (fun ((name, _), value) ->
-            match Jsont.Json.decode Jsont.string value with
-            | Ok s -> Some (name, s)
-            | Error _ -> None
-          ) members
+          List.filter_map
+            (fun ((name, _), value) ->
+              match Jsont.Json.decode Jsont.string value with
+              | Ok s -> Some (name, s)
+              | Error _ -> None)
+            members
       | _ -> [])
     ~enc:(fun pairs ->
-      Jsont.Json.object' (List.map (fun (k, v) ->
-        Jsont.Json.mem (Jsont.Json.name k) (Jsont.Json.string v)
-      ) pairs))
+      Jsont.Json.object'
+        (List.map
+           (fun (k, v) ->
+             Jsont.Json.mem (Jsont.Json.name k) (Jsont.Json.string v))
+           pairs))
     Jsont.json
 
 let jsont : t Jsont.t =
-  let make allowed_tools disallowed_tools max_thinking_tokens
-      system_prompt append_system_prompt permission_mode
-      model env unknown =
-    { allowed_tools; disallowed_tools; max_thinking_tokens;
-      system_prompt; append_system_prompt; permission_mode;
+  let make allowed_tools disallowed_tools max_thinking_tokens system_prompt
+      append_system_prompt permission_mode model env unknown =
+    {
+      allowed_tools;
+      disallowed_tools;
+      max_thinking_tokens;
+      system_prompt;
+      append_system_prompt;
+      permission_mode;
       permission_callback = Some Permissions.default_allow_callback;
-      model; cwd = None; env;
+      model;
+      cwd = None;
+      env;
       continue_conversation = false;
       resume = None;
       max_turns = None;
@@ -204,31 +225,24 @@ let jsont : t Jsont.t =
       max_buffer_size = None;
       user = None;
       output_format = None;
-      unknown }
+      unknown;
+    }
   in
-  Jsont.Object.map ~kind:"Options" make
-  |> Jsont.Object.mem "allowed_tools" (Jsont.list Jsont.string) ~enc:allowed_tools ~dec_absent:[]
-  |> Jsont.Object.mem "disallowed_tools" (Jsont.list Jsont.string) ~enc:disallowed_tools ~dec_absent:[]
-  |> Jsont.Object.mem "max_thinking_tokens" Jsont.int ~enc:max_thinking_tokens ~dec_absent:8000
-  |> Jsont.Object.opt_mem "system_prompt" Jsont.string ~enc:system_prompt
-  |> Jsont.Object.opt_mem "append_system_prompt" Jsont.string ~enc:append_system_prompt
-  |> Jsont.Object.opt_mem "permission_mode" Permissions.Mode.jsont ~enc:permission_mode
-  |> Jsont.Object.opt_mem "model" model_jsont ~enc:model
-  |> Jsont.Object.mem "env" env_jsont ~enc:env ~dec_absent:[]
-  |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
-  |> Jsont.Object.finish
-
-(*
-let to_json t =
-  match Jsont.Json.encode jsont t with
-  | Ok json -> json
-  | Error msg -> failwith ("Options.to_json: " ^ msg)
-
-let of_json json =
-  match Jsont.Json.decode jsont json with
-  | Ok t -> t
-  | Error msg -> raise (Invalid_argument ("Options.of_json: " ^ msg))
-*)
+  Jsont.Object.(
+    map ~kind:"Options" make
+    |> mem "allowed_tools" (Jsont.list Jsont.string) ~enc:allowed_tools
+         ~dec_absent:[]
+    |> mem "disallowed_tools" (Jsont.list Jsont.string) ~enc:disallowed_tools
+         ~dec_absent:[]
+    |> mem "max_thinking_tokens" Jsont.int ~enc:max_thinking_tokens
+         ~dec_absent:8000
+    |> opt_mem "system_prompt" Jsont.string ~enc:system_prompt
+    |> opt_mem "append_system_prompt" Jsont.string ~enc:append_system_prompt
+    |> opt_mem "permission_mode" Permissions.Mode.jsont ~enc:permission_mode
+    |> opt_mem "model" model_jsont ~enc:model
+    |> mem "env" env_jsont ~enc:env ~dec_absent:[]
+    |> keep_unknown Jsont.json_mems ~enc:unknown
+    |> finish)
 
 let log_options t =
   Log.debug (fun m -> m "Claude options: %a" (Jsont.pp_value jsont ()) t)

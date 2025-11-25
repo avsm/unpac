@@ -2,8 +2,8 @@
 
     This module provides a type and utilities for preserving unknown/extra
     fields when parsing JSON objects with jsont. Use with
-    [Jsont.Object.keep_unknown] to capture fields not explicitly defined
-    in your codec. *)
+    [Jsont.Object.keep_unknown] to capture fields not explicitly defined in your
+    codec. *)
 
 type t = Jsont.json
 (** The type of unknown fields - stored as raw JSON. *)

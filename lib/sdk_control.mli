@@ -10,12 +10,12 @@
 
     {2 Protocol Overview}
 
-    The SDK control protocol is a JSON-based request/response protocol that
-    runs alongside the main message stream. It enables:
+    The SDK control protocol is a JSON-based request/response protocol that runs
+    alongside the main message stream. It enables:
 
-    1. {b Callbacks}: Claude asks the SDK for permission or hook execution
-    2. {b Control}: SDK changes Claude's behavior dynamically
-    3. {b Introspection}: SDK queries server metadata
+    1. {b Callbacks}: Claude asks the SDK for permission or hook execution 2.
+    {b Control}: SDK changes Claude's behavior dynamically 3. {b Introspection}:
+    SDK queries server metadata
 
     {2 Request/Response Flow}
 
@@ -51,22 +51,19 @@
     See {!Client.set_permission_mode}, {!Client.set_model}, and
     {!Client.get_server_info} for high-level APIs that use this protocol. *)
 
-(** The log source for SDK control operations *)
 val src : Logs.Src.t
+(** The log source for SDK control operations *)
 
 (** {1 Request Types} *)
 
 module Request : sig
   (** SDK control request types. *)
 
-  type interrupt = {
-    subtype : [`Interrupt];
-    unknown : Unknown.t;
-  }
+  type interrupt = { subtype : [ `Interrupt ]; unknown : Unknown.t }
   (** Interrupt request to stop execution. *)
 
   type permission = {
-    subtype : [`Can_use_tool];
+    subtype : [ `Can_use_tool ];
     tool_name : string;
     input : Jsont.json;
     permission_suggestions : Permissions.Update.t list option;
@@ -76,21 +73,21 @@ module Request : sig
   (** Permission request for tool usage. *)
 
   type initialize = {
-    subtype : [`Initialize];
-    hooks : (string * Jsont.json) list option;  (* Hook event to configuration *)
+    subtype : [ `Initialize ];
+    hooks : (string * Jsont.json) list option; (* Hook event to configuration *)
     unknown : Unknown.t;
   }
   (** Initialize request with optional hook configuration. *)
 
   type set_permission_mode = {
-    subtype : [`Set_permission_mode];
+    subtype : [ `Set_permission_mode ];
     mode : Permissions.Mode.t;
     unknown : Unknown.t;
   }
   (** Request to change permission mode. *)
 
   type hook_callback = {
-    subtype : [`Hook_callback];
+    subtype : [ `Hook_callback ];
     callback_id : string;
     input : Jsont.json;
     tool_use_id : string option;
@@ -99,7 +96,7 @@ module Request : sig
   (** Hook callback request. *)
 
   type mcp_message = {
-    subtype : [`Mcp_message];
+    subtype : [ `Mcp_message ];
     server_name : string;
     message : Jsont.json;
     unknown : Unknown.t;
@@ -107,16 +104,13 @@ module Request : sig
   (** MCP server message request. *)
 
   type set_model = {
-    subtype : [`Set_model];
+    subtype : [ `Set_model ];
     model : string;
     unknown : Unknown.t;
   }
   (** Request to change the AI model. *)
 
-  type get_server_info = {
-    subtype : [`Get_server_info];
-    unknown : Unknown.t;
-  }
+  type get_server_info = { subtype : [ `Get_server_info ]; unknown : Unknown.t }
   (** Request to get server information. *)
 
   type t =
@@ -128,7 +122,7 @@ module Request : sig
     | Mcp_message of mcp_message
     | Set_model of set_model
     | Get_server_info of get_server_info
-  (** The type of SDK control requests. *)
+        (** The type of SDK control requests. *)
 
   val interrupt : ?unknown:Unknown.t -> unit -> t
   (** [interrupt ?unknown ()] creates an interrupt request. *)
@@ -139,26 +133,34 @@ module Request : sig
     ?permission_suggestions:Permissions.Update.t list ->
     ?blocked_path:string ->
     ?unknown:Unknown.t ->
-    unit -> t
-  (** [permission ~tool_name ~input ?permission_suggestions ?blocked_path ?unknown ()]
-      creates a permission request. *)
+    unit ->
+    t
+  (** [permission ~tool_name ~input ?permission_suggestions ?blocked_path
+       ?unknown ()] creates a permission request. *)
 
-  val initialize : ?hooks:(string * Jsont.json) list -> ?unknown:Unknown.t -> unit -> t
+  val initialize :
+    ?hooks:(string * Jsont.json) list -> ?unknown:Unknown.t -> unit -> t
   (** [initialize ?hooks ?unknown ()] creates an initialize request. *)
 
-  val set_permission_mode : mode:Permissions.Mode.t -> ?unknown:Unknown.t -> unit -> t
-  (** [set_permission_mode ~mode ?unknown] creates a permission mode change request. *)
+  val set_permission_mode :
+    mode:Permissions.Mode.t -> ?unknown:Unknown.t -> unit -> t
+  (** [set_permission_mode ~mode ?unknown] creates a permission mode change
+      request. *)
 
   val hook_callback :
     callback_id:string ->
     input:Jsont.json ->
     ?tool_use_id:string ->
     ?unknown:Unknown.t ->
-    unit -> t
-  (** [hook_callback ~callback_id ~input ?tool_use_id ?unknown ()] creates a hook callback request. *)
+    unit ->
+    t
+  (** [hook_callback ~callback_id ~input ?tool_use_id ?unknown ()] creates a
+      hook callback request. *)
 
-  val mcp_message : server_name:string -> message:Jsont.json -> ?unknown:Unknown.t -> unit -> t
-  (** [mcp_message ~server_name ~message ?unknown] creates an MCP message request. *)
+  val mcp_message :
+    server_name:string -> message:Jsont.json -> ?unknown:Unknown.t -> unit -> t
+  (** [mcp_message ~server_name ~message ?unknown] creates an MCP message
+      request. *)
 
   val set_model : model:string -> ?unknown:Unknown.t -> unit -> t
   (** [set_model ~model ?unknown] creates a model change request. *)
@@ -167,8 +169,8 @@ module Request : sig
   (** [get_server_info ?unknown ()] creates a server info request. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the jsont codec for requests.
-      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
+  (** [jsont] is the jsont codec for requests. Use [Jsont.pp_value jsont ()] for
+      pretty-printing. *)
 end
 
 (** {1 Response Types} *)
@@ -177,7 +179,7 @@ module Response : sig
   (** SDK control response types. *)
 
   type success = {
-    subtype : [`Success];
+    subtype : [ `Success ];
     request_id : string;
     response : Jsont.json option;
     unknown : Unknown.t;
@@ -185,7 +187,7 @@ module Response : sig
   (** Successful response. *)
 
   type error = {
-    subtype : [`Error];
+    subtype : [ `Error ];
     request_id : string;
     error : string;
     unknown : Unknown.t;
@@ -194,24 +196,25 @@ module Response : sig
 
   type t =
     | Success of success
-    | Error of error
-  (** The type of SDK control responses. *)
+    | Error of error  (** The type of SDK control responses. *)
 
-  val success : request_id:string -> ?response:Jsont.json -> ?unknown:Unknown.t -> unit -> t
+  val success :
+    request_id:string -> ?response:Jsont.json -> ?unknown:Unknown.t -> unit -> t
   (** [success ~request_id ?response ?unknown ()] creates a success response. *)
 
-  val error : request_id:string -> error:string -> ?unknown:Unknown.t -> unit -> t
+  val error :
+    request_id:string -> error:string -> ?unknown:Unknown.t -> unit -> t
   (** [error ~request_id ~error ?unknown] creates an error response. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the jsont codec for responses.
-      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
+  (** [jsont] is the jsont codec for responses. Use [Jsont.pp_value jsont ()]
+      for pretty-printing. *)
 end
 
 (** {1 Control Messages} *)
 
 type control_request = {
-  type_ : [`Control_request];
+  type_ : [ `Control_request ];
   request_id : string;
   request : Request.t;
   unknown : Unknown.t;
@@ -219,29 +222,32 @@ type control_request = {
 (** Control request message. *)
 
 type control_response = {
-  type_ : [`Control_response];
+  type_ : [ `Control_response ];
   response : Response.t;
   unknown : Unknown.t;
 }
 (** Control response message. *)
 
 val control_response_jsont : control_response Jsont.t
-(** [control_response_jsont] is the jsont codec for control response messages. *)
+(** [control_response_jsont] is the jsont codec for control response messages.
+*)
 
 type t =
   | Request of control_request
-  | Response of control_response
-(** The type of SDK control messages. *)
+  | Response of control_response  (** The type of SDK control messages. *)
 
-val create_request : request_id:string -> request:Request.t -> ?unknown:Unknown.t -> unit -> t
-(** [create_request ~request_id ~request ?unknown ()] creates a control request message. *)
+val create_request :
+  request_id:string -> request:Request.t -> ?unknown:Unknown.t -> unit -> t
+(** [create_request ~request_id ~request ?unknown ()] creates a control request
+    message. *)
 
 val create_response : response:Response.t -> ?unknown:Unknown.t -> unit -> t
-(** [create_response ~response ?unknown ()] creates a control response message. *)
+(** [create_response ~response ?unknown ()] creates a control response message.
+*)
 
 val jsont : t Jsont.t
-(** [jsont] is the jsont codec for control messages.
-    Use [Jsont.pp_value jsont ()] for pretty-printing. *)
+(** [jsont] is the jsont codec for control messages. Use
+    [Jsont.pp_value jsont ()] for pretty-printing. *)
 
 (** {1 Logging} *)
 
@@ -253,8 +259,8 @@ val log_response : Response.t -> unit
 
 (** {1 Server Information}
 
-    Server information provides metadata about the Claude CLI server,
-    including version, capabilities, available commands, and output styles.
+    Server information provides metadata about the Claude CLI server, including
+    version, capabilities, available commands, and output styles.
 
     {2 Use Cases}
 
@@ -267,33 +273,25 @@ val log_response : Response.t -> unit
 
     {[
       let info = Client.get_server_info client in
-      Printf.printf "Claude CLI version: %s\n"
-        (Server_info.version info);
+      Printf.printf "Claude CLI version: %s\n" (Server_info.version info);
 
       if List.mem "structured-output" (Server_info.capabilities info) then
         Printf.printf "Structured output is supported\n"
-      else
-        Printf.printf "Structured output not available\n";
+      else Printf.printf "Structured output not available\n"
     ]} *)
 
 module Server_info : sig
   (** Server information and capabilities. *)
 
   type t = {
-    version : string;
-    (** Server version string (e.g., "2.0.0") *)
-
+    version : string;  (** Server version string (e.g., "2.0.0") *)
     capabilities : string list;
-    (** Available server capabilities (e.g., "hooks", "structured-output") *)
-
-    commands : string list;
-    (** Available CLI commands *)
-
+        (** Available server capabilities (e.g., "hooks", "structured-output")
+        *)
+    commands : string list;  (** Available CLI commands *)
     output_styles : string list;
-    (** Supported output formats (e.g., "json", "stream-json") *)
-
-    unknown : Unknown.t;
-    (** Unknown fields for forward compatibility *)
+        (** Supported output formats (e.g., "json", "stream-json") *)
+    unknown : Unknown.t;  (** Unknown fields for forward compatibility *)
   }
   (** Server metadata and capabilities.
 
@@ -307,7 +305,8 @@ module Server_info : sig
     ?unknown:Unknown.t ->
     unit ->
     t
-  (** [create ~version ~capabilities ~commands ~output_styles ?unknown ()] creates server info. *)
+  (** [create ~version ~capabilities ~commands ~output_styles ?unknown ()]
+      creates server info. *)
 
   val version : t -> string
   (** [version t] returns the server version. *)
@@ -325,6 +324,6 @@ module Server_info : sig
   (** [unknown t] returns the unknown fields. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the jsont codec for server info.
-      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
+  (** [jsont] is the jsont codec for server info. Use [Jsont.pp_value jsont ()]
+      for pretty-printing. *)
 end

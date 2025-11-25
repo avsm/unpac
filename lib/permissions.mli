@@ -1,23 +1,23 @@
 (** Permission system for Claude tool invocations.
 
-    This module provides a permission system for controlling
-    which tools Claude can invoke and how they can be used. It includes
-    support for permission modes, rules, updates, and callbacks. *)
+    This module provides a permission system for controlling which tools Claude
+    can invoke and how they can be used. It includes support for permission
+    modes, rules, updates, and callbacks. *)
 
-(** The log source for permission operations *)
 val src : Logs.Src.t
+(** The log source for permission operations *)
 
 (** {1 Permission Modes} *)
 
 module Mode : sig
   (** Permission modes control the overall behavior of the permission system. *)
 
+  (** The type of permission modes. *)
   type t =
     | Default  (** Standard permission mode with normal checks *)
     | Accept_edits  (** Automatically accept file edits *)
     | Plan  (** Planning mode with restricted execution *)
     | Bypass_permissions  (** Bypass all permission checks *)
-  (** The type of permission modes. *)
 
   val to_string : t -> string
   (** [to_string t] converts a mode to its string representation. *)
@@ -27,8 +27,8 @@ module Mode : sig
       @raise Invalid_argument if the string is not a valid mode. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for permission modes.
-      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
+  (** [jsont] is the Jsont codec for permission modes. Use
+      [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Permission Behaviors} *)
@@ -36,11 +36,11 @@ end
 module Behavior : sig
   (** Behaviors determine how permission requests are handled. *)
 
+  (** The type of permission behaviors. *)
   type t =
     | Allow  (** Allow the operation *)
     | Deny  (** Deny the operation *)
     | Ask  (** Ask the user for permission *)
-  (** The type of permission behaviors. *)
 
   val to_string : t -> string
   (** [to_string t] converts a behavior to its string representation. *)
@@ -50,8 +50,8 @@ module Behavior : sig
       @raise Invalid_argument if the string is not a valid behavior. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for permission behaviors.
-      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
+  (** [jsont] is the Jsont codec for permission behaviors. Use
+      [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Permission Rules} *)
@@ -66,7 +66,8 @@ module Rule : sig
   }
   (** The type of permission rules. *)
 
-  val create : tool_name:string -> ?rule_content:string -> ?unknown:Unknown.t -> unit -> t
+  val create :
+    tool_name:string -> ?rule_content:string -> ?unknown:Unknown.t -> unit -> t
   (** [create ~tool_name ?rule_content ?unknown ()] creates a new rule.
       @param tool_name The name of the tool this rule applies to
       @param rule_content Optional rule specification or pattern
@@ -82,8 +83,8 @@ module Rule : sig
   (** [unknown t] returns the unknown fields. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for permission rules.
-      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
+  (** [jsont] is the Jsont codec for permission rules. Use
+      [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Permission Updates} *)
@@ -91,13 +92,14 @@ end
 module Update : sig
   (** Updates modify permission settings. *)
 
+  (** The destination for permission updates. *)
   type destination =
     | User_settings  (** Apply to user settings *)
     | Project_settings  (** Apply to project settings *)
     | Local_settings  (** Apply to local settings *)
     | Session  (** Apply to current session only *)
-  (** The destination for permission updates. *)
 
+  (** The type of permission update. *)
   type update_type =
     | Add_rules  (** Add new rules *)
     | Replace_rules  (** Replace existing rules *)
@@ -105,7 +107,6 @@ module Update : sig
     | Set_mode  (** Set permission mode *)
     | Add_directories  (** Add allowed directories *)
     | Remove_directories  (** Remove allowed directories *)
-  (** The type of permission update. *)
 
   type t
   (** The type of permission updates. *)
@@ -118,9 +119,10 @@ module Update : sig
     ?directories:string list ->
     ?destination:destination ->
     ?unknown:Unknown.t ->
-    unit -> t
-  (** [create ~update_type ?rules ?behavior ?mode ?directories ?destination ?unknown ()]
-      creates a new permission update.
+    unit ->
+    t
+  (** [create ~update_type ?rules ?behavior ?mode ?directories ?destination
+       ?unknown ()] creates a new permission update.
       @param update_type The type of update to perform
       @param rules Optional list of rules to add/remove/replace
       @param behavior Optional behavior to set
@@ -151,8 +153,8 @@ module Update : sig
   (** [unknown t] returns the unknown fields. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for permission updates.
-      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
+  (** [jsont] is the Jsont codec for permission updates. Use
+      [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Permission Context} *)
@@ -178,8 +180,8 @@ module Context : sig
   (** [unknown t] returns the unknown fields. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for permission context.
-      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
+  (** [jsont] is the Jsont codec for permission context. Use
+      [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Permission Results} *)
@@ -190,18 +192,24 @@ module Result : sig
   type t =
     | Allow of {
         updated_input : Jsont.json option;  (** Modified tool input *)
-        updated_permissions : Update.t list option;  (** Permission updates to apply *)
+        updated_permissions : Update.t list option;
+            (** Permission updates to apply *)
         unknown : Unknown.t;  (** Unknown fields *)
       }
     | Deny of {
         message : string;  (** Reason for denial *)
         interrupt : bool;  (** Whether to interrupt execution *)
         unknown : Unknown.t;  (** Unknown fields *)
-      }
-  (** The type of permission results. *)
+      }  (** The type of permission results. *)
 
-  val allow : ?updated_input:Jsont.json -> ?updated_permissions:Update.t list -> ?unknown:Unknown.t -> unit -> t
-  (** [allow ?updated_input ?updated_permissions ?unknown ()] creates an allow result.
+  val allow :
+    ?updated_input:Jsont.json ->
+    ?updated_permissions:Update.t list ->
+    ?unknown:Unknown.t ->
+    unit ->
+    t
+  (** [allow ?updated_input ?updated_permissions ?unknown ()] creates an allow
+      result.
       @param updated_input Optional modified tool input
       @param updated_permissions Optional permission updates to apply
       @param unknown Optional unknown fields to preserve *)
@@ -213,27 +221,24 @@ module Result : sig
       @param unknown Optional unknown fields to preserve *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for permission results.
-      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
+  (** [jsont] is the Jsont codec for permission results. Use
+      [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Permission Callbacks} *)
 
 type callback =
-  tool_name:string ->
-  input:Jsont.json ->
-  context:Context.t ->
-  Result.t
-(** The type of permission callbacks. Callbacks are invoked when Claude
-    attempts to use a tool, allowing custom permission logic. *)
+  tool_name:string -> input:Jsont.json -> context:Context.t -> Result.t
+(** The type of permission callbacks. Callbacks are invoked when Claude attempts
+    to use a tool, allowing custom permission logic. *)
 
 val default_allow_callback : callback
 (** [default_allow_callback] always allows tool invocations. *)
 
 val discovery_callback : Rule.t list ref -> callback
-(** [discovery_callback log] creates a callback that collects suggested
-    rules into the provided reference. Useful for discovering what
-    permissions an operation requires. *)
+(** [discovery_callback log] creates a callback that collects suggested rules
+    into the provided reference. Useful for discovering what permissions an
+    operation requires. *)
 
 (** {1 Logging} *)
 

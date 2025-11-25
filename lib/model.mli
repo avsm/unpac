@@ -4,14 +4,13 @@
     model strings. Use polymorphic variants for known models with a custom
     escape hatch for future or unknown models. *)
 
-type t = [
-  | `Sonnet_4_5       (** claude-sonnet-4-5 - Most recent Sonnet model *)
-  | `Sonnet_4         (** claude-sonnet-4 - Sonnet 4 model *)
-  | `Sonnet_3_5       (** claude-sonnet-3-5 - Sonnet 3.5 model *)
-  | `Opus_4           (** claude-opus-4 - Opus 4 model for complex tasks *)
-  | `Haiku_4          (** claude-haiku-4 - Fast, cost-effective Haiku model *)
-  | `Custom of string (** Custom model string for future/unknown models *)
-]
+type t =
+  [ `Sonnet_4_5  (** claude-sonnet-4-5 - Most recent Sonnet model *)
+  | `Sonnet_4  (** claude-sonnet-4 - Sonnet 4 model *)
+  | `Sonnet_3_5  (** claude-sonnet-3-5 - Sonnet 3.5 model *)
+  | `Opus_4  (** claude-opus-4 - Opus 4 model for complex tasks *)
+  | `Haiku_4  (** claude-haiku-4 - Fast, cost-effective Haiku model *)
+  | `Custom of string  (** Custom model string for future/unknown models *) ]
 (** The type of Claude models. *)
 
 val to_string : t -> string
@@ -25,8 +24,8 @@ val to_string : t -> string
 val of_string : string -> t
 (** [of_string s] parses a model string into a typed model.
 
-    Known model strings are converted to their typed variants.
-    Unknown strings become [`Custom s].
+    Known model strings are converted to their typed variants. Unknown strings
+    become [`Custom s].
 
     Examples:
     - "claude-sonnet-4-5" becomes [`Sonnet_4_5]

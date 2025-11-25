@@ -1,10 +1,11 @@
 (** Content blocks for Claude messages.
 
-    This module defines the various types of content blocks that can appear
-    in Claude messages, including text, tool use, tool results, and thinking blocks. *)
+    This module defines the various types of content blocks that can appear in
+    Claude messages, including text, tool use, tool results, and thinking
+    blocks. *)
 
-(** The log source for content block operations *)
 val src : Logs.Src.t
+(** The log source for content block operations *)
 
 (** {1 Text Blocks} *)
 
@@ -24,9 +25,9 @@ module Text : sig
   (** [unknown t] returns any unknown fields from JSON parsing. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for text blocks.
-      Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization.
-      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
+  (** [jsont] is the Jsont codec for text blocks. Use [Jsont.Json.encode jsont]
+      and [Jsont.Json.decode jsont] for serialization. Use
+      [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Tool Use Blocks} *)
@@ -44,7 +45,8 @@ module Tool_use : sig
     (** [jsont] is the Jsont codec for tool inputs. *)
 
     val of_string_pairs : (string * string) list -> t
-    (** [of_string_pairs pairs] creates tool input from string key-value pairs. *)
+    (** [of_string_pairs pairs] creates tool input from string key-value pairs.
+    *)
 
     val of_assoc : (string * Jsont.json) list -> t
     (** [of_assoc assoc] creates tool input from an association list. *)
@@ -63,7 +65,6 @@ module Tool_use : sig
 
     val keys : t -> string list
     (** [keys t] returns all keys in the input. *)
-
   end
 
   type t
@@ -88,8 +89,8 @@ module Tool_use : sig
   (** [unknown t] returns any unknown fields from JSON parsing. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for tool use blocks.
-      Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization.
+  (** [jsont] is the Jsont codec for tool use blocks. Use
+      [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization.
       Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
@@ -101,8 +102,10 @@ module Tool_result : sig
   type t
   (** The type of tool result blocks. *)
 
-  val create : tool_use_id:string -> ?content:string -> ?is_error:bool -> unit -> t
-  (** [create ~tool_use_id ?content ?is_error ()] creates a new tool result block.
+  val create :
+    tool_use_id:string -> ?content:string -> ?is_error:bool -> unit -> t
+  (** [create ~tool_use_id ?content ?is_error ()] creates a new tool result
+      block.
       @param tool_use_id The ID of the corresponding tool use block
       @param content Optional result content
       @param is_error Whether the tool execution resulted in an error *)
@@ -120,8 +123,8 @@ module Tool_result : sig
   (** [unknown t] returns any unknown fields from JSON parsing. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for tool result blocks.
-      Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization.
+  (** [jsont] is the Jsont codec for tool result blocks. Use
+      [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization.
       Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
@@ -148,8 +151,8 @@ module Thinking : sig
   (** [unknown t] returns any unknown fields from JSON parsing. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for thinking blocks.
-      Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization.
+  (** [jsont] is the Jsont codec for thinking blocks. Use
+      [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization.
       Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
@@ -160,7 +163,8 @@ type t =
   | Tool_use of Tool_use.t
   | Tool_result of Tool_result.t
   | Thinking of Thinking.t
-(** The type of content blocks, which can be text, tool use, tool result, or thinking. *)
+      (** The type of content blocks, which can be text, tool use, tool result,
+          or thinking. *)
 
 val text : string -> t
 (** [text s] creates a text content block. *)
@@ -168,16 +172,18 @@ val text : string -> t
 val tool_use : id:string -> name:string -> input:Tool_use.Input.t -> t
 (** [tool_use ~id ~name ~input] creates a tool use content block. *)
 
-val tool_result : tool_use_id:string -> ?content:string -> ?is_error:bool -> unit -> t
-(** [tool_result ~tool_use_id ?content ?is_error ()] creates a tool result content block. *)
+val tool_result :
+  tool_use_id:string -> ?content:string -> ?is_error:bool -> unit -> t
+(** [tool_result ~tool_use_id ?content ?is_error ()] creates a tool result
+    content block. *)
 
 val thinking : thinking:string -> signature:string -> t
 (** [thinking ~thinking ~signature] creates a thinking content block. *)
 
 val jsont : t Jsont.t
-(** [jsont] is the Jsont codec for content blocks.
-    Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization.
-    Use [Jsont.pp_value jsont ()] for pretty-printing. *)
+(** [jsont] is the Jsont codec for content blocks. Use [Jsont.Json.encode jsont]
+    and [Jsont.Json.decode jsont] for serialization. Use
+    [Jsont.pp_value jsont ()] for pretty-printing. *)
 
 (** {1 Logging} *)
 

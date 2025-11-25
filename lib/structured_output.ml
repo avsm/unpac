@@ -1,9 +1,8 @@
 let src = Logs.Src.create "claude.structured_output" ~doc:"Structured output"
+
 module Log = (val Logs.src_log src : Logs.LOG)
 
-type t = {
-  json_schema : Jsont.json;
-}
+type t = { json_schema : Jsont.json }
 
 let json_to_string json =
   match Jsont_bytesrw.encode_string' Jsont.json json with
@@ -11,16 +10,15 @@ let json_to_string json =
   | Error err -> failwith (Jsont.Error.to_string err)
 
 let of_json_schema schema =
-  Log.debug (fun m -> m "Created output format from JSON schema: %s"
-    (json_to_string schema));
+  Log.debug (fun m ->
+      m "Created output format from JSON schema: %s" (json_to_string schema));
   { json_schema = schema }
 
 let json_schema t = t.json_schema
 
 (* Codec for serializing structured output format *)
 let jsont : t Jsont.t =
-  Jsont.Object.map ~kind:"StructuredOutput"
-    (fun json_schema -> {json_schema})
+  Jsont.Object.map ~kind:"StructuredOutput" (fun json_schema -> { json_schema })
   |> Jsont.Object.mem "jsonSchema" Jsont.json ~enc:(fun t -> t.json_schema)
   |> Jsont.Object.finish
 
