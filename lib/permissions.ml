@@ -1,0 +1,337 @@
+let src = Logs.Src.create "claude.permission" ~doc:"Claude permission system"
+module Log = (val Logs.src_log src : Logs.LOG)
+
+(* Helper for pretty-printing JSON *)
+let pp_json fmt json =
+  let s = match Jsont_bytesrw.encode_string' Jsont.json json with
+    | Ok s -> s
+    | Error err -> Jsont.Error.to_string err
+  in
+  Fmt.string fmt s
+
+(** Permission modes *)
+module Mode = struct
+  type t =
+    | Default
+    | Accept_edits
+    | Plan
+    | Bypass_permissions
+
+  let to_string = function
+    | Default -> "default"
+    | Accept_edits -> "acceptEdits"
+    | Plan -> "plan"
+    | Bypass_permissions -> "bypassPermissions"
+
+  let of_string = function
+    | "default" -> Default
+    | "acceptEdits" -> Accept_edits
+    | "plan" -> Plan
+    | "bypassPermissions" -> Bypass_permissions
+    | s -> raise (Invalid_argument (Printf.sprintf "Mode.of_string: unknown mode %s" s))
+
+  let pp fmt t = Fmt.string fmt (to_string t)
+
+  let jsont : t Jsont.t =
+    Jsont.enum [
+      "default", Default;
+      "acceptEdits", Accept_edits;
+      "plan", Plan;
+      "bypassPermissions", Bypass_permissions;
+    ]
+end
+
+(** Permission behaviors *)
+module Behavior = struct
+  type t = Allow | Deny | Ask
+
+  let to_string = function
+    | Allow -> "allow"
+    | Deny -> "deny"
+    | Ask -> "ask"
+
+  let of_string = function
+    | "allow" -> Allow
+    | "deny" -> Deny
+    | "ask" -> Ask
+    | s -> raise (Invalid_argument (Printf.sprintf "Behavior.of_string: unknown behavior %s" s))
+
+  let pp fmt t = Fmt.string fmt (to_string t)
+
+  let jsont : t Jsont.t =
+    Jsont.enum [
+      "allow", Allow;
+      "deny", Deny;
+      "ask", Ask;
+    ]
+end
+
+(** Permission rules *)
+module Rule = struct
+  type t = {
+    tool_name : string;
+    rule_content : string option;
+    unknown : Unknown.t;
+  }
+
+  let create ~tool_name ?rule_content ?(unknown = Unknown.empty) () =
+    { tool_name; rule_content; unknown }
+  let tool_name t = t.tool_name
+  let rule_content t = t.rule_content
+  let unknown t = t.unknown
+
+  let jsont : t Jsont.t =
+    let make tool_name rule_content unknown = { tool_name; rule_content; unknown } in
+    Jsont.Object.map ~kind:"Rule" make
+    |> Jsont.Object.mem "tool_name" Jsont.string ~enc:tool_name
+    |> Jsont.Object.opt_mem "rule_content" Jsont.string ~enc:rule_content
+    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
+    |> Jsont.Object.finish
+
+  let pp fmt t =
+    Fmt.pf fmt "@[<2>Rule@ { tool_name = %S;@ rule_content = %a }@]"
+      t.tool_name Fmt.(option string) t.rule_content
+end
+
+(** Permission updates *)
+module Update = struct
+  type destination =
+    | User_settings
+    | Project_settings
+    | Local_settings
+    | Session
+
+  let destination_to_string = function
+    | User_settings -> "userSettings"
+    | Project_settings -> "projectSettings"
+    | Local_settings -> "localSettings"
+    | Session -> "session"
+
+  let _destination_of_string = function
+    | "userSettings" -> User_settings
+    | "projectSettings" -> Project_settings
+    | "localSettings" -> Local_settings
+    | "session" -> Session
+    | s -> raise (Invalid_argument (Printf.sprintf "destination_of_string: unknown %s" s))
+
+  let destination_jsont : destination Jsont.t =
+    Jsont.enum [
+      "userSettings", User_settings;
+      "projectSettings", Project_settings;
+      "localSettings", Local_settings;
+      "session", Session;
+    ]
+
+  type update_type =
+    | Add_rules
+    | Replace_rules
+    | Remove_rules
+    | Set_mode
+    | Add_directories
+    | Remove_directories
+
+  let update_type_to_string = function
+    | Add_rules -> "addRules"
+    | Replace_rules -> "replaceRules"
+    | Remove_rules -> "removeRules"
+    | Set_mode -> "setMode"
+    | Add_directories -> "addDirectories"
+    | Remove_directories -> "removeDirectories"
+
+  let _update_type_of_string = function
+    | "addRules" -> Add_rules
+    | "replaceRules" -> Replace_rules
+    | "removeRules" -> Remove_rules
+    | "setMode" -> Set_mode
+    | "addDirectories" -> Add_directories
+    | "removeDirectories" -> Remove_directories
+    | s -> raise (Invalid_argument (Printf.sprintf "update_type_of_string: unknown %s" s))
+
+  let update_type_jsont : update_type Jsont.t =
+    Jsont.enum [
+      "addRules", Add_rules;
+      "replaceRules", Replace_rules;
+      "removeRules", Remove_rules;
+      "setMode", Set_mode;
+      "addDirectories", Add_directories;
+      "removeDirectories", Remove_directories;
+    ]
+
+  type t = {
+    update_type : update_type;
+    rules : Rule.t list option;
+    behavior : Behavior.t option;
+    mode : Mode.t option;
+    directories : string list option;
+    destination : destination option;
+    unknown : Unknown.t;
+  }
+
+  let create ~update_type ?rules ?behavior ?mode ?directories ?destination ?(unknown = Unknown.empty) () =
+    { update_type; rules; behavior; mode; directories; destination; unknown }
+
+  let update_type t = t.update_type
+  let rules t = t.rules
+  let behavior t = t.behavior
+  let mode t = t.mode
+  let directories t = t.directories
+  let destination t = t.destination
+  let unknown t = t.unknown
+
+  let jsont : t Jsont.t =
+    let make update_type rules behavior mode directories destination unknown =
+      { update_type; rules; behavior; mode; directories; destination; unknown }
+    in
+    Jsont.Object.map ~kind:"Update" make
+    |> Jsont.Object.mem "type" update_type_jsont ~enc:update_type
+    |> Jsont.Object.opt_mem "rules" (Jsont.list Rule.jsont) ~enc:rules
+    |> Jsont.Object.opt_mem "behavior" Behavior.jsont ~enc:behavior
+    |> Jsont.Object.opt_mem "mode" Mode.jsont ~enc:mode
+    |> Jsont.Object.opt_mem "directories" (Jsont.list Jsont.string) ~enc:directories
+    |> Jsont.Object.opt_mem "destination" destination_jsont ~enc:destination
+    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
+    |> Jsont.Object.finish
+  
+  let pp fmt t =
+    Fmt.pf fmt "@[<2>Update@ { type = %s;@ rules = %a;@ behavior = %a;@ \
+                mode = %a;@ directories = %a;@ destination = %a }@]"
+      (update_type_to_string t.update_type)
+      Fmt.(option (list Rule.pp)) t.rules
+      Fmt.(option Behavior.pp) t.behavior
+      Fmt.(option Mode.pp) t.mode
+      Fmt.(option (list string)) t.directories
+      Fmt.(option (fun fmt d -> Fmt.string fmt (destination_to_string d))) t.destination
+end
+
+(** Permission context for callbacks *)
+module Context = struct
+  type t = {
+    suggestions : Update.t list;
+    unknown : Unknown.t;
+  }
+
+  let create ?(suggestions = []) ?(unknown = Unknown.empty) () = { suggestions; unknown }
+  let suggestions t = t.suggestions
+  let unknown t = t.unknown
+
+  let jsont : t Jsont.t =
+    let make suggestions unknown = { suggestions; unknown } in
+    Jsont.Object.map ~kind:"Context" make
+    |> Jsont.Object.mem "suggestions" (Jsont.list Update.jsont) ~enc:suggestions ~dec_absent:[]
+    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
+    |> Jsont.Object.finish
+
+  let pp fmt t =
+    Fmt.pf fmt "@[<2>Context@ { suggestions = @[<v>%a@] }@]"
+      Fmt.(list ~sep:(any "@,") Update.pp) t.suggestions
+end
+
+(** Permission results *)
+module Result = struct
+  type t =
+    | Allow of {
+        updated_input : Jsont.json option;
+        updated_permissions : Update.t list option;
+        unknown : Unknown.t;
+      }
+    | Deny of {
+        message : string;
+        interrupt : bool;
+        unknown : Unknown.t;
+      }
+
+  let allow ?updated_input ?updated_permissions ?(unknown = Unknown.empty) () =
+    Allow { updated_input; updated_permissions; unknown }
+
+  let deny ~message ~interrupt ?(unknown = Unknown.empty) () =
+    Deny { message; interrupt; unknown }
+
+  let jsont : t Jsont.t =
+    let allow_record =
+      let make updated_input updated_permissions unknown =
+        Allow { updated_input; updated_permissions; unknown }
+      in
+      Jsont.Object.map ~kind:"AllowRecord" make
+      |> Jsont.Object.opt_mem "updated_input" Jsont.json ~enc:(function
+           | Allow { updated_input; _ } -> updated_input
+           | _ -> None)
+      |> Jsont.Object.opt_mem "updated_permissions" (Jsont.list Update.jsont) ~enc:(function
+           | Allow { updated_permissions; _ } -> updated_permissions
+           | _ -> None)
+      |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:(function
+           | Allow { unknown; _ } -> unknown
+           | _ -> Unknown.empty)
+      |> Jsont.Object.finish
+    in
+    let deny_record =
+      let make message interrupt unknown =
+        Deny { message; interrupt; unknown }
+      in
+      Jsont.Object.map ~kind:"DenyRecord" make
+      |> Jsont.Object.mem "message" Jsont.string ~enc:(function
+           | Deny { message; _ } -> message
+           | _ -> "")
+      |> Jsont.Object.mem "interrupt" Jsont.bool ~enc:(function
+           | Deny { interrupt; _ } -> interrupt
+           | _ -> false)
+      |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:(function
+           | Deny { unknown; _ } -> unknown
+           | _ -> Unknown.empty)
+      |> Jsont.Object.finish
+    in
+    let case_allow = Jsont.Object.Case.map "allow" allow_record ~dec:(fun v -> v) in
+    let case_deny = Jsont.Object.Case.map "deny" deny_record ~dec:(fun v -> v) in
+
+    let enc_case = function
+      | Allow _ as v -> Jsont.Object.Case.value case_allow v
+      | Deny _ as v -> Jsont.Object.Case.value case_deny v
+    in
+
+    let cases = Jsont.Object.Case.[
+      make case_allow;
+      make case_deny
+    ] in
+
+    Jsont.Object.map ~kind:"Result" Fun.id
+    |> Jsont.Object.case_mem "behavior" Jsont.string ~enc:Fun.id ~enc_case cases
+        ~tag_to_string:Fun.id ~tag_compare:String.compare
+    |> Jsont.Object.finish
+  
+  let pp fmt = function
+    | Allow { updated_input; updated_permissions; _ } ->
+        Fmt.pf fmt "@[<2>Allow@ { updated_input = %a;@ updated_permissions = %a }@]"
+          Fmt.(option pp_json) updated_input
+          Fmt.(option (list Update.pp)) updated_permissions
+    | Deny { message; interrupt; _ } ->
+        Fmt.pf fmt "@[<2>Deny@ { message = %S;@ interrupt = %b }@]" message interrupt
+end
+
+(** Permission callback type *)
+type callback =
+  tool_name:string ->
+  input:Jsont.json ->
+  context:Context.t ->
+  Result.t
+
+(** Default callbacks *)
+let default_allow_callback ~tool_name:_ ~input:_ ~context:_ =
+  Result.allow ()
+
+let discovery_callback log ~tool_name:_ ~input:_ ~context =
+  List.iter (fun update ->
+    match Update.rules update with
+    | Some rules ->
+        List.iter (fun rule ->
+          log := rule :: !log
+        ) rules
+    | None -> ()
+  ) (Context.suggestions context);
+  Result.allow ()
+
+(** Logging *)
+let log_permission_check ~tool_name ~result =
+  match result with
+  | Result.Allow _ -> 
+      Log.info (fun m -> m "Permission granted for tool: %s" tool_name)
+  | Result.Deny { message; _ } ->
+      Log.warn (fun m -> m "Permission denied for tool %s: %s" tool_name message)
