@@ -1,14 +1,6 @@
 let src = Logs.Src.create "claude.control" ~doc:"Claude control messages"
 module Log = (val Logs.src_log src : Logs.LOG)
 
-(* Helper for pretty-printing JSON *)
-let pp_json fmt json =
-  let s = match Jsont_bytesrw.encode_string' Jsont.json json with
-    | Ok s -> s
-    | Error err -> Jsont.Error.to_string err
-  in
-  Fmt.string fmt s
-
 type t = {
   request_id : string;
   subtype : string;
@@ -48,12 +40,8 @@ let of_json json =
       | Error e -> raise (Invalid_argument ("Control.of_json: " ^ e)))
   | Error e -> raise (Invalid_argument ("Control.of_json: " ^ e))
 
-let pp fmt t =
-  Fmt.pf fmt "@[<2>Control@ { request_id = %S;@ subtype = %S;@ data = %a }@]"
-    t.request_id t.subtype pp_json t.data
-
 let log_received t =
-  Log.debug (fun m -> m "Received control message: %a" pp t)
+  Log.debug (fun m -> m "Received control message: %a" (Jsont.pp_value jsont ()) t)
 
 let log_sending t =
-  Log.debug (fun m -> m "Sending control message: %a" pp t)
+  Log.debug (fun m -> m "Sending control message: %a" (Jsont.pp_value jsont ()) t)

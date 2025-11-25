@@ -26,11 +26,9 @@ module Mode : sig
   (** [of_string s] parses a mode from its string representation.
       @raise Invalid_argument if the string is not a valid mode. *)
 
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the mode. *)
-
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for permission modes. *)
+  (** [jsont] is the Jsont codec for permission modes.
+      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Permission Behaviors} *)
@@ -51,11 +49,9 @@ module Behavior : sig
   (** [of_string s] parses a behavior from its string representation.
       @raise Invalid_argument if the string is not a valid behavior. *)
 
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the behavior. *)
-
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for permission behaviors. *)
+  (** [jsont] is the Jsont codec for permission behaviors.
+      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Permission Rules} *)
@@ -85,11 +81,9 @@ module Rule : sig
   val unknown : t -> Unknown.t
   (** [unknown t] returns the unknown fields. *)
 
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the rule. *)
-
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for permission rules. *)
+  (** [jsont] is the Jsont codec for permission rules.
+      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Permission Updates} *)
@@ -156,11 +150,9 @@ module Update : sig
   val unknown : t -> Unknown.t
   (** [unknown t] returns the unknown fields. *)
 
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the update. *)
-
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for permission updates. *)
+  (** [jsont] is the Jsont codec for permission updates.
+      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Permission Context} *)
@@ -185,11 +177,9 @@ module Context : sig
   val unknown : t -> Unknown.t
   (** [unknown t] returns the unknown fields. *)
 
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the context. *)
-
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for permission context. *)
+  (** [jsont] is the Jsont codec for permission context.
+      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Permission Results} *)
@@ -222,11 +212,9 @@ module Result : sig
       @param interrupt Whether to interrupt further execution
       @param unknown Optional unknown fields to preserve *)
 
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the result. *)
-
   val jsont : t Jsont.t
-  (** [jsont] is the Jsont codec for permission results. *)
+  (** [jsont] is the Jsont codec for permission results.
+      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Permission Callbacks} *)

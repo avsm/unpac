@@ -125,32 +125,6 @@ module User = struct
     match Jsont.Json.decode incoming_jsont json with
     | Ok v -> v
     | Error msg -> raise (Invalid_argument ("User.of_json: " ^ msg))
-
-  let pp fmt t =
-    match t.content with
-    | String s ->
-        if String.length s > 60 then
-          let truncated = String.sub s 0 57 in
-          Fmt.pf fmt "@[<2>User:@ %s...@]" truncated
-        else
-          Fmt.pf fmt "@[<2>User:@ %S@]" s
-    | Blocks blocks ->
-        let text_count = List.length (List.filter (function
-          | Content_block.Text _ -> true | _ -> false) blocks) in
-        let tool_result_count = List.length (List.filter (function
-          | Content_block.Tool_result _ -> true | _ -> false) blocks) in
-        match text_count, tool_result_count with
-        | 1, 0 ->
-            let text = List.find_map (function
-              | Content_block.Text t -> Some (Content_block.Text.text t)
-              | _ -> None) blocks in
-            Fmt.pf fmt "@[<2>User:@ %a@]" Fmt.(option string) text
-        | 0, 1 ->
-            Fmt.pf fmt "@[<2>User:@ [tool result]@]"
-        | 0, n when n > 1 ->
-            Fmt.pf fmt "@[<2>User:@ [%d tool results]@]" n
-        | _ ->
-            Fmt.pf fmt "@[<2>User:@ [%d blocks]@]" (List.length blocks)
 end
 
 module Assistant = struct
@@ -294,37 +268,6 @@ module Assistant = struct
     match Jsont.Json.decode incoming_jsont json with
     | Ok v -> v
     | Error msg -> raise (Invalid_argument ("Assistant.of_json: " ^ msg))
-
-  let pp fmt t =
-    let text_count = List.length (get_text_blocks t) in
-    let tool_count = List.length (get_tool_uses t) in
-    let thinking_count = List.length (get_thinking t) in
-    match text_count, tool_count, thinking_count with
-    | 1, 0, 0 ->
-        (* Simple text response *)
-        Fmt.pf fmt "@[<2>Assistant@ [%s]:@ %S@]"
-          t.model (combined_text t)
-    | _, 0, 0 when text_count > 0 ->
-        (* Multiple text blocks *)
-        Fmt.pf fmt "@[<2>Assistant@ [%s]:@ %d text blocks@]"
-          t.model text_count
-    | 0, _, 0 when tool_count > 0 ->
-        (* Only tool uses *)
-        let tools = get_tool_uses t in
-        let tool_names = List.map Content_block.Tool_use.name tools in
-        Fmt.pf fmt "@[<2>Assistant@ [%s]:@ tools(%a)@]"
-          t.model Fmt.(list ~sep:comma string) tool_names
-    | _ ->
-        (* Mixed content *)
-        let parts = [] in
-        let parts = if text_count > 0 then
-          Printf.sprintf "%d text" text_count :: parts else parts in
-        let parts = if tool_count > 0 then
-          Printf.sprintf "%d tools" tool_count :: parts else parts in
-        let parts = if thinking_count > 0 then
-          Printf.sprintf "%d thinking" thinking_count :: parts else parts in
-        Fmt.pf fmt "@[<2>Assistant@ [%s]:@ %s@]"
-          t.model (String.concat ", " (List.rev parts))
 end
 
 module System = struct
@@ -427,17 +370,6 @@ module System = struct
     match Jsont.Json.decode jsont json with
     | Ok v -> v
     | Error msg -> raise (Invalid_argument ("System.of_json: " ^ msg))
-
-  let pp fmt = function
-    | Init i ->
-        Fmt.pf fmt "@[<2>System.init@ { session_id = %a;@ model = %a;@ cwd = %a }@]"
-          Fmt.(option string) i.session_id
-          Fmt.(option string) i.model
-          Fmt.(option string) i.cwd
-    | Error e ->
-        Fmt.pf fmt "@[<2>System.error@ { error = %s }@]" e.error
-    | Other o ->
-        Fmt.pf fmt "@[<2>System.%s@ { ... }@]" o.subtype
 end
 
 module Result = struct
@@ -493,16 +425,6 @@ module Result = struct
           let output_cost = float_of_int output *. output_price /. 1_000_000. in
           Some (input_cost +. output_cost)
       | _ -> None
-
-    let pp fmt t =
-      Fmt.pf fmt "@[<2>Usage@ { input = %a;@ output = %a;@ total = %a;@ \
-                  cache_creation = %a;@ cache_read = %a }@]"
-        Fmt.(option int) t.input_tokens
-        Fmt.(option int) t.output_tokens
-        Fmt.(option int) t.total_tokens
-        Fmt.(option int) t.cache_creation_input_tokens
-        Fmt.(option int) t.cache_read_input_tokens
-
   end
 
   type t = {
@@ -620,31 +542,6 @@ module Result = struct
     match Jsont.Json.decode jsont json with
     | Ok v -> v
     | Error msg -> raise (Invalid_argument ("Result.of_json: " ^ msg))
-
-  let pp fmt t =
-    if t.is_error then
-      Fmt.pf fmt "@[<2>Result.error@ { session = %S;@ result = %a }@]"
-        t.session_id
-        Fmt.(option string) t.result
-    else
-      let tokens_info = match t.usage with
-        | Some u ->
-            let input = Usage.input_tokens u in
-            let output = Usage.output_tokens u in
-            let cached = Usage.cache_read_input_tokens u in
-            (match input, output, cached with
-            | Some i, Some o, Some c when c > 0 ->
-                Printf.sprintf " (tokens: %d+%d, cached: %d)" i o c
-            | Some i, Some o, _ ->
-                Printf.sprintf " (tokens: %d+%d)" i o
-            | _ -> "")
-        | None -> ""
-      in
-      Fmt.pf fmt "@[<2>Result.%s@ { duration = %dms;@ cost = $%.4f%s }@]"
-        t.subtype
-        t.duration_ms
-        (Option.value t.total_cost_usd ~default:0.0)
-        tokens_info
 end
 
 type t =
@@ -708,12 +605,6 @@ let of_json json =
   | Ok v -> v
   | Error msg -> raise (Invalid_argument ("Message.of_json: " ^ msg))
 
-let pp fmt = function
-  | User t -> User.pp fmt t
-  | Assistant t -> Assistant.pp fmt t
-  | System t -> System.pp fmt t
-  | Result t -> Result.pp fmt t
-
 let is_user = function User _ -> true | _ -> false
 let is_assistant = function Assistant _ -> true | _ -> false
 let is_system = function System _ -> true | _ -> false
@@ -739,6 +630,8 @@ let get_session_id = function
   | System s -> System.session_id s
   | Result r -> Some (Result.session_id r)
   | _ -> None
+
+let pp = Jsont.pp_value jsont ()
 
 let log_received t =
   Log.info (fun m -> m "← %a" pp t)

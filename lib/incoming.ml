@@ -180,9 +180,3 @@ let jsont : t Jsont.t =
   in
 
   Jsont.map ~kind:"Incoming" ~dec ~enc Jsont.json
-
-let pp fmt = function
-  | Message msg -> Format.fprintf fmt "@[<2>Message@ %a@]" Message.pp msg
-  | Control_response resp -> Format.fprintf fmt "@[<2>ControlResponse@ %a@]" Sdk_control.pp (Sdk_control.Response resp)
-  | Control_request req -> Format.fprintf fmt "@[<2>ControlRequest@ { request_id=%S; subtype=%S }@]"
-      (Control_request.request_id req) (Control_request.subtype req)

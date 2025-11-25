@@ -218,29 +218,6 @@ module Request = struct
     |> Jsont.Object.case_mem "subtype" Jsont.string ~enc:Fun.id ~enc_case cases
         ~tag_to_string:Fun.id ~tag_compare:String.compare
     |> Jsont.Object.finish
-  
-  let pp fmt = function
-    | Interrupt _ ->
-        Fmt.pf fmt "@[<2>Interrupt@]"
-    | Permission p ->
-        Fmt.pf fmt "@[<2>Permission@ { tool = %S;@ blocked_path = %a }@]"
-          p.tool_name Fmt.(option string) p.blocked_path
-    | Initialize i ->
-        Fmt.pf fmt "@[<2>Initialize@ { hooks = %s }@]"
-          (if Option.is_some i.hooks then "present" else "none")
-    | Set_permission_mode s ->
-        Fmt.pf fmt "@[<2>SetPermissionMode@ { mode = %a }@]"
-          Permissions.Mode.pp s.mode
-    | Hook_callback h ->
-        Fmt.pf fmt "@[<2>HookCallback@ { id = %S;@ tool_use_id = %a }@]"
-          h.callback_id Fmt.(option string) h.tool_use_id
-    | Mcp_message m ->
-        Fmt.pf fmt "@[<2>McpMessage@ { server = %S }@]"
-          m.server_name
-    | Set_model s ->
-        Fmt.pf fmt "@[<2>SetModel@ { model = %S }@]" s.model
-    | Get_server_info _ ->
-        Fmt.pf fmt "@[<2>GetServerInfo@]"
 end
 
 module Response = struct
@@ -318,14 +295,6 @@ module Response = struct
     |> Jsont.Object.case_mem "subtype" Jsont.string ~enc:Fun.id ~enc_case cases
         ~tag_to_string:Fun.id ~tag_compare:String.compare
     |> Jsont.Object.finish
-  
-  let pp fmt = function
-    | Success s ->
-        Fmt.pf fmt "@[<2>Success@ { request_id = %S;@ response = %s }@]"
-          s.request_id (if Option.is_some s.response then "present" else "none")
-    | Error e ->
-        Fmt.pf fmt "@[<2>Error@ { request_id = %S;@ error = %S }@]"
-          e.request_id e.error
 end
 
 type control_request = {
@@ -400,19 +369,11 @@ let jsont : t Jsont.t =
       ~tag_to_string:Fun.id ~tag_compare:String.compare
   |> Jsont.Object.finish
 
-let pp fmt = function
-  | Request r ->
-      Fmt.pf fmt "@[<2>ControlRequest@ { id = %S;@ request = %a }@]"
-        r.request_id Request.pp r.request
-  | Response r ->
-      Fmt.pf fmt "@[<2>ControlResponse@ { %a }@]"
-        Response.pp r.response
-
 let log_request req =
-  Log.debug (fun m -> m "SDK control request: %a" Request.pp req)
+  Log.debug (fun m -> m "SDK control request: %a" (Jsont.pp_value Request.jsont ()) req)
 
 let log_response resp =
-  Log.debug (fun m -> m "SDK control response: %a" Response.pp resp)
+  Log.debug (fun m -> m "SDK control response: %a" (Jsont.pp_value Response.jsont ()) resp)
 
 (** Server information *)
 module Server_info = struct
@@ -444,11 +405,4 @@ module Server_info = struct
     |> Jsont.Object.mem "outputStyles" (Jsont.list Jsont.string) ~enc:(fun (r : t) -> r.output_styles) ~dec_absent:[]
     |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:(fun (r : t) -> r.unknown)
     |> Jsont.Object.finish
-
-  let pp fmt t =
-    Fmt.pf fmt "@[<2>ServerInfo@ { version = %S;@ capabilities = [%a];@ commands = [%a];@ output_styles = [%a] }@]"
-      t.version
-      Fmt.(list ~sep:(any ", ") (quote string)) t.capabilities
-      Fmt.(list ~sep:(any ", ") (quote string)) t.commands
-      Fmt.(list ~sep:(any ", ") (quote string)) t.output_styles
 end

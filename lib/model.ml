@@ -22,6 +22,3 @@ let of_string = function
   | "claude-opus-4" -> `Opus_4
   | "claude-haiku-4" -> `Haiku_4
   | s -> `Custom s
-
-let pp fmt t =
-  Fmt.string fmt (to_string t)

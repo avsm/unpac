@@ -230,25 +230,5 @@ let of_json json =
   | Error msg -> raise (Invalid_argument ("Options.of_json: " ^ msg))
 *)
 
-let pp fmt t =
-  Fmt.pf fmt "@[<v>Options {@ \
-    allowed_tools = %a;@ \
-    disallowed_tools = %a;@ \
-    max_thinking_tokens = %d;@ \
-    system_prompt = %a;@ \
-    append_system_prompt = %a;@ \
-    permission_mode = %a;@ \
-    model = %a;@ \
-    env = %a@ \
-  }@]"
-    Fmt.(list string) t.allowed_tools
-    Fmt.(list string) t.disallowed_tools
-    t.max_thinking_tokens
-    Fmt.(option string) t.system_prompt
-    Fmt.(option string) t.append_system_prompt
-    Fmt.(option Permissions.Mode.pp) t.permission_mode
-    Fmt.(option Model.pp) t.model
-    Fmt.(list (pair string string)) t.env
-
 let log_options t =
-  Log.debug (fun m -> m "Claude options: %a" pp t)
+  Log.debug (fun m -> m "Claude options: %a" (Jsont.pp_value jsont ()) t)

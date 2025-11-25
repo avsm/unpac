@@ -31,6 +31,3 @@ val of_string : string -> t
     Examples:
     - "claude-sonnet-4-5" becomes [`Sonnet_4_5]
     - "future-model" becomes [`Custom "future-model"] *)
-
-val pp : Format.formatter -> t -> unit
-(** [pp fmt t] pretty-prints a model identifier. *)
