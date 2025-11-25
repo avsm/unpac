@@ -1,0 +1,4 @@
+(library
+ (public_name claude)
+ (name claude)
+ (libraries eio eio.unix fmt logs jsont jsont.bytesrw))
