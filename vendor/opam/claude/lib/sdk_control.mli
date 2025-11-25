@@ -167,10 +167,8 @@ module Request : sig
   (** [get_server_info ?unknown ()] creates a server info request. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the jsont codec for requests. *)
-
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the request. *)
+  (** [jsont] is the jsont codec for requests.
+      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Response Types} *)
@@ -206,10 +204,8 @@ module Response : sig
   (** [error ~request_id ~error ?unknown] creates an error response. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the jsont codec for responses. *)
-
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the response. *)
+  (** [jsont] is the jsont codec for responses.
+      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Control Messages} *)
@@ -244,10 +240,8 @@ val create_response : response:Response.t -> ?unknown:Unknown.t -> unit -> t
 (** [create_response ~response ?unknown ()] creates a control response message. *)
 
 val jsont : t Jsont.t
-(** [jsont] is the jsont codec for control messages. *)
-
-val pp : Format.formatter -> t -> unit
-(** [pp fmt t] pretty-prints the control message. *)
+(** [jsont] is the jsont codec for control messages.
+    Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 
 (** {1 Logging} *)
 
@@ -331,8 +325,6 @@ module Server_info : sig
   (** [unknown t] returns the unknown fields. *)
 
   val jsont : t Jsont.t
-  (** [jsont] is the jsont codec for server info. *)
-
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the server info. *)
+  (** [jsont] is the jsont codec for server info.
+      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 end

@@ -33,17 +33,3 @@ let of_json json =
   match Jsont.Json.decode jsont json with
   | Ok t -> t
   | Error msg -> raise (Invalid_argument ("Structured_output.of_json: " ^ msg))
-
-let pp fmt t =
-  let schema_str =
-    match Jsont_bytesrw.encode_string' ~format:Jsont.Minify Jsont.json t.json_schema with
-    | Ok s -> s
-    | Error err -> Jsont.Error.to_string err
-  in
-  let truncated =
-    if String.length schema_str > 100 then
-      String.sub schema_str 0 97 ^ "..."
-    else
-      schema_str
-  in
-  Fmt.pf fmt "@[<2>StructuredOutput { schema = %s }@]" truncated

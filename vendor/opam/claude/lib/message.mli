@@ -59,9 +59,6 @@ module User : sig
   val of_json : Jsont.json -> t
   (** [of_json json] parses a user message from JSON.
       @raise Invalid_argument if the JSON is not a valid user message. *)
-
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the user message. *)
 end
 
 (** {1 Assistant Messages} *)
@@ -130,9 +127,6 @@ module Assistant : sig
   val of_json : Jsont.json -> t
   (** [of_json json] parses an assistant message from JSON.
       @raise Invalid_argument if the JSON is not a valid assistant message. *)
-
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the assistant message. *)
 end
 
 (** {1 System Messages} *)
@@ -213,9 +207,6 @@ module System : sig
   val of_json : Jsont.json -> t
   (** [of_json json] parses from JSON.
       @raise Invalid_argument if invalid. *)
-
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the message. *)
 end
 
 (** {1 Result Messages} *)
@@ -266,9 +257,6 @@ module Result : sig
     val total_cost_estimate : t -> input_price:float -> output_price:float -> float option
     (** [total_cost_estimate t ~input_price ~output_price] estimates the cost based on token
         prices per million tokens. Returns None if token counts are not available. *)
-
-    val pp : Format.formatter -> t -> unit
-    (** [pp fmt t] pretty-prints the usage statistics. *)
   end
 
   type t
@@ -341,9 +329,6 @@ module Result : sig
   val of_json : Jsont.json -> t
   (** [of_json json] parses a result message from JSON.
       @raise Invalid_argument if the JSON is not a valid result message. *)
-
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the result message. *)
 end
 
 (** {1 Message Union Type} *)

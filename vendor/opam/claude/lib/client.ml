@@ -395,14 +395,14 @@ let set_permission_mode t mode =
   let request_id = Printf.sprintf "set_perm_mode_%f" (Unix.gettimeofday ()) in
   let request = Sdk_control.Request.set_permission_mode ~mode () in
   let _response = send_control_request t ~request_id request in
-  Log.info (fun m -> m "Permission mode set to: %a" Permissions.Mode.pp mode)
+  Log.info (fun m -> m "Permission mode set to: %s" (Permissions.Mode.to_string mode))
 
 let set_model t model =
   let model_str = Model.to_string model in
   let request_id = Printf.sprintf "set_model_%f" (Unix.gettimeofday ()) in
   let request = Sdk_control.Request.set_model ~model:model_str () in
   let _response = send_control_request t ~request_id request in
-  Log.info (fun m -> m "Model set to: %a" Model.pp model)
+  Log.info (fun m -> m "Model set to: %s" model_str)
 
 let set_model_string t model_str =
   set_model t (Model.of_string model_str)
@@ -416,7 +416,7 @@ let get_server_info t =
         | Ok si -> si
         | Error msg -> raise (Invalid_argument ("Failed to decode server info: " ^ msg))
       in
-      Log.info (fun m -> m "Retrieved server info: %a" Sdk_control.Server_info.pp server_info);
+      Log.info (fun m -> m "Retrieved server info: %a" (Jsont.pp_value Sdk_control.Server_info.jsont ()) server_info);
       server_info
   | None ->
       raise (Failure "No response data from get_server_info request")

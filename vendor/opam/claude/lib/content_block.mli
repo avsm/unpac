@@ -25,10 +25,8 @@ module Text : sig
 
   val jsont : t Jsont.t
   (** [jsont] is the Jsont codec for text blocks.
-      Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization. *)
-
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the text block. *)
+      Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization.
+      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Tool Use Blocks} *)
@@ -91,10 +89,8 @@ module Tool_use : sig
 
   val jsont : t Jsont.t
   (** [jsont] is the Jsont codec for tool use blocks.
-      Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization. *)
-
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the tool use block. *)
+      Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization.
+      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Tool Result Blocks} *)
@@ -125,10 +121,8 @@ module Tool_result : sig
 
   val jsont : t Jsont.t
   (** [jsont] is the Jsont codec for tool result blocks.
-      Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization. *)
-
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the tool result block. *)
+      Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization.
+      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Thinking Blocks} *)
@@ -155,10 +149,8 @@ module Thinking : sig
 
   val jsont : t Jsont.t
   (** [jsont] is the Jsont codec for thinking blocks.
-      Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization. *)
-
-  val pp : Format.formatter -> t -> unit
-  (** [pp fmt t] pretty-prints the thinking block. *)
+      Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization.
+      Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 end
 
 (** {1 Content Block Union Type} *)
@@ -184,10 +176,8 @@ val thinking : thinking:string -> signature:string -> t
 
 val jsont : t Jsont.t
 (** [jsont] is the Jsont codec for content blocks.
-    Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization. *)
-
-val pp : Format.formatter -> t -> unit
-(** [pp fmt t] pretty-prints any content block. *)
+    Use [Jsont.Json.encode jsont] and [Jsont.Json.decode jsont] for serialization.
+    Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 
 (** {1 Logging} *)
 

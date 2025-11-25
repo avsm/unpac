@@ -54,7 +54,5 @@ type t =
   | Control_request of Control_request.t
 
 val jsont : t Jsont.t
-(** Codec for incoming messages. Uses the "type" field to discriminate. *)
-
-val pp : Format.formatter -> t -> unit
-(** [pp fmt t] pretty-prints the incoming message. *)
+(** Codec for incoming messages. Uses the "type" field to discriminate.
+    Use [Jsont.pp_value jsont ()] for pretty-printing. *)

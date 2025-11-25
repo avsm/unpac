@@ -166,6 +166,3 @@ val of_json : Jsont.json -> t
 (** [of_json json] parses an output format from JSON.
     Internal use only.
     @raise Invalid_argument if the JSON is not a valid output format. *)
-
-val pp : Format.formatter -> t -> unit
-(** [pp fmt t] pretty-prints the output format. *)

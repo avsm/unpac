@@ -35,9 +35,6 @@ val of_json : Jsont.json -> t
 (** [of_json json] parses a control message from JSON.
     @raise Invalid_argument if the JSON is not a valid control message. *)
 
-val pp : Format.formatter -> t -> unit
-(** [pp fmt t] pretty-prints the control message. *)
-
 (** {1 Logging} *)
 
 val log_received : t -> unit

@@ -19,13 +19,6 @@ module Text = struct
     |> Jsont.Object.mem "text" Jsont.string ~enc:text
     |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
     |> Jsont.Object.finish
-
-  let pp fmt t =
-    if String.length t.text > 60 then
-      let truncated = String.sub t.text 0 57 in
-      Fmt.pf fmt "Text[%s...]" truncated
-    else
-      Fmt.pf fmt "Text[%S]" t.text
 end
 
 module Tool_use = struct
@@ -88,15 +81,6 @@ module Tool_use = struct
     |> Jsont.Object.mem "input" Input.jsont ~enc:input
     |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
     |> Jsont.Object.finish
-
-  let pp fmt t =
-    let keys = Input.keys t.input in
-    let key_info = match keys with
-      | [] -> ""
-      | [k] -> Printf.sprintf "(%s)" k
-      | ks -> Printf.sprintf "(%d params)" (List.length ks)
-    in
-    Fmt.pf fmt "Tool[%s%s]" t.name key_info
 end
 
 module Tool_result = struct
@@ -124,22 +108,6 @@ module Tool_result = struct
     |> Jsont.Object.opt_mem "is_error" Jsont.bool ~enc:is_error
     |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
     |> Jsont.Object.finish
-
-  let pp fmt t =
-    match t.is_error, t.content with
-    | Some true, Some c ->
-        if String.length c > 40 then
-          let truncated = String.sub c 0 37 in
-          Fmt.pf fmt "ToolResult[error: %s...]" truncated
-        else
-          Fmt.pf fmt "ToolResult[error: %s]" c
-    | _, Some c ->
-        if String.length c > 40 then
-          let truncated = String.sub c 0 37 in
-          Fmt.pf fmt "ToolResult[%s...]" truncated
-        else
-          Fmt.pf fmt "ToolResult[%s]" c
-    | _, None -> Fmt.pf fmt "ToolResult[empty]"
 end
 
 module Thinking = struct
@@ -162,13 +130,6 @@ module Thinking = struct
     |> Jsont.Object.mem "signature" Jsont.string ~enc:signature
     |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
     |> Jsont.Object.finish
-
-  let pp fmt t =
-    if String.length t.thinking > 50 then
-      let truncated = String.sub t.thinking 0 47 in
-      Fmt.pf fmt "Thinking[%s...]" truncated
-    else
-      Fmt.pf fmt "Thinking[%s]" t.thinking
 end
 
 type t =
@@ -211,14 +172,8 @@ let jsont : t Jsont.t =
       ~tag_to_string:Fun.id ~tag_compare:String.compare
   |> Jsont.Object.finish
 
-let pp fmt = function
-  | Text t -> Text.pp fmt t
-  | Tool_use t -> Tool_use.pp fmt t
-  | Tool_result t -> Tool_result.pp fmt t
-  | Thinking t -> Thinking.pp fmt t
-
 let log_received t =
-  Log.debug (fun m -> m "Received content block: %a" pp t)
+  Log.debug (fun m -> m "Received content block: %a" (Jsont.pp_value jsont ()) t)
 
 let log_sending t =
-  Log.debug (fun m -> m "Sending content block: %a" pp t)
+  Log.debug (fun m -> m "Sending content block: %a" (Jsont.pp_value jsont ()) t)

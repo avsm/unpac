@@ -354,10 +354,8 @@ val with_output_format : Structured_output.t -> t -> t
 (** {1 Serialization} *)
 
 val jsont : t Jsont.t
-(** [jsont] is the Jsont codec for Options.t *)
-
-val pp : Format.formatter -> t -> unit
-(** [pp fmt t] pretty-prints the options. *)
+(** [jsont] is the Jsont codec for Options.t
+    Use [Jsont.pp_value jsont ()] for pretty-printing. *)
 
 (** {1 Logging} *)
 

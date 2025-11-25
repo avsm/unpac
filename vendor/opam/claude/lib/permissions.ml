@@ -1,14 +1,6 @@
 let src = Logs.Src.create "claude.permission" ~doc:"Claude permission system"
 module Log = (val Logs.src_log src : Logs.LOG)
 
-(* Helper for pretty-printing JSON *)
-let pp_json fmt json =
-  let s = match Jsont_bytesrw.encode_string' Jsont.json json with
-    | Ok s -> s
-    | Error err -> Jsont.Error.to_string err
-  in
-  Fmt.string fmt s
-
 (** Permission modes *)
 module Mode = struct
   type t =
@@ -29,8 +21,6 @@ module Mode = struct
     | "plan" -> Plan
     | "bypassPermissions" -> Bypass_permissions
     | s -> raise (Invalid_argument (Printf.sprintf "Mode.of_string: unknown mode %s" s))
-
-  let pp fmt t = Fmt.string fmt (to_string t)
 
   let jsont : t Jsont.t =
     Jsont.enum [
@@ -55,8 +45,6 @@ module Behavior = struct
     | "deny" -> Deny
     | "ask" -> Ask
     | s -> raise (Invalid_argument (Printf.sprintf "Behavior.of_string: unknown behavior %s" s))
-
-  let pp fmt t = Fmt.string fmt (to_string t)
 
   let jsont : t Jsont.t =
     Jsont.enum [
@@ -87,10 +75,6 @@ module Rule = struct
     |> Jsont.Object.opt_mem "rule_content" Jsont.string ~enc:rule_content
     |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
     |> Jsont.Object.finish
-
-  let pp fmt t =
-    Fmt.pf fmt "@[<2>Rule@ { tool_name = %S;@ rule_content = %a }@]"
-      t.tool_name Fmt.(option string) t.rule_content
 end
 
 (** Permission updates *)
@@ -100,12 +84,6 @@ module Update = struct
     | Project_settings
     | Local_settings
     | Session
-
-  let destination_to_string = function
-    | User_settings -> "userSettings"
-    | Project_settings -> "projectSettings"
-    | Local_settings -> "localSettings"
-    | Session -> "session"
 
   let _destination_of_string = function
     | "userSettings" -> User_settings
@@ -129,14 +107,6 @@ module Update = struct
     | Set_mode
     | Add_directories
     | Remove_directories
-
-  let update_type_to_string = function
-    | Add_rules -> "addRules"
-    | Replace_rules -> "replaceRules"
-    | Remove_rules -> "removeRules"
-    | Set_mode -> "setMode"
-    | Add_directories -> "addDirectories"
-    | Remove_directories -> "removeDirectories"
 
   let _update_type_of_string = function
     | "addRules" -> Add_rules
@@ -191,16 +161,6 @@ module Update = struct
     |> Jsont.Object.opt_mem "destination" destination_jsont ~enc:destination
     |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
     |> Jsont.Object.finish
-  
-  let pp fmt t =
-    Fmt.pf fmt "@[<2>Update@ { type = %s;@ rules = %a;@ behavior = %a;@ \
-                mode = %a;@ directories = %a;@ destination = %a }@]"
-      (update_type_to_string t.update_type)
-      Fmt.(option (list Rule.pp)) t.rules
-      Fmt.(option Behavior.pp) t.behavior
-      Fmt.(option Mode.pp) t.mode
-      Fmt.(option (list string)) t.directories
-      Fmt.(option (fun fmt d -> Fmt.string fmt (destination_to_string d))) t.destination
 end
 
 (** Permission context for callbacks *)
@@ -220,10 +180,6 @@ module Context = struct
     |> Jsont.Object.mem "suggestions" (Jsont.list Update.jsont) ~enc:suggestions ~dec_absent:[]
     |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
     |> Jsont.Object.finish
-
-  let pp fmt t =
-    Fmt.pf fmt "@[<2>Context@ { suggestions = @[<v>%a@] }@]"
-      Fmt.(list ~sep:(any "@,") Update.pp) t.suggestions
 end
 
 (** Permission results *)
@@ -296,14 +252,6 @@ module Result = struct
     |> Jsont.Object.case_mem "behavior" Jsont.string ~enc:Fun.id ~enc_case cases
         ~tag_to_string:Fun.id ~tag_compare:String.compare
     |> Jsont.Object.finish
-  
-  let pp fmt = function
-    | Allow { updated_input; updated_permissions; _ } ->
-        Fmt.pf fmt "@[<2>Allow@ { updated_input = %a;@ updated_permissions = %a }@]"
-          Fmt.(option pp_json) updated_input
-          Fmt.(option (list Update.pp)) updated_permissions
-    | Deny { message; interrupt; _ } ->
-        Fmt.pf fmt "@[<2>Deny@ { message = %S;@ interrupt = %b }@]" message interrupt
 end
 
 (** Permission callback type *)
