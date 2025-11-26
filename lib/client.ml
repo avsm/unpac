@@ -91,21 +91,20 @@ type t = {
 
 let session_id t = t.session_id
 
-let handle_control_request t (ctrl_req : Incoming.Control_request.t) =
-  let request_id = Incoming.Control_request.request_id ctrl_req in
-  Log.info (fun m ->
-      m "Handling control request: %s"
-        (Incoming.Control_request.subtype ctrl_req));
+let handle_control_request t (ctrl_req : Sdk_control.control_request) =
+  let request_id = ctrl_req.request_id in
+  Log.info (fun m -> m "Handling control request: %s" request_id);
 
-  match Incoming.Control_request.request ctrl_req with
-  | Incoming.Control_request.Can_use_tool req ->
-      let tool_name = Incoming.Control_request.Can_use_tool.tool_name req in
-      let input = Incoming.Control_request.Can_use_tool.input req in
+  match ctrl_req.request with
+  | Sdk_control.Request.Permission req ->
+      let tool_name = req.tool_name in
+      let input = req.input in
       Log.info (fun m ->
           m "Permission request for tool '%s' with input: %s" tool_name
             (json_to_string input));
-      (* TODO: Parse permission_suggestions properly *)
-      let context = Permissions.Context.create ~suggestions:[] () in
+      (* Convert permission_suggestions to Context *)
+      let suggestions = Option.value req.permission_suggestions ~default:[] in
+      let context = Permissions.Context.create ~suggestions () in
 
       Log.info (fun m ->
           m "Invoking permission callback for tool: %s" tool_name);
@@ -136,14 +135,10 @@ let handle_control_request t (ctrl_req : Incoming.Control_request.t) =
       Log.info (fun m ->
           m "Sending control response: %s" (json_to_string response));
       Transport.send t.transport response
-  | Incoming.Control_request.Hook_callback req -> (
-      let callback_id =
-        Incoming.Control_request.Hook_callback.callback_id req
-      in
-      let input = Incoming.Control_request.Hook_callback.input req in
-      let tool_use_id =
-        Incoming.Control_request.Hook_callback.tool_use_id req
-      in
+  | Sdk_control.Request.Hook_callback req -> (
+      let callback_id = req.callback_id in
+      let input = req.input in
+      let tool_use_id = req.tool_use_id in
       Log.info (fun m ->
           m "Hook callback request for callback_id: %s" callback_id);
 
@@ -156,6 +151,8 @@ let handle_control_request t (ctrl_req : Incoming.Control_request.t) =
           Jsont.Json.encode Hooks.result_jsont result
           |> Err.get_ok ~msg:"Failed to encode hook result: "
         in
+        Log.debug (fun m ->
+            m "Hook result JSON: %s" (json_to_string result_json));
         let response =
           Control_response.success ~request_id ~response:(Some result_json)
         in
@@ -176,10 +173,9 @@ let handle_control_request t (ctrl_req : Incoming.Control_request.t) =
           Log.err (fun m -> m "%s" error_msg);
           Transport.send t.transport
             (Control_response.error ~request_id ~message:error_msg))
-  | Incoming.Control_request.Unknown (subtype, _) ->
-      let error_msg =
-        Printf.sprintf "Unsupported control request: %s" subtype
-      in
+  | _ ->
+      (* Other request types not handled here *)
+      let error_msg = "Unsupported control request type" in
       Transport.send t.transport
         (Control_response.error ~request_id ~message:error_msg)
 
@@ -229,9 +225,8 @@ let handle_messages t =
             loop ()
         | Ok (Incoming.Control_request ctrl_req) ->
             Log.info (fun m ->
-                m "Received control request: %s (request_id: %s)"
-                  (Incoming.Control_request.subtype ctrl_req)
-                  (Incoming.Control_request.request_id ctrl_req));
+                m "Received control request (request_id: %s)"
+                  ctrl_req.request_id);
             handle_control_request t ctrl_req;
             loop ()
         | Error err ->

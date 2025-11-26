@@ -24,6 +24,10 @@ module User : sig
   val jsont : t Jsont.t
   (** [jsont] is the Jsont codec for user messages. *)
 
+  val incoming_jsont : t Jsont.t
+  (** [incoming_jsont] is the codec for parsing incoming user messages from CLI.
+      This parses the envelope format with "message" wrapper. *)
+
   val create_string : string -> t
   (** [create_string s] creates a user message with simple text content. *)
 
@@ -90,6 +94,10 @@ module Assistant : sig
   val jsont : t Jsont.t
   (** [jsont] is the Jsont codec for assistant messages. *)
 
+  val incoming_jsont : t Jsont.t
+  (** [incoming_jsont] is the codec for parsing incoming assistant messages from
+      CLI. This parses the envelope format with "message" wrapper. *)
+
   val create :
     content:Content_block.t list -> model:string -> ?error:error -> unit -> t
   (** [create ~content ~model ?error ()] creates an assistant message.
@@ -141,8 +149,7 @@ module System : sig
 
       System messages use a discriminated union on the "subtype" field:
       - "init": Session initialization with session_id, model, cwd
-      - "error": Error messages with error string
-      - Other subtypes are preserved as [Other] *)
+      - "error": Error messages with error string *)
 
   type init = {
     session_id : string option;
@@ -155,13 +162,7 @@ module System : sig
   type error = { error : string; unknown : Unknown.t }
   (** Error message fields. *)
 
-  type other = { subtype : string; unknown : Unknown.t }
-  (** Unknown subtype fields. *)
-
-  type t =
-    | Init of init
-    | Error of error
-    | Other of other  (** The type of system messages. *)
+  type t = Init of init | Error of error
 
   val jsont : t Jsont.t
   (** [jsont] is the Jsont codec for system messages. *)
@@ -173,9 +174,6 @@ module System : sig
 
   val error : error:string -> t
   (** [error ~error] creates an error message. *)
-
-  val other : subtype:string -> t
-  (** [other ~subtype] creates a message with unknown subtype. *)
 
   (** {2 Accessors} *)
 

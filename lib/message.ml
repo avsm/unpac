@@ -286,31 +286,21 @@ module System = struct
   }
 
   type error = { error : string; unknown : Unknown.t }
-  type other = { subtype : string; unknown : Unknown.t }
-  type t = Init of init | Error of error | Other of other
+  type t = Init of init | Error of error
 
   (* Accessors *)
   let session_id = function Init i -> i.session_id | _ -> None
   let model = function Init i -> i.model | _ -> None
   let cwd = function Init i -> i.cwd | _ -> None
   let error_msg = function Error e -> Some e.error | _ -> None
-
-  let subtype = function
-    | Init _ -> "init"
-    | Error _ -> "error"
-    | Other o -> o.subtype
-
-  let unknown = function
-    | Init i -> i.unknown
-    | Error e -> e.unknown
-    | Other o -> o.unknown
+  let subtype = function Init _ -> "init" | Error _ -> "error"
+  let unknown = function Init i -> i.unknown | Error e -> e.unknown
 
   (* Constructors *)
   let init ?session_id ?model ?cwd () =
     Init { session_id; model; cwd; unknown = Unknown.empty }
 
   let error ~error = Error { error; unknown = Unknown.empty }
-  let other ~subtype = Other { subtype; unknown = Unknown.empty }
 
   (* Individual record codecs *)
   let init_jsont : init Jsont.t =
@@ -343,21 +333,9 @@ module System = struct
     let case_error =
       Jsont.Object.Case.map "error" error_jsont ~dec:(fun v -> Error v)
     in
-    let case_other tag =
-      (* For unknown subtypes, create Other with the tag as subtype *)
-      let other_codec : other Jsont.t =
-        let make unknown : other = { subtype = tag; unknown } in
-        Jsont.Object.map ~kind:"SystemOther" make
-        |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:(fun (r : other) ->
-            r.unknown)
-        |> Jsont.Object.finish
-      in
-      Jsont.Object.Case.map tag other_codec ~dec:(fun v -> Other v)
-    in
     let enc_case = function
       | Init v -> Jsont.Object.Case.value case_init v
       | Error v -> Jsont.Object.Case.value case_error v
-      | Other v -> Jsont.Object.Case.value (case_other v.subtype) v
     in
     let cases = Jsont.Object.Case.[ make case_init; make case_error ] in
     Jsont.Object.map ~kind:"System" Fun.id
@@ -665,7 +643,7 @@ let is_result = function Result _ -> true | _ -> false
 
 let is_error = function
   | Result r -> Result.is_error r
-  | System s -> System.subtype s = "error"
+  | System (System.Error _) -> true
   | _ -> false
 
 let extract_text = function
