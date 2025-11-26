@@ -228,6 +228,9 @@ type control_response = {
 }
 (** Control response message. *)
 
+val control_request_jsont : control_request Jsont.t
+(** [control_request_jsont] is the jsont codec for control request messages. *)
+
 val control_response_jsont : control_response Jsont.t
 (** [control_response_jsont] is the jsont codec for control response messages.
 *)

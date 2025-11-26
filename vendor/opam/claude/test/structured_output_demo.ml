@@ -199,10 +199,9 @@ let run_codebase_analysis env =
               match C.Message.Result.result result with
               | Some text -> Printf.printf "Text result: %s\n" text
               | None -> ()))
-      | C.Message.System sys -> (
-          match C.Message.System.subtype sys with
-          | "init" -> Printf.printf "Session initialized\n"
-          | _ -> ())
+      | C.Message.System (C.Message.System.Init _) ->
+          Printf.printf "Session initialized\n"
+      | C.Message.System (C.Message.System.Error _) -> ()
       | _ -> ())
     messages;
 

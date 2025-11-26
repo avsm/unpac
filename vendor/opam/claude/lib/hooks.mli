@@ -268,9 +268,20 @@ end
 
 (** SubagentStop hook - fires when a subagent stops *)
 module SubagentStop : sig
-  include module type of Stop
+  type input = Stop.input
+  type t = input
+  type output = Stop.output
 
   val of_json : Jsont.json -> t
+  val session_id : t -> string
+  val transcript_path : t -> string
+  val stop_hook_active : t -> bool
+  val unknown : t -> Unknown.t
+  val input_jsont : input Jsont.t
+  val output_jsont : output Jsont.t
+  val continue : ?unknown:Unknown.t -> unit -> output
+  val block : ?reason:string -> ?unknown:Unknown.t -> unit -> output
+  val output_to_json : output -> Jsont.json
 end
 
 (** PreCompact hook - fires before message compaction *)

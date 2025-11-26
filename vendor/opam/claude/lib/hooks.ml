@@ -65,6 +65,35 @@ type decision = Continue | Block
 let decision_jsont : decision Jsont.t =
   Jsont.enum [ ("continue", Continue); ("block", Block) ]
 
+(** Wire format for hook-specific output that includes hookEventName *)
+module Hook_specific_output = struct
+  type t = { hook_event_name : event; output : Jsont.json }
+
+  let create ~event ~output = { hook_event_name = event; output }
+
+  let to_json t =
+    (* Encode the event name *)
+    let event_name_json =
+      Jsont.Json.encode event_jsont t.hook_event_name
+      |> Err.get_ok ~msg:"Hook_specific_output.to_json: event_name encoding"
+    in
+    (* Merge hookEventName into the output object *)
+    match t.output with
+    | Jsont.Object (members, meta) ->
+        let hook_event_name_member =
+          (Jsont.Json.name "hookEventName", event_name_json)
+        in
+        Jsont.Object (hook_event_name_member :: members, meta)
+    | _ ->
+        (* If output is not an object, wrap it *)
+        Jsont.Object
+          ( [
+              ( Jsont.Json.name "hookEventName",
+                event_name_json );
+            ],
+            Jsont.Meta.none )
+end
+
 type result = {
   decision : decision option;
   system_message : string option;
@@ -154,9 +183,11 @@ module PreToolUse = struct
     |> Jsont.Object.finish
 
   let output_to_json output =
-    match Jsont.Json.encode output_jsont output with
-    | Ok json -> json
-    | Error msg -> failwith ("PreToolUse.output_to_json: " ^ msg)
+    let inner =
+      Jsont.Json.encode output_jsont output
+      |> Err.get_ok ~msg:"PreToolUse.output_to_json: "
+    in
+    Hook_specific_output.(create ~event:Pre_tool_use ~output:inner |> to_json)
 
   let allow ?reason ?updated_input ?(unknown = Unknown.empty) () =
     {
@@ -257,9 +288,11 @@ module PostToolUse = struct
     |> Jsont.Object.finish
 
   let output_to_json output =
-    match Jsont.Json.encode output_jsont output with
-    | Ok json -> json
-    | Error msg -> failwith ("PostToolUse.output_to_json: " ^ msg)
+    let inner =
+      Jsont.Json.encode output_jsont output
+      |> Err.get_ok ~msg:"PostToolUse.output_to_json: "
+    in
+    Hook_specific_output.(create ~event:Post_tool_use ~output:inner |> to_json)
 
   let continue ?additional_context ?(unknown = Unknown.empty) () =
     { decision = None; reason = None; additional_context; unknown }
@@ -320,9 +353,12 @@ module UserPromptSubmit = struct
     |> Jsont.Object.finish
 
   let output_to_json output =
-    match Jsont.Json.encode output_jsont output with
-    | Ok json -> json
-    | Error msg -> failwith ("UserPromptSubmit.output_to_json: " ^ msg)
+    let inner =
+      Jsont.Json.encode output_jsont output
+      |> Err.get_ok ~msg:"UserPromptSubmit.output_to_json: "
+    in
+    Hook_specific_output.(
+      create ~event:User_prompt_submit ~output:inner |> to_json)
 
   let continue ?additional_context ?(unknown = Unknown.empty) () =
     { decision = None; reason = None; additional_context; unknown }
@@ -378,9 +414,11 @@ module Stop = struct
     |> Jsont.Object.finish
 
   let output_to_json output =
-    match Jsont.Json.encode output_jsont output with
-    | Ok json -> json
-    | Error msg -> failwith ("Stop.output_to_json: " ^ msg)
+    let inner =
+      Jsont.Json.encode output_jsont output
+      |> Err.get_ok ~msg:"Stop.output_to_json: "
+    in
+    Hook_specific_output.(create ~event:Stop ~output:inner |> to_json)
 
   let continue ?(unknown = Unknown.empty) () =
     { decision = None; reason = None; unknown }
@@ -391,7 +429,26 @@ end
 
 (** {1 SubagentStop Hook} - Same structure as Stop *)
 module SubagentStop = struct
-  include Stop
+  type input = Stop.input
+  type t = input
+  type output = Stop.output
+
+  let session_id = Stop.session_id
+  let transcript_path = Stop.transcript_path
+  let stop_hook_active = Stop.stop_hook_active
+  let unknown = Stop.unknown
+  let input_jsont = Stop.input_jsont
+  let of_json = Stop.of_json
+  let output_jsont = Stop.output_jsont
+  let continue = Stop.continue
+  let block = Stop.block
+
+  let output_to_json output =
+    let inner =
+      Jsont.Json.encode output_jsont output
+      |> Err.get_ok ~msg:"SubagentStop.output_to_json: "
+    in
+    Hook_specific_output.(create ~event:Subagent_stop ~output:inner |> to_json)
 end
 
 (** {1 PreCompact Hook} *)
@@ -425,7 +482,10 @@ module PreCompact = struct
 
   type output = unit (* No specific output for PreCompact *)
 
-  let output_to_json () = Jsont.Object ([], Jsont.Meta.none)
+  let output_to_json () =
+    let inner = Jsont.Object ([], Jsont.Meta.none) in
+    Hook_specific_output.(create ~event:Pre_compact ~output:inner |> to_json)
+
   let continue () = ()
 end
 
