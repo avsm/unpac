@@ -1,6 +1,6 @@
 # How to contribute changes
 
-:+1::tada: First off, thank you for taking time to contribute! :tada::+1:
+👍🎉 First off, thank you for taking time to contribute! 👍🎉
 
 The following is a set of guidelines for proposing changes to the
 OCaml distribution. These are just guidelines, not rules, use your
