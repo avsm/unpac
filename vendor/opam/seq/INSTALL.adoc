@@ -205,7 +205,7 @@ A cross compiler is a compiler that runs on some machine, named the _host_, but
 generates code for a different machine, named the _target_. To build a cross
 compiler you first need to have a non-cross compiler of the same version
 installed in your `$PATH`. You can install that standard non-cross compiler by
-any means, for instance using `opam` or compiling it manually from source. Note
+any means, for instance using opam or compiling it manually from source. Note
 though that the version of the non-cross compiler must match the version of the
 cross compiler since the cross compiler will be compiled by the non-cross
 compiler: the cross compiler will combine code compiled from source with the

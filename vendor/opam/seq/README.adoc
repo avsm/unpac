@@ -152,11 +152,11 @@ link:CONTRIBUTING.md[].
 == Separately maintained components
 
 Some libraries and tools which used to be part of the OCaml distribution are
-now maintained separately and distributed as OPAM packages.
+now maintained separately and distributed as opam packages.
 Please use the issue trackers at their respective new homes:
 
 |====
-| Library           |  Removed since    |  OPAM package
+| Library           |  Removed since    |  opam package
 
 | https://github.com/ocaml/camlp-streams/issues[The Stream and Genlex standard library modules] | OCaml 5.0 | `camlp-streams`
 | https://github.com/ocaml/graphics/issues[The Graphics library] | OCaml 4.09 | `graphics`
