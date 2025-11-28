@@ -279,6 +279,10 @@ Working version
   recursive modules.
   (Shivam Acharya, review by Gabriel Scherer and Florian Angeletti)
 
+- #13994: documentation for external types
+  (Gabriel Scherer, review by Jan Midtgaard, Jacques Garrigue
+   and Florian Angeletti)
+
 - #14076, 14111: error messages, add a short explanation for mismatched
   universal variables and universal quantifications.
   (Florian Angeletti, review by Gabriel Scherer)
