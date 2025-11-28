@@ -86,9 +86,9 @@ file LICENSE.
 
 == Installation
 
-See the file link:INSTALL.adoc[] for installation instructions on
+See the file xref:INSTALL.adoc[] for installation instructions on
 machines running Unix, Linux, macOS, WSL and Cygwin.  For native Microsoft
-Windows, see link:README.win32.adoc[].
+Windows, see xref:README.win32.adoc[].
 
 == Documentation
 
@@ -146,7 +146,7 @@ using (machine type, etc).
 
 == Contributing
 
-For information on contributing to OCaml, see link:HACKING.adoc[] and
+For information on contributing to OCaml, see xref:HACKING.adoc[] and
 link:CONTRIBUTING.md[].
 
 == Separately maintained components
