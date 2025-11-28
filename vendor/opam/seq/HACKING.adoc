@@ -434,7 +434,7 @@ installation, the following targets may be of use:
 `make -C testsuite parallel`:: see xref:testsuite/HACKING.adoc[]
 
 You can use `make foo V=1` to build the target foo and show full
-commands instead of abbreviated names like OCAMLC, etc. This can be
+commands instead of abbreviated names like `OCAMLC`, etc. This can be
 useful to know the flags to use to manually rebuild a file.
 
 Additionally, there are some developer specific targets in link:Makefile.dev[].
@@ -743,7 +743,7 @@ OCaml's GitHub repository and then push "mybranch" to your fork.
 5. Visit https://ci.inria.fr/ocaml/job/precheck and log in. Click on
 "Build with parameters".
 
-6. Fill in the REPO_URL and BRANCH fields as appropriate and run the build.
+6. Fill in the `REPO_URL` and `BRANCH` fields as appropriate and run the build.
 
 7. You should receive a bunch of e-mails with the build logs for each
 slave and each tested configuration (with and without flambda) attached.
