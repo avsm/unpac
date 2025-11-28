@@ -76,7 +76,7 @@ newcomers. Here are various potential projects:
   clarifying comments can be an excellent contribution to help you,
   next time, and other code readers.
 
-* The https://github.com/ocaml/ocaml[github project] contains a lot of
+* The https://github.com/ocaml/ocaml[GitHub project] contains a lot of
   pull requests, many of them being in dire need of a review -- we
   have more people willing to contribute changes than to review
   someone else's change. Picking one of them, trying to understand the
@@ -221,9 +221,9 @@ has excellent documentation.
 [#tips]
 == Development tips and tricks
 
-=== Keep merge commits when merging and cherry-picking Github PRs
+=== Keep merge commits when merging and cherry-picking GitHub PRs
 
-Having the Github PR number show up in the git log is very useful for
+Having the GitHub PR number show up in the git log is very useful for
 later triaging. We recently disabled the "Rebase and merge" button,
 precisely because it does not produce a merge commit.
 
@@ -690,7 +690,7 @@ triggered by setting a label on the pull request. See below:
 INRIA provides a Jenkins continuous integration service that OCaml
 uses, see link:https://ci.inria.fr/ocaml/[]. It provides a wider
 architecture support (MSVC and MinGW, a zsystems s390x machine, and
-various MacOS versions) than the Travis/AppVeyor testing on github,
+various MacOS versions) than the Travis/AppVeyor testing on GitHub,
 but only runs on commits to the trunk or release branches, not on every
 PR.
 
@@ -708,7 +708,7 @@ https://sympa.inria.fr/sympa/info/ocaml-ci-notifications[its web page.]
 
 If you have suspicions that your changes may fail on exotic architectures
 (they touch the build system or the backend code generator,
-for example) and would like to get wider testing than github's CI
+for example) and would like to get wider testing than GitHub's CI
 provides, it is possible to manually start INRIA's CI on arbitrary git
 branches even before opening a pull request as follows:
 
