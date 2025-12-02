@@ -28,6 +28,11 @@ Working version
   (Ulysse Gérard, Leo White, review by Florian Angeletti, Samuel Vivien, Gabriel
   Scherer and Jacques Garrigue)
 
+- #14040: generalize the constructs `let module`, `let exception` and `let open`
+  to most other structure items, eg `let type t = ... in ...`, `let type t +=
+  ... in ...`, etc.
+  (Nicolás Ojeda Bär, review by Valentin Gatien-Baron)
+
 ### Runtime system:
 
 - #13616: Change free list representation in shared heap
