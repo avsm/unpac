@@ -617,9 +617,9 @@ with GNU Autoconf installed.
 If you're using a version of GNU Autoconf that differs from our CI,
 then the generated `configure` script might differ too. The latest
 Ubuntu LTS packages may be used as a reasonable base to generate this
-file. Using a Docker image with GNU Autoconf installed, and `git
-rebase --exec`, one can properly regenerate the `configure` script for
-each commit in a branch.
+file. Using a Docker image with GNU Autoconf installed, and
+`git rebase --exec`, one can properly regenerate the `configure`
+script for each commit in a branch.
 
 [source,sh]
 ----
