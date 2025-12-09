@@ -18,6 +18,7 @@
  (depends
   (ocaml (>= 5.1.0))
   eio
+  (eio_main :with-test)
   fmt
   logs
   (jsont (>= 0.2.0))
