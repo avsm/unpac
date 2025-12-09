@@ -92,8 +92,9 @@ module Decision : sig
   val deny_interrupt : t -> bool
   (** [deny_interrupt t] returns whether to interrupt if the decision is deny. *)
 
-  val to_proto_result : t -> Proto.Permissions.Result.t
-  (** [to_proto_result t] converts to the protocol result representation. *)
+  val to_proto_result : original_input:Tool_input.t -> t -> Proto.Permissions.Result.t
+  (** [to_proto_result ~original_input t] converts to the protocol result representation.
+      When the decision allows without modification, the original_input is returned. *)
 end
 
 (** {1 Permission Context} *)

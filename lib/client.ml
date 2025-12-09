@@ -92,7 +92,7 @@ let handle_control_request t (ctrl_req : Sdk_control.control_request) =
             (if Permissions.Decision.is_allow decision then "ALLOW" else "DENY"));
 
       (* Convert permission decision to proto result *)
-      let proto_result = Permissions.Decision.to_proto_result decision in
+      let proto_result = Permissions.Decision.to_proto_result ~original_input:input decision in
 
       (* Encode to JSON *)
       let response_data =
