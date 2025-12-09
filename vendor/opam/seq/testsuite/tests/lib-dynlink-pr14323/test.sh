@@ -2,8 +2,6 @@
 
 set -eu
 
-ocamlsrcdir="$1"
-
 ocamlopt () {
   "$ocamlsrcdir"/ocamlopt.opt \
     -nostdlib \
@@ -15,30 +13,6 @@ ocamlopt () {
 
 cat >lib.ml <<EOF
 let s = "Hello natdynlink!"
-EOF
-
-cat >toto.ml <<EOF
-let () =
-  print_endline Lib.s
-EOF
-
-cat >main.ml <<EOF
-let () =
-  let rec loop failed i =
-    if i > 5 then begin
-      print_endline "Too many failures.";
-      exit 1
-    end else
-    match Dynlink.loadfile "toto.cmxs" with
-    | _ ->
-      print_endline "OK";
-      exit 0
-    | exception exn ->
-      if not failed then print_endline "Dynlink.loadfile failed. Retrying.";
-      Unix.sleep 1;
-      loop true (i + 1)
-  in
-  loop false 0
 EOF
 
 # Build toto.cmxs against the original lib.cmi
@@ -63,4 +37,8 @@ PID=$!
 sleep 1
 ocamlopt -shared -o toto.cmxs toto.ml
 
-wait $PID || :
+if wait $PID; then
+  exit ${TEST_PASS}
+else
+  exit ${TEST_FAIL}
+fi
