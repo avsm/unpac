@@ -72,8 +72,8 @@ module Rule = struct
       { tool_name; rule_content; unknown }
     in
     Jsont.Object.map ~kind:"Rule" make
-    |> Jsont.Object.mem "tool_name" Jsont.string ~enc:tool_name
-    |> Jsont.Object.opt_mem "rule_content" Jsont.string ~enc:rule_content
+    |> Jsont.Object.mem "toolName" Jsont.string ~enc:tool_name
+    |> Jsont.Object.opt_mem "ruleContent" Jsont.string ~enc:rule_content
     |> Jsont.Object.keep_unknown Unknown.mems ~enc:unknown
     |> Jsont.Object.finish
 end
@@ -193,10 +193,12 @@ module Result = struct
         Allow { updated_input; updated_permissions; unknown }
       in
       Jsont.Object.map ~kind:"AllowRecord" make
-      |> Jsont.Object.opt_mem "updated_input" Jsont.json ~enc:(function
-        | Allow { updated_input; _ } -> updated_input
-        | _ -> None)
-      |> Jsont.Object.opt_mem "updated_permissions" (Jsont.list Update.jsont)
+      |> Jsont.Object.mem "updatedInput" (Jsont.option Jsont.json)
+           ~enc:(function
+              | Allow { updated_input; _ } -> updated_input
+              | _ -> None)
+           ~dec_absent:None
+      |> Jsont.Object.opt_mem "updatedPermissions" (Jsont.list Update.jsont)
            ~enc:(function
            | Allow { updated_permissions; _ } -> updated_permissions
            | _ -> None)

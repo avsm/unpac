@@ -75,11 +75,13 @@ module Decision = struct
 
   let deny_interrupt = function Allow _ -> false | Deny { interrupt; _ } -> interrupt
 
-  let to_proto_result (t : t) : Proto.Permissions.Result.t =
+  let to_proto_result ~original_input (t : t) : Proto.Permissions.Result.t =
     match t with
     | Allow { updated_input } ->
         let updated_input_json =
-          Option.map Tool_input.to_json updated_input
+          match updated_input with
+          | Some input -> Some (Tool_input.to_json input)
+          | None -> Some (Tool_input.to_json original_input) (* Return original when not modified *)
         in
         Proto.Permissions.Result.allow ?updated_input:updated_input_json ()
     | Deny { message; interrupt } ->
