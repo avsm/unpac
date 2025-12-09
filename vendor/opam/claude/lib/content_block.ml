@@ -1,3 +1,8 @@
+(*---------------------------------------------------------------------------
+  Copyright (c) 2025 Anil Madhavapeddy <anil@recoil.org>. All rights reserved.
+  SPDX-License-Identifier: ISC
+ ---------------------------------------------------------------------------*)
+
 let src = Logs.Src.create "claude.content_block" ~doc:"Claude content blocks"
 
 module Log = (val Logs.src_log src : Logs.LOG)
