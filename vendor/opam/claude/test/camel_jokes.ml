@@ -51,7 +51,7 @@ let run_claude ~sw ~env name prompt =
   in
 
   let client =
-    Claude.Client.create ~options ~sw ~process_mgr:env#process_mgr ()
+    Claude.Client.create ~options ~sw ~process_mgr:env#process_mgr ~clock:env#clock ()
   in
 
   Claude.Client.query client prompt;

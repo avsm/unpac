@@ -183,6 +183,35 @@ end
 module Response : sig
   (** SDK control response types. *)
 
+  (** Re-export Error_code from Proto for convenience. *)
+  module Error_code = Proto.Control.Response.Error_code
+
+  (** Structured error detail similar to JSON-RPC.
+
+      This allows programmatic error handling with numeric error codes and
+      optional structured data for additional context. *)
+  type error_detail = {
+    code : int;  (** Error code for programmatic handling *)
+    message : string;  (** Human-readable error message *)
+    data : Jsont.json option;  (** Optional additional error data *)
+  }
+
+  val error_detail :
+    code:[< Error_code.t] -> message:string -> ?data:Jsont.json -> unit -> error_detail
+  (** [error_detail ~code ~message ?data ()] creates a structured error detail
+      using typed error codes.
+
+      Example:
+      {[
+        error_detail
+          ~code:`Method_not_found
+          ~message:"Hook callback not found"
+          ()
+      ]} *)
+
+  val error_detail_jsont : error_detail Jsont.t
+  (** [error_detail_jsont] is the Jsont codec for error details. *)
+
   type success = {
     subtype : [ `Success ];
     request_id : string;
@@ -194,10 +223,10 @@ module Response : sig
   type error = {
     subtype : [ `Error ];
     request_id : string;
-    error : string;
+    error : error_detail;
     unknown : Unknown.t;
   }
-  (** Error response. *)
+  (** Error response with structured error detail. *)
 
   type t =
     | Success of success
@@ -208,8 +237,8 @@ module Response : sig
   (** [success ~request_id ?response ?unknown ()] creates a success response. *)
 
   val error :
-    request_id:string -> error:string -> ?unknown:Unknown.t -> unit -> t
-  (** [error ~request_id ~error ?unknown] creates an error response. *)
+    request_id:string -> error:error_detail -> ?unknown:Unknown.t -> unit -> t
+  (** [error ~request_id ~error ?unknown] creates an error response with structured error detail. *)
 
   val jsont : t Jsont.t
   (** [jsont] is the jsont codec for responses. Use [Jsont.pp_value jsont ()]

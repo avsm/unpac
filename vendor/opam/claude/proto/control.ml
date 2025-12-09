@@ -223,6 +223,52 @@ module Request = struct
 end
 
 module Response = struct
+  (* Standard JSON-RPC 2.0 error codes using polymorphic variants *)
+  module Error_code = struct
+    type t = [
+      | `Parse_error
+      | `Invalid_request
+      | `Method_not_found
+      | `Invalid_params
+      | `Internal_error
+      | `Custom of int
+    ]
+
+    let to_int : [< t] -> int = function
+      | `Parse_error -> -32700
+      | `Invalid_request -> -32600
+      | `Method_not_found -> -32601
+      | `Invalid_params -> -32602
+      | `Internal_error -> -32603
+      | `Custom n -> n
+
+    let of_int = function
+      | -32700 -> `Parse_error
+      | -32600 -> `Invalid_request
+      | -32601 -> `Method_not_found
+      | -32602 -> `Invalid_params
+      | -32603 -> `Internal_error
+      | n -> `Custom n
+  end
+
+  (* Structured error similar to JSON-RPC *)
+  type error_detail = {
+    code : int;
+    message : string;
+    data : Jsont.json option;
+  }
+
+  let error_detail ~code ~message ?data () =
+    { code = Error_code.to_int code; message; data }
+
+  let error_detail_jsont : error_detail Jsont.t =
+    let make code message data = { code; message; data } in
+    Jsont.Object.map ~kind:"ErrorDetail" make
+    |> Jsont.Object.mem "code" Jsont.int ~enc:(fun e -> e.code)
+    |> Jsont.Object.mem "message" Jsont.string ~enc:(fun e -> e.message)
+    |> Jsont.Object.opt_mem "data" Jsont.json ~enc:(fun e -> e.data)
+    |> Jsont.Object.finish
+
   (* Individual record types for each response variant *)
   type success_r = {
     request_id : string;
@@ -232,7 +278,7 @@ module Response = struct
 
   type error_r = {
     request_id : string;
-    error : string;
+    error : error_detail;
     unknown : Unknown.t;
   }
 
@@ -257,7 +303,7 @@ module Response = struct
     let make request_id error unknown = { request_id; error; unknown } in
     (Jsont.Object.map ~kind:"Error" make
     |> Jsont.Object.mem "requestId" Jsont.string ~enc:(fun (r : error_r) -> r.request_id)
-    |> Jsont.Object.mem "error" Jsont.string ~enc:(fun (r : error_r) -> r.error)
+    |> Jsont.Object.mem "error" error_detail_jsont ~enc:(fun (r : error_r) -> r.error)
     |> Jsont.Object.keep_unknown Unknown.mems ~enc:(fun (r : error_r) -> r.unknown)
     |> Jsont.Object.finish)
 

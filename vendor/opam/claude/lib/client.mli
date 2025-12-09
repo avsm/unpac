@@ -13,7 +13,7 @@
 
     {[
       Eio.Switch.run @@ fun sw ->
-      let client = Client.create ~sw ~process_mgr () in
+      let client = Client.create ~sw ~process_mgr ~clock () in
       Client.query client "What is 2+2?";
 
       let messages = Client.receive_all client in
@@ -61,13 +61,15 @@ val create :
   ?options:Options.t ->
   sw:Eio.Switch.t ->
   process_mgr:_ Eio.Process.mgr ->
+  clock:float Eio.Time.clock_ty Eio.Resource.t ->
   unit ->
   t
-(** [create ?options ~sw ~process_mgr ()] creates a new Claude client.
+(** [create ?options ~sw ~process_mgr ~clock ()] creates a new Claude client.
 
     @param options Configuration options (defaults to {!Options.default})
     @param sw Eio switch for resource management
-    @param process_mgr Eio process manager for spawning the Claude CLI *)
+    @param process_mgr Eio process manager for spawning the Claude CLI
+    @param clock Eio clock for time operations *)
 
 (** {1 Simple Query Interface} *)
 
@@ -165,7 +167,7 @@ val interrupt : t -> unit
 
     {[
       (* Start with strict permissions *)
-      let client = Client.create ~sw ~process_mgr
+      let client = Client.create ~sw ~process_mgr ~clock
         ~options:(Options.default
                   |> Options.with_permission_mode Permissions.Mode.Default) ()
       in
@@ -184,7 +186,7 @@ val interrupt : t -> unit
 
     {[
       (* Use powerful model for complex analysis *)
-      let client = Client.create ~sw ~process_mgr
+      let client = Client.create ~sw ~process_mgr ~clock
         ~options:(Options.default |> Options.with_model "claude-sonnet-4-5") ()
       in
 

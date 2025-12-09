@@ -12,10 +12,11 @@ let () = Logs.set_level (Some Logs.Info)
 let run env =
   Switch.run @@ fun sw ->
   let process_mgr = Eio.Stdenv.process_mgr env in
+  let clock = Eio.Stdenv.clock env in
 
   (* Create client with default options *)
   let options = Options.default in
-  let client = Client.create ~options ~sw ~process_mgr () in
+  let client = Client.create ~options ~sw ~process_mgr ~clock () in
 
   traceln "=== Dynamic Control Demo ===\n";
 

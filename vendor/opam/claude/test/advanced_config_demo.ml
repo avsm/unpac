@@ -75,7 +75,7 @@ let _large_output_config () =
   |> Options.with_model (Claude.Proto.Model.of_string "claude-sonnet-4-5")
 
 (* Helper to run a query with a specific configuration *)
-let run_query ~sw process_mgr config prompt =
+let run_query ~sw process_mgr clock config prompt =
   print_endline "\n=== Configuration ===";
   (match Options.max_budget_usd config with
   | Some budget -> Printf.printf "Budget limit: $%.2f\n" budget
@@ -91,7 +91,7 @@ let run_query ~sw process_mgr config prompt =
   | None -> print_endline "Buffer size: Default (1MB)");
 
   print_endline "\n=== Running Query ===";
-  let client = Client.create ~options:config ~sw ~process_mgr () in
+  let client = Client.create ~options:config ~sw ~process_mgr ~clock () in
   Client.query client prompt;
   let responses = Client.receive client in
 
@@ -115,6 +115,7 @@ let main () =
   Eio_main.run @@ fun env ->
   Switch.run @@ fun sw ->
   let process_mgr = Eio.Stdenv.process_mgr env in
+  let clock = Eio.Stdenv.clock env in
 
   print_endline "==============================================";
   print_endline "Claude SDK - Advanced Configuration Examples";
@@ -124,26 +125,26 @@ let main () =
   print_endline "\n\n### Example 1: CI/CD Configuration ###";
   print_endline "Purpose: Isolated, reproducible environment for CI/CD";
   let config = ci_cd_config () in
-  run_query ~sw process_mgr config "What is 2+2? Answer in one sentence.";
+  run_query ~sw process_mgr clock config "What is 2+2? Answer in one sentence.";
 
   (* Example: Production with fallback *)
   print_endline "\n\n### Example 2: Production Configuration ###";
   print_endline "Purpose: Production with cost controls and fallback";
   let config = production_config () in
-  run_query ~sw process_mgr config "Explain OCaml in one sentence.";
+  run_query ~sw process_mgr clock config "Explain OCaml in one sentence.";
 
   (* Example: Development with settings *)
   print_endline "\n\n### Example 3: Development Configuration ###";
   print_endline "Purpose: Development with user/project settings";
   let config = dev_config () in
-  run_query ~sw process_mgr config
+  run_query ~sw process_mgr clock config
     "What is functional programming? One sentence.";
 
   (* Example: Test configuration *)
   print_endline "\n\n### Example 4: Test Configuration ###";
   print_endline "Purpose: Automated testing with strict limits";
   let config = test_config () in
-  run_query ~sw process_mgr config "Say 'test passed' in one word.";
+  run_query ~sw process_mgr clock config "Say 'test passed' in one word.";
 
   print_endline "\n\n==============================================";
   print_endline "All examples completed successfully!";

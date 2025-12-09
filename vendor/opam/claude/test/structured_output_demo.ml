@@ -124,7 +124,8 @@ let run_codebase_analysis env =
   (* Create Claude client and query *)
   Eio.Switch.run @@ fun sw ->
   let process_mgr = Eio.Stdenv.process_mgr env in
-  let client = C.Client.create ~sw ~process_mgr ~options () in
+  let clock = Eio.Stdenv.clock env in
+  let client = C.Client.create ~sw ~process_mgr ~clock ~options () in
 
   let prompt =
     "Please analyze the current codebase structure. Look at the files, \

@@ -61,7 +61,8 @@ let simple_example env =
 
   Eio.Switch.run @@ fun sw ->
   let process_mgr = Eio.Stdenv.process_mgr env in
-  let client = C.Client.create ~sw ~process_mgr ~options () in
+  let clock = Eio.Stdenv.clock env in
+  let client = C.Client.create ~sw ~process_mgr ~clock ~options () in
 
   C.Client.query client
     "Tell me about a famous computer scientist. Provide their name, age, and \

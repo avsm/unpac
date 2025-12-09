@@ -159,7 +159,7 @@ let run_demo ~sw ~env =
   in
 
   let client =
-    Claude.Client.create ~options ~sw ~process_mgr:env#process_mgr ()
+    Claude.Client.create ~options ~sw ~process_mgr:env#process_mgr ~clock:env#clock ()
   in
 
   (* First prompt - Claude will need to request Read permission for ../lib *)

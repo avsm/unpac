@@ -27,7 +27,7 @@ let run_test ~sw ~env =
 
   Log.app (fun m -> m "Creating client with permission callback...");
   let client =
-    Claude.Client.create ~options ~sw ~process_mgr:env#process_mgr ()
+    Claude.Client.create ~options ~sw ~process_mgr:env#process_mgr ~clock:env#clock ()
   in
 
   (* Simple query that will trigger tool use *)

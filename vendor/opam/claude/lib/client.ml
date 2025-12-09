@@ -15,8 +15,9 @@ module Control_response = struct
     Jsont.Json.encode Sdk_control.jsont ctrl
     |> Err.get_ok ~msg:"Control_response.success: "
 
-  let error ~request_id ~message =
-    let resp = Sdk_control.Response.error ~request_id ~error:message () in
+  let error ~request_id ~code ~message ?data () =
+    let error_detail = Sdk_control.Response.error_detail ~code ~message ?data () in
+    let resp = Sdk_control.Response.error ~request_id ~error:error_detail () in
     let ctrl = Sdk_control.create_response ~response:resp () in
     Jsont.Json.encode Sdk_control.jsont ctrl
     |> Err.get_ok ~msg:"Control_response.error: "
@@ -58,6 +59,7 @@ type t = {
   control_responses : (string, Jsont.json) Hashtbl.t;
   control_mutex : Eio.Mutex.t;
   control_condition : Eio.Condition.t;
+  clock : float Eio.Time.clock_ty Eio.Resource.t;
 }
 
 let session_id t = t.session_id
@@ -142,19 +144,19 @@ let handle_control_request t (ctrl_req : Sdk_control.control_request) =
           in
           Log.err (fun m -> m "%s" error_msg);
           Transport.send t.transport
-            (Control_response.error ~request_id ~message:error_msg)
+            (Control_response.error ~request_id ~code:`Method_not_found ~message:error_msg ())
       | exn ->
           let error_msg =
             Printf.sprintf "Hook callback error: %s" (Printexc.to_string exn)
           in
           Log.err (fun m -> m "%s" error_msg);
           Transport.send t.transport
-            (Control_response.error ~request_id ~message:error_msg))
+            (Control_response.error ~request_id ~code:`Internal_error ~message:error_msg ()))
   | _ ->
       (* Other request types not handled here *)
       let error_msg = "Unsupported control request type" in
       Transport.send t.transport
-        (Control_response.error ~request_id ~message:error_msg)
+        (Control_response.error ~request_id ~code:`Invalid_request ~message:error_msg ())
 
 let handle_control_response t control_resp =
   let request_id =
@@ -235,7 +237,7 @@ let handle_messages t =
   in
   loop raw_seq
 
-let create ?(options = Options.default) ~sw ~process_mgr () =
+let create ?(options = Options.default) ~sw ~process_mgr ~clock () =
   (* Automatically enable permission prompt tool when callback is configured
      (matching Python SDK behavior in client.py:104-121) *)
   let options =
@@ -261,6 +263,7 @@ let create ?(options = Options.default) ~sw ~process_mgr () =
       control_responses = Hashtbl.create 16;
       control_mutex = Eio.Mutex.create ();
       control_condition = Eio.Condition.create ();
+      clock;
     }
   in
 
@@ -386,7 +389,7 @@ let send_control_request t ~request_id request =
   (* Wait for the response with timeout *)
   let max_wait = 10.0 in
   (* 10 seconds timeout *)
-  let start_time = Unix.gettimeofday () in
+  let start_time = Eio.Time.now t.clock in
 
   let rec wait_for_response () =
     Eio.Mutex.use_rw ~protect:false t.control_mutex (fun () ->
@@ -396,7 +399,7 @@ let send_control_request t ~request_id request =
             Hashtbl.remove t.control_responses request_id;
             response_json
         | None ->
-            let elapsed = Unix.gettimeofday () -. start_time in
+            let elapsed = Eio.Time.now t.clock -. start_time in
             if elapsed > max_wait then
               raise
                 (Failure
@@ -429,10 +432,10 @@ let send_control_request t ~request_id request =
   match response with
   | Sdk_control.Response.Success s -> s.response
   | Sdk_control.Response.Error e ->
-      raise (Failure (Printf.sprintf "Control request failed: %s" e.error))
+      raise (Failure (Printf.sprintf "Control request failed: [%d] %s" e.error.code e.error.message))
 
 let set_permission_mode t mode =
-  let request_id = Printf.sprintf "set_perm_mode_%f" (Unix.gettimeofday ()) in
+  let request_id = Printf.sprintf "set_perm_mode_%f" (Eio.Time.now t.clock) in
   let proto_mode = Permissions.Mode.to_proto mode in
   let request = Sdk_control.Request.set_permission_mode ~mode:proto_mode () in
   let _response = send_control_request t ~request_id request in
@@ -441,13 +444,13 @@ let set_permission_mode t mode =
 
 let set_model t model =
   let model_str = Model.to_string model in
-  let request_id = Printf.sprintf "set_model_%f" (Unix.gettimeofday ()) in
+  let request_id = Printf.sprintf "set_model_%f" (Eio.Time.now t.clock) in
   let request = Sdk_control.Request.set_model ~model:model_str () in
   let _response = send_control_request t ~request_id request in
   Log.info (fun m -> m "Model set to: %s" model_str)
 
 let get_server_info t =
-  let request_id = Printf.sprintf "get_server_info_%f" (Unix.gettimeofday ()) in
+  let request_id = Printf.sprintf "get_server_info_%f" (Eio.Time.now t.clock) in
   let request = Sdk_control.Request.get_server_info () in
   let response_data =
     send_control_request t ~request_id request
