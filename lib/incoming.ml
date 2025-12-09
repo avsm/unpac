@@ -1,3 +1,8 @@
+(*---------------------------------------------------------------------------
+  Copyright (c) 2025 Anil Madhavapeddy <anil@recoil.org>. All rights reserved.
+  SPDX-License-Identifier: ISC
+ ---------------------------------------------------------------------------*)
+
 let src =
   Logs.Src.create "claude.incoming" ~doc:"Incoming messages from Claude CLI"
 

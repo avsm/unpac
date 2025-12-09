@@ -1,3 +1,8 @@
+(*---------------------------------------------------------------------------
+  Copyright (c) 2025 Anil Madhavapeddy <anil@recoil.org>. All rights reserved.
+  SPDX-License-Identifier: ISC
+ ---------------------------------------------------------------------------*)
+
 (** Content blocks in messages. Opaque types without wire concerns.
 
     This module provides opaque wrapper types around the proto content block

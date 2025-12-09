@@ -1,3 +1,8 @@
+(*---------------------------------------------------------------------------
+  Copyright (c) 2025 Anil Madhavapeddy <anil@recoil.org>. All rights reserved.
+  SPDX-License-Identifier: ISC
+ ---------------------------------------------------------------------------*)
+
 (** Unknown fields for preserving extra JSON object members during
     round-tripping.
 

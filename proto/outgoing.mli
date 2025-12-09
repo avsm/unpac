@@ -1,3 +1,8 @@
+(*---------------------------------------------------------------------------
+  Copyright (c) 2025 Anil Madhavapeddy <anil@recoil.org>. All rights reserved.
+  SPDX-License-Identifier: ISC
+ ---------------------------------------------------------------------------*)
+
 (** Outgoing messages to the Claude CLI.
 
     This module provides encoding for all message types that can be sent to the

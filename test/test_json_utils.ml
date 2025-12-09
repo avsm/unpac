@@ -1,3 +1,8 @@
+(*---------------------------------------------------------------------------
+  Copyright (c) 2025 Anil Madhavapeddy <anil@recoil.org>. All rights reserved.
+  SPDX-License-Identifier: ISC
+ ---------------------------------------------------------------------------*)
+
 (* Helper functions for JSON operations in tests using jsont codecs *)
 
 let to_string ?(minify = false) json =
