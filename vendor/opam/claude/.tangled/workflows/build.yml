@@ -40,7 +40,7 @@ steps:
        opam install . --confirm-level=unsafe-yes --deps-only
   - name: build
     command: |
-       opam exec -- dune build -p claudeio
+       opam exec -- dune build -p claude
   - name: switch-test
     command: |
        opam install . --confirm-level=unsafe-yes --deps-only --with-test
