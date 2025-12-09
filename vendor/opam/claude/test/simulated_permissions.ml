@@ -42,19 +42,22 @@ module PermissionState = struct
 end
 
 (* Example permission callback *)
-let example_permission_callback ~tool_name ~input:_ ~context:_ =
+let example_permission_callback ctx =
+  let open Claude.Permissions in
+  let tool_name = ctx.tool_name in
+
   Log.app (fun m -> m "\n🔐 Permission Request for: %s" tool_name);
 
   (* Check current state *)
   if PermissionState.is_granted tool_name then begin
     Log.app (fun m -> m "  → Auto-approved (previously granted)");
-    Claude.Permissions.Result.allow ()
+    Decision.allow ()
   end
   else if PermissionState.is_denied tool_name then begin
     Log.app (fun m -> m "  → Auto-denied (previously denied)");
-    Claude.Permissions.Result.deny
+    Decision.deny
       ~message:(Printf.sprintf "Tool %s is blocked by policy" tool_name)
-      ~interrupt:false ()
+      ~interrupt:false
   end
   else begin
     (* Ask user *)
@@ -62,26 +65,26 @@ let example_permission_callback ~tool_name ~input:_ ~context:_ =
     match read_line () |> String.lowercase_ascii with
     | "y" | "yes" ->
         Log.app (fun m -> m "  → Allowed (one time)");
-        Claude.Permissions.Result.allow ()
+        Decision.allow ()
     | "n" | "no" ->
         Log.app (fun m -> m "  → Denied (one time)");
-        Claude.Permissions.Result.deny
+        Decision.deny
           ~message:(Printf.sprintf "User denied %s" tool_name)
-          ~interrupt:false ()
+          ~interrupt:false
     | "a" | "always" ->
         PermissionState.grant tool_name;
         Log.app (fun m -> m "  → Allowed (always)");
-        Claude.Permissions.Result.allow ()
+        Decision.allow ()
     | "never" ->
         PermissionState.deny tool_name;
         Log.app (fun m -> m "  → Denied (always)");
-        Claude.Permissions.Result.deny
+        Decision.deny
           ~message:(Printf.sprintf "Tool %s permanently blocked" tool_name)
-          ~interrupt:false ()
+          ~interrupt:false
     | _ ->
         Log.app (fun m -> m "  → Denied (invalid response)");
-        Claude.Permissions.Result.deny ~message:"Invalid permission response"
-          ~interrupt:false ()
+        Decision.deny ~message:"Invalid permission response"
+          ~interrupt:false
   end
 
 (* Demonstrate the permission system *)
@@ -91,14 +94,13 @@ let demo_permissions () =
 
   (* Simulate permission requests *)
   let tools = [ "Read"; "Write"; "Bash"; "Edit" ] in
-  let context = Claude.Permissions.Context.create () in
 
   Log.app (fun m -> m "This demo simulates permission requests.");
   Log.app (fun m -> m "You can respond with: y/n/always/never\n");
 
   (* Test each tool *)
   List.iter
-    (fun tool ->
+    (fun tool_name ->
       let input =
         let open Jsont in
         Object
@@ -107,17 +109,27 @@ let demo_permissions () =
             ],
             Meta.none )
       in
-      let result =
-        example_permission_callback ~tool_name:tool ~input ~context
+      let tool_input = Claude.Tool_input.of_json input in
+      let ctx =
+        Claude.Permissions.
+          {
+            tool_name;
+            input = tool_input;
+            suggested_rules = [];
+          }
       in
+      let decision = example_permission_callback ctx in
 
       (* Show result *)
-      match result with
-      | Claude.Permissions.Result.Allow _ ->
-          Log.info (fun m -> m "Result: Permission granted for %s" tool)
-      | Claude.Permissions.Result.Deny { message; _ } ->
-          Log.info (fun m ->
-              m "Result: Permission denied for %s - %s" tool message))
+      if Claude.Permissions.Decision.is_allow decision then
+        Log.info (fun m -> m "Result: Permission granted for %s" tool_name)
+      else
+        match Claude.Permissions.Decision.deny_message decision with
+        | Some message ->
+            Log.info (fun m ->
+                m "Result: Permission denied for %s - %s" tool_name message)
+        | None ->
+            Log.info (fun m -> m "Result: Permission denied for %s" tool_name))
     tools;
 
   (* Show final state *)
@@ -129,7 +141,7 @@ let demo_discovery () =
   Log.app (fun m -> m "====================================\n");
 
   let discovered = ref [] in
-  let callback = Claude.Permissions.discovery_callback discovered in
+  let callback = Claude.Permissions.discovery discovered in
 
   (* Simulate some tool requests *)
   let requests =
@@ -153,10 +165,18 @@ let demo_discovery () =
   Log.app (fun m -> m "Simulating tool requests with discovery callback...\n");
 
   List.iter
-    (fun (tool, input) ->
-      Log.app (fun m -> m "  Request: %s" tool);
-      let context = Claude.Permissions.Context.create () in
-      let _ = callback ~tool_name:tool ~input ~context in
+    (fun (tool_name, input) ->
+      Log.app (fun m -> m "  Request: %s" tool_name);
+      let tool_input = Claude.Tool_input.of_json input in
+      let ctx =
+        Claude.Permissions.
+          {
+            tool_name;
+            input = tool_input;
+            suggested_rules = [];
+          }
+      in
+      let _ = callback ctx in
       ())
     requests;
 

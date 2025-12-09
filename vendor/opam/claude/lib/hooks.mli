@@ -1,14 +1,16 @@
-(** Claude Code Hooks System
+(** Fully typed hook callbacks.
 
     Hooks allow you to intercept and control events in Claude Code sessions,
-    such as tool usage, prompt submission, and session stops.
+    using fully typed OCaml values instead of raw JSON.
 
     {1 Overview}
 
-    Hooks are organized by event type, with each event having:
-    - A typed input structure (accessible via submodules)
-    - A typed output structure for responses
+    This module provides a high-level, type-safe interface to hooks. Each hook
+    type has:
+    - Fully typed input records using {!Tool_input.t}
+    - Fully typed output records
     - Helper functions for common responses
+    - Conversion functions to/from wire format ({!Proto.Hooks})
 
     {1 Example Usage}
 
@@ -16,351 +18,335 @@
       open Eio.Std
 
       (* Block dangerous bash commands *)
-      let get_string json key =
-        match json with
-        | Jsont.Object (members, _) ->
-            List.find_map (fun ((name, _), value) ->
-              if name = key then
-                match value with
-                | Jsont.String (s, _) -> Some s
-                | _ -> None
-              else None
-            ) members
-        | _ -> None
-      in
-      let block_rm_rf ~input ~tool_use_id:_ ~context:_ =
-        let hook = Hooks.PreToolUse.of_json input in
-        if Hooks.PreToolUse.tool_name hook = "Bash" then
-          let tool_input = Hooks.PreToolUse.tool_input hook in
-          match get_string tool_input "command" with
+      let block_rm_rf input =
+        if input.Hooks.PreToolUse.tool_name = "Bash" then
+          match Tool_input.get_string input.tool_input "command" with
           | Some cmd when String.contains cmd "rm -rf" ->
-              let output = Hooks.PreToolUse.deny ~reason:"Dangerous command" () in
-              Hooks.continue
-                ~hook_specific_output:(Hooks.PreToolUse.output_to_json output)
-                ()
-          | _ -> Hooks.continue ()
-        else Hooks.continue ()
+              Hooks.PreToolUse.deny ~reason:"Dangerous command" ()
+          | _ -> Hooks.PreToolUse.continue ()
+        else Hooks.PreToolUse.continue ()
 
       let hooks =
         Hooks.empty
-        |> Hooks.add Hooks.Pre_tool_use [
-            Hooks.matcher ~pattern:"Bash" [block_rm_rf]
-          ]
+        |> Hooks.on_pre_tool_use ~pattern:"Bash" block_rm_rf
 
-      let options = Claude.Options.create ~hooks:(Some hooks) () in
+      let options = Claude.Options.create ~hooks () in
       let client = Claude.Client.create ~options ~sw ~process_mgr () in
     ]} *)
 
 val src : Logs.Src.t
 (** The log source for hooks *)
 
-(** {1 Hook Events} *)
-
-(** Hook event types *)
-type event =
-  | Pre_tool_use  (** Fires before a tool is executed *)
-  | Post_tool_use  (** Fires after a tool completes *)
-  | User_prompt_submit  (** Fires when user submits a prompt *)
-  | Stop  (** Fires when conversation stops *)
-  | Subagent_stop  (** Fires when a subagent stops *)
-  | Pre_compact  (** Fires before message compaction *)
-
-val event_to_string : event -> string
-val event_of_string : string -> event
-val event_jsont : event Jsont.t
-
-(** {1 Context} *)
-
-module Context : sig
-  type t = { signal : unit option; unknown : Unknown.t }
-
-  val create : ?signal:unit option -> ?unknown:Unknown.t -> unit -> t
-  val signal : t -> unit option
-  val unknown : t -> Unknown.t
-  val jsont : t Jsont.t
-end
-
-(** {1 Decisions} *)
-
-type decision =
-  | Continue  (** Allow the action to proceed *)
-  | Block  (** Block the action *)
-
-val decision_jsont : decision Jsont.t
-
-(** {1 Generic Hook Result} *)
-
-type result = {
-  decision : decision option;
-  system_message : string option;
-  hook_specific_output : Jsont.json option;
-  unknown : Unknown.t;
-}
-(** Generic result structure for hooks *)
-
-val result_jsont : result Jsont.t
-
-(** {1 Typed Hook Modules} *)
+(** {1 Hook Types} *)
 
 (** PreToolUse hook - fires before tool execution *)
 module PreToolUse : sig
+  (** {2 Input} *)
+
   type input = {
     session_id : string;
     transcript_path : string;
     tool_name : string;
-    tool_input : Jsont.json;
-    unknown : Unknown.t;
+    tool_input : Tool_input.t;
   }
-  (** Typed input for PreToolUse hooks *)
+  (** Input provided to PreToolUse hooks. *)
 
-  type t = input
+  (** {2 Output} *)
 
-  val of_json : Jsont.json -> t
-  (** Parse hook input from JSON *)
-
-  val session_id : t -> string
-  (** {2 Accessors} *)
-
-  val transcript_path : t -> string
-  val tool_name : t -> string
-  val tool_input : t -> Jsont.json
-  val unknown : t -> Unknown.t
-  val input_jsont : input Jsont.t
-
-  type permission_decision = [ `Allow | `Deny | `Ask ]
-  (** Permission decision for tool usage *)
-
-  val permission_decision_jsont : permission_decision Jsont.t
+  type decision =
+    | Allow
+    | Deny
+    | Ask
+  (** Permission decision for tool usage. *)
 
   type output = {
-    permission_decision : permission_decision option;
-    permission_decision_reason : string option;
-    updated_input : Jsont.json option;
-    unknown : Unknown.t;
+    decision : decision option;
+    reason : string option;
+    updated_input : Tool_input.t option;
   }
-  (** Typed output for PreToolUse hooks *)
+  (** Output from PreToolUse hooks. *)
 
-  val output_jsont : output Jsont.t
-
-  val allow :
-    ?reason:string ->
-    ?updated_input:Jsont.json ->
-    ?unknown:Unknown.t ->
-    unit ->
-    output
   (** {2 Response Builders} *)
 
-  val deny : ?reason:string -> ?unknown:Unknown.t -> unit -> output
-  val ask : ?reason:string -> ?unknown:Unknown.t -> unit -> output
-  val continue : ?unknown:Unknown.t -> unit -> output
+  val allow : ?reason:string -> ?updated_input:Tool_input.t -> unit -> output
+  (** [allow ?reason ?updated_input ()] creates an allow response.
+      @param reason Optional explanation for allowing
+      @param updated_input Optional modified tool input *)
 
-  val output_to_json : output -> Jsont.json
-  (** Convert output to JSON for hook_specific_output *)
+  val deny : ?reason:string -> unit -> output
+  (** [deny ?reason ()] creates a deny response.
+      @param reason Optional explanation for denying *)
+
+  val ask : ?reason:string -> unit -> output
+  (** [ask ?reason ()] creates an ask response to prompt the user.
+      @param reason Optional explanation for asking *)
+
+  val continue : unit -> output
+  (** [continue ()] creates a continue response with no decision. *)
+
+  (** {2 Callback Type} *)
+
+  type callback = input -> output
+  (** Callback function type for PreToolUse hooks. *)
+
+  (** {2 Conversion Functions} *)
+
+  val input_of_proto : Proto.Hooks.PreToolUse.Input.t -> input
+  (** [input_of_proto proto] converts wire format input to typed input. *)
+
+  val output_to_proto : output -> Proto.Hooks.PreToolUse.Output.t
+  (** [output_to_proto output] converts typed output to wire format. *)
 end
 
 (** PostToolUse hook - fires after tool execution *)
 module PostToolUse : sig
+  (** {2 Input} *)
+
   type input = {
     session_id : string;
     transcript_path : string;
     tool_name : string;
-    tool_input : Jsont.json;
-    tool_response : Jsont.json;
-    unknown : Unknown.t;
+    tool_input : Tool_input.t;
+    tool_response : Jsont.json;  (* Response varies by tool *)
   }
+  (** Input provided to PostToolUse hooks.
+      Note: [tool_response] remains as {!Jsont.json} since response schemas
+      vary by tool. *)
 
-  type t = input
-
-  val of_json : Jsont.json -> t
-  val session_id : t -> string
-  val transcript_path : t -> string
-  val tool_name : t -> string
-  val tool_input : t -> Jsont.json
-  val tool_response : t -> Jsont.json
-  val unknown : t -> Unknown.t
-  val input_jsont : input Jsont.t
+  (** {2 Output} *)
 
   type output = {
-    decision : decision option;
+    block : bool;
     reason : string option;
     additional_context : string option;
-    unknown : Unknown.t;
   }
+  (** Output from PostToolUse hooks. *)
 
-  val output_jsont : output Jsont.t
+  (** {2 Response Builders} *)
 
-  val continue :
-    ?additional_context:string -> ?unknown:Unknown.t -> unit -> output
+  val continue : ?additional_context:string -> unit -> output
+  (** [continue ?additional_context ()] creates a continue response.
+      @param additional_context Optional context to add to the transcript *)
 
   val block :
-    ?reason:string ->
-    ?additional_context:string ->
-    ?unknown:Unknown.t ->
-    unit ->
-    output
+    ?reason:string -> ?additional_context:string -> unit -> output
+  (** [block ?reason ?additional_context ()] creates a block response.
+      @param reason Optional explanation for blocking
+      @param additional_context Optional context to add to the transcript *)
 
-  val output_to_json : output -> Jsont.json
+  (** {2 Callback Type} *)
+
+  type callback = input -> output
+  (** Callback function type for PostToolUse hooks. *)
+
+  (** {2 Conversion Functions} *)
+
+  val input_of_proto : Proto.Hooks.PostToolUse.Input.t -> input
+  (** [input_of_proto proto] converts wire format input to typed input. *)
+
+  val output_to_proto : output -> Proto.Hooks.PostToolUse.Output.t
+  (** [output_to_proto output] converts typed output to wire format. *)
 end
 
 (** UserPromptSubmit hook - fires when user submits a prompt *)
 module UserPromptSubmit : sig
+  (** {2 Input} *)
+
   type input = {
     session_id : string;
     transcript_path : string;
     prompt : string;
-    unknown : Unknown.t;
   }
+  (** Input provided to UserPromptSubmit hooks. *)
 
-  type t = input
-
-  val of_json : Jsont.json -> t
-  val session_id : t -> string
-  val transcript_path : t -> string
-  val prompt : t -> string
-  val unknown : t -> Unknown.t
-  val input_jsont : input Jsont.t
+  (** {2 Output} *)
 
   type output = {
-    decision : decision option;
+    block : bool;
     reason : string option;
     additional_context : string option;
-    unknown : Unknown.t;
   }
+  (** Output from UserPromptSubmit hooks. *)
 
-  val output_jsont : output Jsont.t
+  (** {2 Response Builders} *)
 
-  val continue :
-    ?additional_context:string -> ?unknown:Unknown.t -> unit -> output
+  val continue : ?additional_context:string -> unit -> output
+  (** [continue ?additional_context ()] creates a continue response.
+      @param additional_context Optional context to add to the transcript *)
 
-  val block : ?reason:string -> ?unknown:Unknown.t -> unit -> output
-  val output_to_json : output -> Jsont.json
+  val block : ?reason:string -> unit -> output
+  (** [block ?reason ()] creates a block response.
+      @param reason Optional explanation for blocking *)
+
+  (** {2 Callback Type} *)
+
+  type callback = input -> output
+  (** Callback function type for UserPromptSubmit hooks. *)
+
+  (** {2 Conversion Functions} *)
+
+  val input_of_proto : Proto.Hooks.UserPromptSubmit.Input.t -> input
+  (** [input_of_proto proto] converts wire format input to typed input. *)
+
+  val output_to_proto : output -> Proto.Hooks.UserPromptSubmit.Output.t
+  (** [output_to_proto output] converts typed output to wire format. *)
 end
 
 (** Stop hook - fires when conversation stops *)
 module Stop : sig
+  (** {2 Input} *)
+
   type input = {
     session_id : string;
     transcript_path : string;
     stop_hook_active : bool;
-    unknown : Unknown.t;
   }
+  (** Input provided to Stop hooks. *)
 
-  type t = input
-
-  val of_json : Jsont.json -> t
-  val session_id : t -> string
-  val transcript_path : t -> string
-  val stop_hook_active : t -> bool
-  val unknown : t -> Unknown.t
-  val input_jsont : input Jsont.t
+  (** {2 Output} *)
 
   type output = {
-    decision : decision option;
+    block : bool;
     reason : string option;
-    unknown : Unknown.t;
   }
+  (** Output from Stop hooks. *)
 
-  val output_jsont : output Jsont.t
-  val continue : ?unknown:Unknown.t -> unit -> output
-  val block : ?reason:string -> ?unknown:Unknown.t -> unit -> output
-  val output_to_json : output -> Jsont.json
+  (** {2 Response Builders} *)
+
+  val continue : unit -> output
+  (** [continue ()] creates a continue response. *)
+
+  val block : ?reason:string -> unit -> output
+  (** [block ?reason ()] creates a block response.
+      @param reason Optional explanation for blocking *)
+
+  (** {2 Callback Type} *)
+
+  type callback = input -> output
+  (** Callback function type for Stop hooks. *)
+
+  (** {2 Conversion Functions} *)
+
+  val input_of_proto : Proto.Hooks.Stop.Input.t -> input
+  (** [input_of_proto proto] converts wire format input to typed input. *)
+
+  val output_to_proto : output -> Proto.Hooks.Stop.Output.t
+  (** [output_to_proto output] converts typed output to wire format. *)
 end
 
 (** SubagentStop hook - fires when a subagent stops *)
 module SubagentStop : sig
-  type input = Stop.input
-  type t = input
-  type output = Stop.output
+  (** {2 Input} *)
 
-  val of_json : Jsont.json -> t
-  val session_id : t -> string
-  val transcript_path : t -> string
-  val stop_hook_active : t -> bool
-  val unknown : t -> Unknown.t
-  val input_jsont : input Jsont.t
-  val output_jsont : output Jsont.t
-  val continue : ?unknown:Unknown.t -> unit -> output
-  val block : ?reason:string -> ?unknown:Unknown.t -> unit -> output
-  val output_to_json : output -> Jsont.json
+  type input = Stop.input
+  (** Same structure as Stop.input *)
+
+  (** {2 Output} *)
+
+  type output = Stop.output
+  (** Same structure as Stop.output *)
+
+  (** {2 Response Builders} *)
+
+  val continue : unit -> output
+  (** [continue ()] creates a continue response. *)
+
+  val block : ?reason:string -> unit -> output
+  (** [block ?reason ()] creates a block response.
+      @param reason Optional explanation for blocking *)
+
+  (** {2 Callback Type} *)
+
+  type callback = input -> output
+  (** Callback function type for SubagentStop hooks. *)
+
+  (** {2 Conversion Functions} *)
+
+  val input_of_proto : Proto.Hooks.SubagentStop.Input.t -> input
+  (** [input_of_proto proto] converts wire format input to typed input. *)
+
+  val output_to_proto : output -> Proto.Hooks.SubagentStop.Output.t
+  (** [output_to_proto output] converts typed output to wire format. *)
 end
 
 (** PreCompact hook - fires before message compaction *)
 module PreCompact : sig
+  (** {2 Input} *)
+
   type input = {
     session_id : string;
     transcript_path : string;
-    unknown : Unknown.t;
   }
+  (** Input provided to PreCompact hooks. *)
 
-  type t = input
-  type output = unit
+  (** {2 Callback Type} *)
 
-  val of_json : Jsont.json -> t
-  val session_id : t -> string
-  val transcript_path : t -> string
-  val unknown : t -> Unknown.t
-  val input_jsont : input Jsont.t
-  val continue : unit -> output
-  val output_to_json : output -> Jsont.json
+  type callback = input -> unit
+  (** Callback function type for PreCompact hooks.
+      PreCompact hooks have no output - they are notification-only. *)
+
+  (** {2 Conversion Functions} *)
+
+  val input_of_proto : Proto.Hooks.PreCompact.Input.t -> input
+  (** [input_of_proto proto] converts wire format input to typed input. *)
 end
 
-(** {1 Callbacks} *)
+(** {1 Hook Configuration} *)
 
-type callback =
-  input:Jsont.json -> tool_use_id:string option -> context:Context.t -> result
-(** Generic callback function type.
+type t
+(** Hook configuration.
 
-    Callbacks receive:
-    - [input]: Raw JSON input (parse with [PreToolUse.of_json], etc.)
-    - [tool_use_id]: Optional tool use ID
-    - [context]: Hook context
+    Hooks are configured using a builder pattern:
+    {[
+      Hooks.empty
+      |> Hooks.on_pre_tool_use ~pattern:"Bash" bash_handler
+      |> Hooks.on_post_tool_use post_handler
+    ]} *)
 
-    And return a generic [result] with optional hook-specific output. *)
+val empty : t
+(** [empty] is an empty hook configuration with no callbacks. *)
 
-(** {1 Matchers} *)
+val on_pre_tool_use : ?pattern:string -> PreToolUse.callback -> t -> t
+(** [on_pre_tool_use ?pattern callback config] adds a PreToolUse hook.
+    @param pattern Optional regex pattern to match tool names (e.g., "Bash|Edit")
+    @param callback Function to invoke on matching events *)
 
-type matcher = {
-  matcher : string option;
-      (** Pattern to match (e.g., "Bash" or "Write|Edit") *)
-  callbacks : callback list;  (** Callbacks to invoke on match *)
-}
-(** A matcher configuration *)
+val on_post_tool_use : ?pattern:string -> PostToolUse.callback -> t -> t
+(** [on_post_tool_use ?pattern callback config] adds a PostToolUse hook.
+    @param pattern Optional regex pattern to match tool names
+    @param callback Function to invoke on matching events *)
 
-type config = (event * matcher list) list
-(** Hook configuration: map from events to matchers *)
+val on_user_prompt_submit : UserPromptSubmit.callback -> t -> t
+(** [on_user_prompt_submit callback config] adds a UserPromptSubmit hook.
+    @param callback Function to invoke on prompt submission *)
 
-(** {1 Generic Result Builders} *)
+val on_stop : Stop.callback -> t -> t
+(** [on_stop callback config] adds a Stop hook.
+    @param callback Function to invoke on conversation stop *)
 
-val continue :
-  ?system_message:string ->
-  ?hook_specific_output:Jsont.json ->
-  ?unknown:Unknown.t ->
-  unit ->
-  result
-(** [continue ?system_message ?hook_specific_output ?unknown ()] creates a
-    continue result *)
+val on_subagent_stop : SubagentStop.callback -> t -> t
+(** [on_subagent_stop callback config] adds a SubagentStop hook.
+    @param callback Function to invoke on subagent stop *)
 
-val block :
-  ?system_message:string ->
-  ?hook_specific_output:Jsont.json ->
-  ?unknown:Unknown.t ->
-  unit ->
-  result
-(** [block ?system_message ?hook_specific_output ?unknown ()] creates a block
-    result *)
+val on_pre_compact : PreCompact.callback -> t -> t
+(** [on_pre_compact callback config] adds a PreCompact hook.
+    @param callback Function to invoke before message compaction *)
 
-(** {1 Configuration Builders} *)
+(** {1 Internal - for client use} *)
 
-val matcher : ?pattern:string -> callback list -> matcher
-(** [matcher ?pattern callbacks] creates a matcher *)
+val get_callbacks :
+  t ->
+  (Proto.Hooks.event * (string option * (Jsont.json -> Proto.Hooks.result))
+   list)
+  list
+(** [get_callbacks config] returns hook configuration in format suitable for
+    registration with the CLI.
 
-val empty : config
-(** Empty hooks configuration *)
+    This function converts typed callbacks into wire format handlers that:
+    - Parse JSON input using Proto.Hooks types
+    - Convert to typed input using input_of_proto
+    - Invoke the user's typed callback
+    - Convert output back to wire format using output_to_proto
 
-val add : event -> matcher list -> config -> config
-(** [add event matchers config] adds matchers for an event *)
-
-(** {1 JSON Serialization} *)
-
-val result_to_json : result -> Jsont.json
-val config_to_protocol_format : config -> Jsont.json
+    This is an internal function used by {!Client} - you should not need to
+    call it directly. *)

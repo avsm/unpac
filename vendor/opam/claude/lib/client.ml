@@ -23,40 +23,6 @@ let json_to_string json =
   |> Result.map_error Jsont.Error.to_string
   |> Err.get_ok ~msg:""
 
-(** Wire-level codec for permission responses to CLI. Uses camelCase field names
-    as expected by the CLI protocol. *)
-module Permission_wire = struct
-  type allow = { allow_behavior : string; allow_updated_input : Jsont.json }
-  type deny = { deny_behavior : string; deny_message : string }
-
-  let allow_jsont : allow Jsont.t =
-    let make allow_behavior allow_updated_input =
-      { allow_behavior; allow_updated_input }
-    in
-    Jsont.Object.map ~kind:"AllowWire" make
-    |> Jsont.Object.mem "behavior" Jsont.string ~enc:(fun r -> r.allow_behavior)
-    |> Jsont.Object.mem "updatedInput" Jsont.json ~enc:(fun r ->
-        r.allow_updated_input)
-    |> Jsont.Object.finish
-
-  let deny_jsont : deny Jsont.t =
-    let make deny_behavior deny_message = { deny_behavior; deny_message } in
-    Jsont.Object.map ~kind:"DenyWire" make
-    |> Jsont.Object.mem "behavior" Jsont.string ~enc:(fun r -> r.deny_behavior)
-    |> Jsont.Object.mem "message" Jsont.string ~enc:(fun r -> r.deny_message)
-    |> Jsont.Object.finish
-
-  let encode_allow ~updated_input =
-    Jsont.Json.encode allow_jsont
-      { allow_behavior = "allow"; allow_updated_input = updated_input }
-    |> Err.get_ok ~msg:"Permission_wire.encode_allow: "
-
-  let encode_deny ~message =
-    Jsont.Json.encode deny_jsont
-      { deny_behavior = "deny"; deny_message = message }
-    |> Err.get_ok ~msg:"Permission_wire.encode_deny: "
-end
-
 (** Wire-level codec for hook matcher configuration sent to CLI. *)
 module Hook_matcher_wire = struct
   type t = { matcher : string option; hook_callback_ids : string list }
@@ -80,9 +46,9 @@ end
 
 type t = {
   transport : Transport.t;
-  permission_callback : Permissions.callback option;
-  permission_log : Permissions.Rule.t list ref option;
-  hook_callbacks : (string, Hooks.callback) Hashtbl.t;
+  mutable permission_callback : Permissions.callback option;
+  mutable permission_log : Permissions.Rule.t list ref option;
+  hook_callbacks : (string, Jsont.json -> Proto.Hooks.result) Hashtbl.t;
   mutable session_id : string option;
   control_responses : (string, Jsont.json) Hashtbl.t;
   control_mutex : Eio.Mutex.t;
@@ -98,36 +64,43 @@ let handle_control_request t (ctrl_req : Sdk_control.control_request) =
   match ctrl_req.request with
   | Sdk_control.Request.Permission req ->
       let tool_name = req.tool_name in
-      let input = req.input in
+      let input_json = req.input in
       Log.info (fun m ->
           m "Permission request for tool '%s' with input: %s" tool_name
-            (json_to_string input));
-      (* Convert permission_suggestions to Context *)
+            (json_to_string input_json));
+      (* Convert permission_suggestions to suggested rules *)
       let suggestions = Option.value req.permission_suggestions ~default:[] in
-      let context = Permissions.Context.create ~suggestions () in
+      let suggested_rules = Permissions.extract_rules_from_proto_updates suggestions in
+
+      (* Convert input to Tool_input.t *)
+      let input = Tool_input.of_json input_json in
+
+      (* Create context *)
+      let context : Permissions.context =
+        { tool_name; input; suggested_rules }
+      in
 
       Log.info (fun m ->
           m "Invoking permission callback for tool: %s" tool_name);
       let callback =
         Option.value t.permission_callback
-          ~default:Permissions.default_allow_callback
+          ~default:Permissions.default_allow
       in
-      let result = callback ~tool_name ~input ~context in
+      let decision = callback context in
       Log.info (fun m ->
           m "Permission callback returned: %s"
-            (match result with
-            | Permissions.Result.Allow _ -> "ALLOW"
-            | Permissions.Result.Deny _ -> "DENY"));
+            (if Permissions.Decision.is_allow decision then "ALLOW" else "DENY"));
 
-      (* Convert permission result to CLI format using wire codec *)
+      (* Convert permission decision to proto result *)
+      let proto_result = Permissions.Decision.to_proto_result decision in
+
+      (* Encode to JSON *)
       let response_data =
-        match result with
-        | Permissions.Result.Allow
-            { updated_input; updated_permissions = _; unknown = _ } ->
-            let updated_input = Option.value updated_input ~default:input in
-            Permission_wire.encode_allow ~updated_input
-        | Permissions.Result.Deny { message; interrupt = _; unknown = _ } ->
-            Permission_wire.encode_deny ~message
+        match Jsont.Json.encode Proto.Permissions.Result.jsont proto_result with
+        | Ok json -> json
+        | Error err ->
+            Log.err (fun m -> m "Failed to encode permission result: %s" err);
+            failwith "Permission result encoding failed"
       in
       let response =
         Control_response.success ~request_id ~response:(Some response_data)
@@ -138,17 +111,16 @@ let handle_control_request t (ctrl_req : Sdk_control.control_request) =
   | Sdk_control.Request.Hook_callback req -> (
       let callback_id = req.callback_id in
       let input = req.input in
-      let tool_use_id = req.tool_use_id in
+      let _tool_use_id = req.tool_use_id in
       Log.info (fun m ->
           m "Hook callback request for callback_id: %s" callback_id);
 
       try
         let callback = Hashtbl.find t.hook_callbacks callback_id in
-        let context = Hooks.Context.create () in
-        let result = callback ~input ~tool_use_id ~context in
+        let result = callback input in
 
         let result_json =
-          Jsont.Json.encode Hooks.result_jsont result
+          Jsont.Json.encode Proto.Hooks.result_jsont result
           |> Err.get_ok ~msg:"Failed to encode hook result: "
         in
         Log.debug (fun m ->
@@ -197,7 +169,7 @@ let handle_control_response t control_resp =
       Hashtbl.replace t.control_responses request_id json;
       Eio.Condition.broadcast t.control_condition)
 
-let handle_messages t =
+let handle_raw_messages t =
   let rec loop () =
     match Transport.receive_line t.transport with
     | None ->
@@ -207,7 +179,26 @@ let handle_messages t =
     | Some line -> (
         (* Use unified Incoming codec for all message types *)
         match Jsont_bytesrw.decode_string' Incoming.jsont line with
-        | Ok (Incoming.Message msg) ->
+        | Ok incoming ->
+            Seq.Cons (incoming, loop)
+        | Error err ->
+            Log.err (fun m ->
+                m "Failed to decode incoming message: %s\nLine: %s"
+                  (Jsont.Error.to_string err)
+                  line);
+            loop ())
+  in
+  Log.debug (fun m -> m "Starting message handler");
+  loop
+
+let handle_messages t =
+  let raw_seq = handle_raw_messages t in
+  let rec loop raw_seq =
+    match raw_seq () with
+    | Seq.Nil -> Seq.Nil
+    | Seq.Cons (incoming, rest) -> (
+        match incoming with
+        | Incoming.Message msg ->
             Log.info (fun m -> m "← %a" Message.pp msg);
 
             (* Extract session ID from system messages *)
@@ -219,25 +210,25 @@ let handle_messages t =
                     Log.debug (fun m -> m "Stored session ID: %s" session_id))
             | _ -> ());
 
-            Seq.Cons (msg, loop)
-        | Ok (Incoming.Control_response resp) ->
+            (* Convert message to response events *)
+            let responses = Response.of_message msg in
+            emit_responses responses rest
+        | Incoming.Control_response resp ->
             handle_control_response t resp;
-            loop ()
-        | Ok (Incoming.Control_request ctrl_req) ->
+            loop rest
+        | Incoming.Control_request ctrl_req ->
             Log.info (fun m ->
                 m "Received control request (request_id: %s)"
                   ctrl_req.request_id);
             handle_control_request t ctrl_req;
-            loop ()
-        | Error err ->
-            Log.err (fun m ->
-                m "Failed to decode incoming message: %s\nLine: %s"
-                  (Jsont.Error.to_string err)
-                  line);
-            loop ())
+            loop rest)
+
+  and emit_responses responses rest =
+    match responses with
+    | [] -> loop rest
+    | r :: rs -> Seq.Cons (r, fun () -> emit_responses rs rest)
   in
-  Log.debug (fun m -> m "Starting message handler");
-  loop
+  loop raw_seq
 
 let create ?(options = Options.default) ~sw ~process_mgr () =
   (* Automatically enable permission prompt tool when callback is configured
@@ -273,37 +264,34 @@ let create ?(options = Options.default) ~sw ~process_mgr () =
   |> Option.iter (fun hooks_config ->
       Log.info (fun m -> m "Registering hooks...");
 
+      (* Get callbacks in wire format from the new Hooks API *)
+      let callbacks_by_event = Hooks.get_callbacks hooks_config in
+
       (* Build hooks configuration with callback IDs as (string * Jsont.json) list *)
       let hooks_list =
         List.map
           (fun (event, matchers) ->
-            let event_name = Hooks.event_to_string event in
+            let event_name = Proto.Hooks.event_to_string event in
             let matcher_wires =
               List.map
-                (fun matcher ->
-                  let callback_ids =
-                    List.map
-                      (fun callback ->
-                        let callback_id =
-                          Printf.sprintf "hook_%d" !next_callback_id
-                        in
-                        incr next_callback_id;
-                        Hashtbl.add hook_callbacks callback_id callback;
-                        Log.debug (fun m ->
-                            m "Registered callback: %s for event: %s"
-                              callback_id event_name);
-                        callback_id)
-                      matcher.Hooks.callbacks
+                (fun (pattern, callback) ->
+                  let callback_id =
+                    Printf.sprintf "hook_%d" !next_callback_id
                   in
+                  incr next_callback_id;
+                  Hashtbl.add hook_callbacks callback_id callback;
+                  Log.debug (fun m ->
+                      m "Registered callback: %s for event: %s"
+                        callback_id event_name);
                   Hook_matcher_wire.
                     {
-                      matcher = matcher.Hooks.matcher;
-                      hook_callback_ids = callback_ids;
+                      matcher = pattern;
+                      hook_callback_ids = [callback_id];
                     })
                 matchers
             in
             (event_name, Hook_matcher_wire.encode matcher_wires))
-          hooks_config
+          callbacks_by_event
       in
 
       (* Create initialize request using Sdk_control codec *)
@@ -320,51 +308,64 @@ let create ?(options = Options.default) ~sw ~process_mgr () =
 
   t
 
-let query t prompt =
-  let msg = Message.user_string prompt in
-  Log.info (fun m -> m "→ %a" Message.pp msg);
-  let json = Message.to_json msg in
-  Transport.send t.transport json
-
+(* Helper to send a message with proper "type" wrapper via Proto.Outgoing *)
 let send_message t msg =
   Log.info (fun m -> m "→ %a" Message.pp msg);
-  let json = Message.to_json msg in
+  let proto_msg = Message.to_proto msg in
+  let outgoing = Proto.Outgoing.Message proto_msg in
+  let json = Proto.Outgoing.to_json outgoing in
   Transport.send t.transport json
 
-let send_user_message t user_msg =
+let query t prompt =
+  let msg = Message.user_string prompt in
+  send_message t msg
+
+let respond_to_tool t ~tool_use_id ~content ?(is_error = false) () =
+  let user_msg = Message.User.with_tool_result ~tool_use_id ~content ~is_error () in
   let msg = Message.User user_msg in
-  Log.info (fun m -> m "→ %a" Message.pp msg);
-  let json = Message.User.to_json user_msg in
-  Transport.send t.transport json
+  send_message t msg
 
-let receive t = handle_messages t
+let respond_to_tools t responses =
+  let tool_results =
+    List.map
+      (fun (tool_use_id, content, is_error_opt) ->
+        let is_error = Option.value is_error_opt ~default:false in
+        Content_block.tool_result ~tool_use_id ~content ~is_error ())
+      responses
+  in
+  let user_msg = Message.User.of_blocks tool_results in
+  let msg = Message.User user_msg in
+  send_message t msg
+
+let receive t = fun () -> handle_messages t
+
+let run t ~handler =
+  Seq.iter (Handler.dispatch handler) (receive t)
 
 let receive_all t =
   let rec collect acc seq =
     match seq () with
     | Seq.Nil ->
         Log.debug (fun m ->
-            m "End of message sequence (%d messages)" (List.length acc));
+            m "End of response sequence (%d responses)" (List.length acc));
         List.rev acc
-    | Seq.Cons ((Message.Result _ as msg), _) ->
-        Log.debug (fun m -> m "Received final Result message");
-        List.rev (msg :: acc)
-    | Seq.Cons (msg, rest) -> collect (msg :: acc) rest
+    | Seq.Cons ((Response.Complete _ as resp), _) ->
+        Log.debug (fun m -> m "Received final Complete response");
+        List.rev (resp :: acc)
+    | Seq.Cons (resp, rest) -> collect (resp :: acc) rest
   in
-  collect [] (handle_messages t)
+  collect [] (receive t)
 
 let interrupt t = Transport.interrupt t.transport
 
-let discover_permissions t =
+let enable_permission_discovery t =
   let log = ref [] in
-  let callback = Permissions.discovery_callback log in
-  { t with permission_callback = Some callback; permission_log = Some log }
+  let callback = Permissions.discovery log in
+  t.permission_callback <- Some callback;
+  t.permission_log <- Some log
 
-let get_discovered_permissions t =
+let discovered_permissions t =
   t.permission_log |> Option.map ( ! ) |> Option.value ~default:[]
-
-let with_permission_callback t callback =
-  { t with permission_callback = Some callback }
 
 (* Helper to send a control request and wait for response *)
 let send_control_request t ~request_id request =
@@ -427,7 +428,8 @@ let send_control_request t ~request_id request =
 
 let set_permission_mode t mode =
   let request_id = Printf.sprintf "set_perm_mode_%f" (Unix.gettimeofday ()) in
-  let request = Sdk_control.Request.set_permission_mode ~mode () in
+  let proto_mode = Permissions.Mode.to_proto mode in
+  let request = Sdk_control.Request.set_permission_mode ~mode:proto_mode () in
   let _response = send_control_request t ~request_id request in
   Log.info (fun m ->
       m "Permission mode set to: %s" (Permissions.Mode.to_string mode))
@@ -455,4 +457,26 @@ let get_server_info t =
       m "Retrieved server info: %a"
         (Jsont.pp_value Sdk_control.Server_info.jsont ())
         server_info);
-  server_info
+  Server_info.of_sdk_control server_info
+
+module Advanced = struct
+  let send_message t msg = send_message t msg
+
+  let send_user_message t user_msg =
+    let msg = Message.User user_msg in
+    send_message t msg
+
+  let send_raw t control =
+    let json =
+      Jsont.Json.encode Sdk_control.jsont control
+      |> Err.get_ok ~msg:"Failed to encode control message: "
+    in
+    Log.info (fun m -> m "→ Raw control: %s" (json_to_string json));
+    Transport.send t.transport json
+
+  let send_json t json =
+    Log.info (fun m -> m "→ Raw JSON: %s" (json_to_string json));
+    Transport.send t.transport json
+
+  let receive_raw t = handle_raw_messages t
+end

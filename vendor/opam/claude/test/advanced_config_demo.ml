@@ -23,8 +23,8 @@ let log_setup () =
 let ci_cd_config () =
   Options.default |> Options.with_no_settings (* Disable all settings loading *)
   |> Options.with_max_budget_usd 0.50 (* 50 cent limit per run *)
-  |> Options.with_fallback_model_string "claude-haiku-4" (* Fast fallback *)
-  |> Options.with_model_string "claude-sonnet-4-5"
+  |> Options.with_fallback_model (Claude.Proto.Model.of_string "claude-haiku-4") (* Fast fallback *)
+  |> Options.with_model (Claude.Proto.Model.of_string "claude-sonnet-4-5")
   |> Options.with_permission_mode Permissions.Mode.Bypass_permissions
 
 (* Example 2: Production Configuration with Fallback
@@ -34,8 +34,8 @@ let ci_cd_config () =
 *)
 let production_config () =
   Options.default
-  |> Options.with_model_string "claude-sonnet-4-5"
-  |> Options.with_fallback_model_string "claude-sonnet-3-5"
+  |> Options.with_model (Claude.Proto.Model.of_string "claude-sonnet-4-5")
+  |> Options.with_fallback_model (Claude.Proto.Model.of_string "claude-sonnet-3-5")
   |> Options.with_max_budget_usd 10.0 (* $10 limit *)
   |> Options.with_max_buffer_size 5_000_000 (* 5MB buffer for large outputs *)
 
@@ -45,9 +45,9 @@ let production_config () =
 *)
 let dev_config () =
   Options.default
-  |> Options.with_setting_sources [ Options.User; Options.Project ]
+  (* Note: Settings are loaded by default from user/project/local files *)
   |> Options.with_max_budget_usd 1.0 (* $1 limit for dev testing *)
-  |> Options.with_fallback_model_string "claude-haiku-4"
+  |> Options.with_fallback_model (Claude.Proto.Model.of_string "claude-haiku-4")
 
 (* Example 4: Isolated Test Configuration
 
@@ -56,7 +56,7 @@ let dev_config () =
 let test_config () =
   Options.default |> Options.with_no_settings
   |> Options.with_max_budget_usd 0.10 (* 10 cent limit per test *)
-  |> Options.with_model_string "claude-haiku-4" (* Fast, cheap model *)
+  |> Options.with_model (Claude.Proto.Model.of_string "claude-haiku-4") (* Fast, cheap model *)
   |> Options.with_permission_mode Permissions.Mode.Bypass_permissions
   |> Options.with_max_buffer_size 1_000_000 (* 1MB buffer *)
 
@@ -67,7 +67,7 @@ let test_config () =
 let _large_output_config () =
   Options.default
   |> Options.with_max_buffer_size 10_000_000 (* 10MB buffer *)
-  |> Options.with_model_string "claude-sonnet-4-5"
+  |> Options.with_model (Claude.Proto.Model.of_string "claude-sonnet-4-5")
 
 (* Helper to run a query with a specific configuration *)
 let run_query ~sw process_mgr config prompt =
@@ -77,22 +77,10 @@ let run_query ~sw process_mgr config prompt =
   | None -> print_endline "Budget limit: None");
   (match Options.fallback_model config with
   | Some model ->
-      Printf.printf "Fallback model: %s\n" (Claude.Model.to_string model)
+      Printf.printf "Fallback model: %s\n" (Claude.Proto.Model.to_string model)
   | None -> print_endline "Fallback model: None");
-  (match Options.setting_sources config with
-  | Some [] -> print_endline "Settings: Isolated (no settings loaded)"
-  | Some sources ->
-      let source_str =
-        String.concat ", "
-          (List.map
-             (function
-               | Options.User -> "user"
-               | Options.Project -> "project"
-               | Options.Local -> "local")
-             sources)
-      in
-      Printf.printf "Settings: %s\n" source_str
-  | None -> print_endline "Settings: Default");
+  (* Settings configuration display removed - API doesn't expose setting_sources *)
+  print_endline "Settings: Default (user/project/local files)";
   (match Options.max_buffer_size config with
   | Some size -> Printf.printf "Buffer size: %d bytes\n" size
   | None -> print_endline "Buffer size: Default (1MB)");
@@ -100,26 +88,21 @@ let run_query ~sw process_mgr config prompt =
   print_endline "\n=== Running Query ===";
   let client = Client.create ~options:config ~sw ~process_mgr () in
   Client.query client prompt;
-  let messages = Client.receive client in
+  let responses = Client.receive client in
 
   Seq.iter
     (function
-      | Message.Assistant msg ->
-          List.iter
-            (function
-              | Content_block.Text t ->
-                  Printf.printf "Response: %s\n" (Content_block.Text.text t)
-              | _ -> ())
-            (Message.Assistant.content msg)
-      | Message.Result result ->
+      | Response.Text text ->
+          Printf.printf "Response: %s\n" (Response.Text.content text)
+      | Response.Complete result ->
           Printf.printf "\n=== Session Complete ===\n";
-          Printf.printf "Duration: %dms\n" (Message.Result.duration_ms result);
-          (match Message.Result.total_cost_usd result with
+          Printf.printf "Duration: %dms\n" (Response.Complete.duration_ms result);
+          (match Response.Complete.total_cost_usd result with
           | Some cost -> Printf.printf "Cost: $%.4f\n" cost
           | None -> ());
-          Printf.printf "Turns: %d\n" (Message.Result.num_turns result)
+          Printf.printf "Turns: %d\n" (Response.Complete.num_turns result)
       | _ -> ())
-    messages
+    responses
 
 let main () =
   log_setup ();

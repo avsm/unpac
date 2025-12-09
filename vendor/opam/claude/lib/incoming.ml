@@ -30,20 +30,20 @@ let jsont : t Jsont.t =
       ~dec:(fun v -> Control_response v)
   in
   let case_user =
-    Jsont.Object.Case.map "user" Message.User.incoming_jsont
-      ~dec:(fun v -> Message (Message.User v))
+    Jsont.Object.Case.map "user" Message.User.incoming_jsont ~dec:(fun v ->
+        Message (Message.User v))
   in
   let case_assistant =
     Jsont.Object.Case.map "assistant" Message.Assistant.incoming_jsont
       ~dec:(fun v -> Message (Message.Assistant v))
   in
   let case_system =
-    Jsont.Object.Case.map "system" Message.System.jsont
-      ~dec:(fun v -> Message (Message.System v))
+    Jsont.Object.Case.map "system" Message.System.jsont ~dec:(fun v ->
+        Message (Message.System v))
   in
   let case_result =
-    Jsont.Object.Case.map "result" Message.Result.jsont
-      ~dec:(fun v -> Message (Message.Result v))
+    Jsont.Object.Case.map "result" Message.Result.jsont ~dec:(fun v ->
+        Message (Message.Result v))
   in
   let enc_case = function
     | Control_request v -> Jsont.Object.Case.value case_control_request v

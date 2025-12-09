@@ -6,54 +6,43 @@ module Log = (val Logs.src_log src : Logs.LOG)
 
 let process_claude_response client name =
   Log.info (fun m -> m "=== %s's Response ===" name);
-  let messages = Claude.Client.receive_all client in
+  let responses = Claude.Client.receive_all client in
   List.iter
-    (fun msg ->
-      match msg with
-      | Claude.Message.Assistant msg ->
-          List.iter
-            (function
-              | Claude.Content_block.Text t ->
-                  let text = Claude.Content_block.Text.text t in
-                  Log.app (fun m -> m "%s: %s" name text)
-              | Claude.Content_block.Tool_use t ->
-                  Log.debug (fun m ->
-                      m "%s using tool: %s" name
-                        (Claude.Content_block.Tool_use.name t))
-              | Claude.Content_block.Thinking t ->
-                  Log.debug (fun m ->
-                      m "%s thinking: %s" name
-                        (Claude.Content_block.Thinking.thinking t))
-              | _ -> ())
-            (Claude.Message.Assistant.content msg);
+    (fun resp ->
+      match resp with
+      | Claude.Response.Text t ->
+          let text = Claude.Response.Text.content t in
+          Log.app (fun m -> m "%s: %s" name text)
+      | Claude.Response.Tool_use t ->
           Log.debug (fun m ->
-              m "%s using model: %s" name (Claude.Message.Assistant.model msg))
-      | Claude.Message.Result msg ->
-          (if Claude.Message.Result.is_error msg then
-             Log.err (fun m -> m "Error from %s!" name)
-           else
-             match Claude.Message.Result.total_cost_usd msg with
-             | Some cost ->
-                 Log.info (fun m -> m "%s's joke cost: $%.6f" name cost)
-             | None -> ());
+              m "%s using tool: %s" name (Claude.Response.Tool_use.name t))
+      | Claude.Response.Thinking t ->
+          Log.debug (fun m ->
+              m "%s thinking: %s" name (Claude.Response.Thinking.content t))
+      | Claude.Response.Complete c ->
+          (if Claude.Response.Complete.total_cost_usd c <> None then
+             let cost = Option.get (Claude.Response.Complete.total_cost_usd c) in
+             Log.info (fun m -> m "%s's joke cost: $%.6f" name cost));
           Log.debug (fun m ->
               m "%s session: %s, duration: %dms" name
-                (Claude.Message.Result.session_id msg)
-                (Claude.Message.Result.duration_ms msg))
-      | Claude.Message.System _ ->
-          (* System messages are already logged by the library *)
+                (Claude.Response.Complete.session_id c)
+                (Claude.Response.Complete.duration_ms c))
+      | Claude.Response.Error e ->
+          Log.err (fun m -> m "Error from %s: %s" name (Claude.Response.Error.message e))
+      | Claude.Response.Init _ ->
+          (* Init messages are already logged by the library *)
           ()
-      | Claude.Message.User _ ->
-          (* User messages are already logged by the library *)
+      | Claude.Response.Tool_result _ ->
+          (* Tool results are user messages, skip *)
           ())
-    messages
+    responses
 
 let run_claude ~sw ~env name prompt =
   Log.info (fun m -> m "🐪 Starting %s..." name);
   let options =
-    Claude.Options.create
-      ~model:(Claude.Model.of_string "sonnet")
-      ~allowed_tools:[] ()
+    Claude.Options.default
+    |> Claude.Options.with_model (Claude.Model.of_string "sonnet")
+    |> Claude.Options.with_allowed_tools []
   in
 
   let client =

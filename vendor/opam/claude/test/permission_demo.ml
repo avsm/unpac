@@ -30,47 +30,52 @@ module Granted = struct
 end
 
 (* Interactive permission callback *)
-let interactive_permission_callback ~tool_name ~input ~context:_ =
+let interactive_permission_callback ctx =
+  let open Claude.Permissions in
+  let tool_name = ctx.tool_name in
+  let input = ctx.input in
+
   Log.info (fun m -> m "🔔 Permission callback invoked for tool: %s" tool_name);
   Log.app (fun m -> m "\n🔐 PERMISSION REQUEST 🔐");
   Log.app (fun m -> m "Tool: %s" tool_name);
 
   (* Log the full input for debugging *)
-  Log.info (fun m -> m "Full input JSON: %s" (Test_json_utils.to_string input));
+  let input_json = Claude.Tool_input.to_json input in
+  Log.info (fun m -> m "Full input JSON: %s" (Test_json_utils.to_string input_json));
 
   (* Show input details *)
   (* Try to extract key information from the input *)
   (try
      match tool_name with
      | "Read" -> (
-         match Test_json_utils.get_string input "file_path" with
+         match Test_json_utils.get_string input_json "file_path" with
          | Some file_path -> Log.app (fun m -> m "File: %s" file_path)
          | None -> ())
      | "Bash" -> (
-         match Test_json_utils.get_string input "command" with
+         match Test_json_utils.get_string input_json "command" with
          | Some command -> Log.app (fun m -> m "Command: %s" command)
          | None -> ())
      | "Write" | "Edit" -> (
-         match Test_json_utils.get_string input "file_path" with
+         match Test_json_utils.get_string input_json "file_path" with
          | Some file_path -> Log.app (fun m -> m "File: %s" file_path)
          | None -> ())
      | "Glob" -> (
-         match Test_json_utils.get_string input "pattern" with
+         match Test_json_utils.get_string input_json "pattern" with
          | Some pattern -> (
              Log.app (fun m -> m "Pattern: %s" pattern);
-             match Test_json_utils.get_string input "path" with
+             match Test_json_utils.get_string input_json "path" with
              | Some path -> Log.app (fun m -> m "Path: %s" path)
              | None -> Log.app (fun m -> m "Path: (current directory)"))
          | None -> ())
      | "Grep" -> (
-         match Test_json_utils.get_string input "pattern" with
+         match Test_json_utils.get_string input_json "pattern" with
          | Some pattern -> (
              Log.app (fun m -> m "Pattern: %s" pattern);
-             match Test_json_utils.get_string input "path" with
+             match Test_json_utils.get_string input_json "path" with
              | Some path -> Log.app (fun m -> m "Path: %s" path)
              | None -> Log.app (fun m -> m "Path: (current directory)"))
          | None -> ())
-     | _ -> Log.app (fun m -> m "Input: %s" (Test_json_utils.to_string input))
+     | _ -> Log.app (fun m -> m "Input: %s" (Test_json_utils.to_string input_json))
    with exn ->
      Log.info (fun m ->
          m "Failed to parse input details: %s" (Printexc.to_string exn)));
@@ -79,7 +84,7 @@ let interactive_permission_callback ~tool_name ~input ~context:_ =
   if Granted.is_granted tool_name then begin
     Log.app (fun m -> m "→ Auto-approved (previously granted)");
     Log.info (fun m -> m "Returning allow result for %s" tool_name);
-    Claude.Permissions.Result.allow ()
+    Decision.allow ()
   end
   else begin
     (* Ask user - read from /dev/tty since stdin is connected to Claude process *)
@@ -91,49 +96,46 @@ let interactive_permission_callback ~tool_name ~input ~context:_ =
     | "y" | "yes" ->
         Log.app (fun m -> m "→ Allowed (this time only)");
         Log.info (fun m -> m "User approved %s for this request only" tool_name);
-        Claude.Permissions.Result.allow ()
+        Decision.allow ()
     | "a" | "always" ->
         Granted.grant tool_name;
         Log.info (fun m ->
             m "User granted permanent permission for %s" tool_name);
-        Claude.Permissions.Result.allow ()
+        Decision.allow ()
     | _ ->
         Granted.deny tool_name;
         Log.info (fun m -> m "User denied permission for %s" tool_name);
-        Claude.Permissions.Result.deny
+        Decision.deny
           ~message:(Printf.sprintf "User denied access to %s" tool_name)
-          ~interrupt:false ()
+          ~interrupt:false
   end
 
 let process_response client =
-  let messages = Claude.Client.receive_all client in
+  let responses = Claude.Client.receive_all client in
   List.iter
-    (fun msg ->
-      match msg with
-      | Claude.Message.Assistant msg ->
-          List.iter
-            (function
-              | Claude.Content_block.Text t ->
-                  let text = Claude.Content_block.Text.text t in
-                  Log.app (fun m -> m "\n📝 Claude says:\n%s" text)
-              | Claude.Content_block.Tool_use t ->
-                  Log.info (fun m ->
-                      m "🔧 Tool use: %s (id: %s)"
-                        (Claude.Content_block.Tool_use.name t)
-                        (Claude.Content_block.Tool_use.id t))
-              | _ -> ())
-            (Claude.Message.Assistant.content msg)
-      | Claude.Message.Result msg ->
-          (if Claude.Message.Result.is_error msg then
+    (fun response ->
+      match response with
+      | Claude.Response.Text t ->
+          let text = Claude.Response.Text.content t in
+          Log.app (fun m -> m "\n📝 Claude says:\n%s" text)
+      | Claude.Response.Tool_use t ->
+          Log.info (fun m ->
+              m "🔧 Tool use: %s (id: %s)"
+                (Claude.Response.Tool_use.name t)
+                (Claude.Response.Tool_use.id t))
+      | Claude.Response.Complete c ->
+          (if Claude.Response.Complete.result_text c = None then
              Log.err (fun m -> m "❌ Error occurred!")
            else
-             match Claude.Message.Result.total_cost_usd msg with
+             match Claude.Response.Complete.total_cost_usd c with
              | Some cost -> Log.info (fun m -> m "💰 Cost: $%.6f" cost)
              | None -> ());
           Log.info (fun m ->
-              m "⏱️ Duration: %dms" (Claude.Message.Result.duration_ms msg))
+              m "⏱️ Duration: %dms" (Claude.Response.Complete.duration_ms c))
+      | Claude.Response.Error e ->
+          Log.err (fun m -> m "❌ Error: %s" (Claude.Response.Error.message e))
       | _ -> ())
-    messages
+    responses
 
 let run_demo ~sw ~env =
   Log.app (fun m -> m "🚀 Starting Permission Demo");
@@ -145,10 +147,10 @@ let run_demo ~sw ~env =
   (* DON'T specify allowed_tools - let the permission callback handle everything.
      The Default permission mode with a callback should send requests for all tools. *)
   let options =
-    Claude.Options.create
-      ~model:(Claude.Model.of_string "sonnet")
-      ~permission_mode:Claude.Permissions.Mode.Default
-      ~permission_callback:interactive_permission_callback ()
+    Claude.Options.default
+    |> Claude.Options.with_model (Claude.Model.of_string "sonnet")
+    |> Claude.Options.with_permission_mode Claude.Permissions.Mode.Default
+    |> Claude.Options.with_permission_callback interactive_permission_callback
   in
 
   let client =

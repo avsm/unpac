@@ -10,7 +10,7 @@ module Request = struct
     subtype : [ `Can_use_tool ];
     tool_name : string;
     input : Jsont.json;
-    permission_suggestions : Permissions.Update.t list option;
+    permission_suggestions : Proto.Permissions.Update.t list option;
     blocked_path : string option;
     unknown : Unknown.t;
   }
@@ -23,7 +23,7 @@ module Request = struct
 
   type set_permission_mode = {
     subtype : [ `Set_permission_mode ];
-    mode : Permissions.Mode.t;
+    mode : Proto.Permissions.Mode.t;
     unknown : Unknown.t;
   }
 
@@ -123,7 +123,7 @@ module Request = struct
     |> Jsont.Object.mem "input" Jsont.json ~enc:(fun (r : permission) ->
         r.input)
     |> Jsont.Object.opt_mem "permission_suggestions"
-         (Jsont.list Permissions.Update.jsont) ~enc:(fun (r : permission) ->
+         (Jsont.list Proto.Permissions.Update.jsont) ~enc:(fun (r : permission) ->
            r.permission_suggestions)
     |> Jsont.Object.opt_mem "blocked_path" Jsont.string
          ~enc:(fun (r : permission) -> r.blocked_path)
@@ -156,7 +156,7 @@ module Request = struct
       { subtype = `Set_permission_mode; mode; unknown }
     in
     Jsont.Object.map ~kind:"SetPermissionMode" make
-    |> Jsont.Object.mem "mode" Permissions.Mode.jsont
+    |> Jsont.Object.mem "mode" Proto.Permissions.Mode.jsont
          ~enc:(fun (r : set_permission_mode) -> r.mode)
     |> Jsont.Object.keep_unknown Jsont.json_mems
          ~enc:(fun (r : set_permission_mode) -> r.unknown)

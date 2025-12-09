@@ -100,7 +100,7 @@ let run_codebase_analysis env =
   in
 
   (* Create structured output format from the schema *)
-  let output_format = C.Structured_output.of_json_schema analysis_schema in
+  let output_format = Claude.Proto.Structured_output.of_json_schema analysis_schema in
 
   (* Configure Claude with structured output *)
   let options =
@@ -132,28 +132,22 @@ let run_codebase_analysis env =
   C.Client.query client prompt;
 
   (* Process responses *)
-  let messages = C.Client.receive client in
+  let responses = C.Client.receive client in
   Seq.iter
     (function
-      | C.Message.Assistant msg ->
-          Printf.printf "\nAssistant response:\n";
-          List.iter
-            (function
-              | C.Content_block.Text text ->
-                  Printf.printf "  Text: %s\n" (C.Content_block.Text.text text)
-              | C.Content_block.Tool_use tool ->
-                  Printf.printf "  Using tool: %s\n"
-                    (C.Content_block.Tool_use.name tool)
-              | _ -> ())
-            (C.Message.Assistant.content msg)
-      | C.Message.Result result -> (
+      | C.Response.Text text ->
+          Printf.printf "\nAssistant text:\n";
+          Printf.printf "  %s\n" (C.Response.Text.content text)
+      | C.Response.Tool_use tool ->
+          Printf.printf "  Using tool: %s\n" (C.Response.Tool_use.name tool)
+      | C.Response.Complete result -> (
           Printf.printf "\n=== Result ===\n";
-          Printf.printf "Duration: %dms\n" (C.Message.Result.duration_ms result);
+          Printf.printf "Duration: %dms\n" (C.Response.Complete.duration_ms result);
           Printf.printf "Cost: $%.4f\n"
-            (Option.value (C.Message.Result.total_cost_usd result) ~default:0.0);
+            (Option.value (C.Response.Complete.total_cost_usd result) ~default:0.0);
 
           (* Extract and display structured output *)
-          match C.Message.Result.structured_output result with
+          match C.Response.Complete.structured_output result with
           | Some output ->
               Printf.printf "\n=== Structured Output ===\n";
               Printf.printf "%s\n\n"
@@ -196,14 +190,14 @@ let run_codebase_analysis env =
                 findings
           | None -> (
               Printf.printf "No structured output received\n";
-              match C.Message.Result.result result with
+              match C.Response.Complete.result_text result with
               | Some text -> Printf.printf "Text result: %s\n" text
               | None -> ()))
-      | C.Message.System (C.Message.System.Init _) ->
-          Printf.printf "Session initialized\n"
-      | C.Message.System (C.Message.System.Error _) -> ()
+      | C.Response.Init _ -> Printf.printf "Session initialized\n"
+      | C.Response.Error err ->
+          Printf.printf "Error: %s\n" (C.Response.Error.message err)
       | _ -> ())
-    messages;
+    responses;
 
   Printf.printf "\nDone!\n"
 
