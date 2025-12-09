@@ -105,3 +105,9 @@
  (name test_incoming)
  (modules test_incoming)
  (libraries claude jsont.bytesrw))
+
+(executable
+ (public_name test_structured_error)
+ (name test_structured_error)
+ (modules test_structured_error)
+ (libraries claude eio_main jsont.bytesrw))

@@ -45,7 +45,7 @@ let run_discovery ~sw ~env =
     |> Claude.Options.with_model (Claude.Proto.Model.of_string "sonnet")
   in
   let client =
-    Claude.Client.create ~options ~sw ~process_mgr:env#process_mgr ()
+    Claude.Client.create ~options ~sw ~process_mgr:env#process_mgr ~clock:env#clock ()
   in
   Claude.Client.enable_permission_discovery client;
 

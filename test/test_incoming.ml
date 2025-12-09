@@ -41,7 +41,7 @@ let test_decode_system_message () =
 
 let test_decode_control_response () =
   let json_str =
-    {|{"type":"control_response","response":{"subtype":"success","request_id":"test-req-1"}}|}
+    {|{"type":"control_response","response":{"subtype":"success","requestId":"test-req-1"}}|}
   in
   match Jsont_bytesrw.decode_string' Proto.Incoming.jsont json_str with
   | Ok (Proto.Incoming.Control_response resp) -> (
@@ -59,13 +59,15 @@ let test_decode_control_response () =
 
 let test_decode_control_response_error () =
   let json_str =
-    {|{"type":"control_response","response":{"subtype":"error","request_id":"test-req-2","error":"Something went wrong"}}|}
+    {|{"type":"control_response","response":{"subtype":"error","requestId":"test-req-2","error":{"code":-32603,"message":"Something went wrong"}}}|}
   in
   match Jsont_bytesrw.decode_string' Proto.Incoming.jsont json_str with
   | Ok (Proto.Incoming.Control_response resp) -> (
       match resp.response with
       | Proto.Control.Response.Error e ->
-          if e.request_id = "test-req-2" && e.error = "Something went wrong"
+          if e.request_id = "test-req-2"
+             && e.error.code = -32603
+             && e.error.message = "Something went wrong"
           then print_endline "✓ Decoded control error response successfully"
           else Printf.printf "✗ Wrong error content\n"
       | Proto.Control.Response.Success _ ->

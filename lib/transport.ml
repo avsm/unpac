@@ -119,8 +119,8 @@ let create ~sw ~process_mgr ~options () =
   let cmd = build_command ~claude_path ~options in
 
   (* Build environment - preserve essential vars for Claude config/auth access *)
-  let home = try Unix.getenv "HOME" with Not_found -> "/tmp" in
-  let path = try Unix.getenv "PATH" with Not_found -> "/usr/bin:/bin" in
+  let home = Option.value (Sys.getenv_opt "HOME") ~default:"/tmp" in
+  let path = Option.value (Sys.getenv_opt "PATH") ~default:"/usr/bin:/bin" in
 
   (* Preserve other potentially important environment variables *)
   let preserve_vars =
@@ -140,8 +140,8 @@ let create ~sw ~process_mgr ~options () =
   let preserved =
     List.filter_map
       (fun var ->
-        try Some (Printf.sprintf "%s=%s" var (Unix.getenv var))
-        with Not_found -> None)
+        Option.map (fun value -> Printf.sprintf "%s=%s" var value)
+          (Sys.getenv_opt var))
       preserve_vars
   in
 

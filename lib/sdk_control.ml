@@ -284,6 +284,27 @@ module Request = struct
 end
 
 module Response = struct
+  (* Re-export Error_code from Proto *)
+  module Error_code = Proto.Control.Response.Error_code
+
+  (* Structured error similar to JSON-RPC *)
+  type error_detail = {
+    code : int;
+    message : string;
+    data : Jsont.json option;
+  }
+
+  let error_detail ~code ~message ?data () =
+    { code = Error_code.to_int code; message; data }
+
+  let error_detail_jsont : error_detail Jsont.t =
+    let make code message data = { code; message; data } in
+    Jsont.Object.map ~kind:"ErrorDetail" make
+    |> Jsont.Object.mem "code" Jsont.int ~enc:(fun e -> e.code)
+    |> Jsont.Object.mem "message" Jsont.string ~enc:(fun e -> e.message)
+    |> Jsont.Object.opt_mem "data" Jsont.json ~enc:(fun e -> e.data)
+    |> Jsont.Object.finish
+
   type success = {
     subtype : [ `Success ];
     request_id : string;
@@ -294,7 +315,7 @@ module Response = struct
   type error = {
     subtype : [ `Error ];
     request_id : string;
-    error : string;
+    error : error_detail;
     unknown : Unknown.t;
   }
 
@@ -327,7 +348,7 @@ module Response = struct
     Jsont.Object.map ~kind:"Error" make
     |> Jsont.Object.mem "request_id" Jsont.string ~enc:(fun (r : error) ->
         r.request_id)
-    |> Jsont.Object.mem "error" Jsont.string ~enc:(fun (r : error) -> r.error)
+    |> Jsont.Object.mem "error" error_detail_jsont ~enc:(fun (r : error) -> r.error)
     |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:(fun (r : error) ->
         r.unknown)
     |> Jsont.Object.finish

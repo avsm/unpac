@@ -113,6 +113,52 @@ end
 module Response : sig
   (** SDK control response types. *)
 
+  (** Standard JSON-RPC 2.0 error codes.
+
+      These codes follow the JSON-RPC 2.0 specification for structured error
+      responses. Using the typed codes instead of raw integers improves code
+      clarity and prevents typos. Polymorphic variants allow for easy extension. *)
+  module Error_code : sig
+    type t = [
+      | `Parse_error  (** -32700: Invalid JSON received *)
+      | `Invalid_request  (** -32600: The request object is invalid *)
+      | `Method_not_found  (** -32601: The requested method does not exist *)
+      | `Invalid_params  (** -32602: Invalid method parameters *)
+      | `Internal_error  (** -32603: Internal server error *)
+      | `Custom of int  (** Application-specific error codes *)
+    ]
+
+    val to_int : [< t] -> int
+    (** [to_int t] converts an error code to its integer representation. *)
+
+    val of_int : int -> t
+    (** [of_int n] converts an integer to an error code.
+        Standard codes are mapped to their variants, others become [`Custom n]. *)
+  end
+
+  (** Structured error detail similar to JSON-RPC. *)
+  type error_detail = {
+    code : int;  (** Error code for programmatic handling *)
+    message : string;  (** Human-readable error message *)
+    data : Jsont.json option;  (** Optional additional error data *)
+  }
+
+  val error_detail :
+    code:[< Error_code.t] -> message:string -> ?data:Jsont.json -> unit -> error_detail
+  (** [error_detail ~code ~message ?data ()] creates a structured error detail
+      using typed error codes.
+
+      Example:
+      {[
+        error_detail
+          ~code:`Method_not_found
+          ~message:"Hook callback not found"
+          ()
+      ]} *)
+
+  val error_detail_jsont : error_detail Jsont.t
+  (** [error_detail_jsont] is the Jsont codec for error details. *)
+
   type success_r = private {
     request_id : string;
     response : Jsont.json option;
@@ -121,7 +167,7 @@ module Response : sig
 
   type error_r = private {
     request_id : string;
-    error : string;
+    error : error_detail;
     unknown : Unknown.t;
   }
 
@@ -135,8 +181,8 @@ module Response : sig
   val success : request_id:string -> ?response:Jsont.json -> unit -> t
   (** [success ~request_id ?response ()] creates a success response. *)
 
-  val error : request_id:string -> error:string -> unit -> t
-  (** [error ~request_id ~error ()] creates an error response. *)
+  val error : request_id:string -> error:error_detail -> unit -> t
+  (** [error ~request_id ~error ()] creates an error response with structured error detail. *)
 end
 
 (** {1 Control Envelopes} *)
