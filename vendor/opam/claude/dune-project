@@ -21,6 +21,5 @@
   fmt
   logs
   (jsont (>= 0.2.0))
-  (jsont_bytesrw (>= 0.2.0))
   (odoc :with-doc)
   (alcotest (and :with-test (>= 1.7.0)))))
