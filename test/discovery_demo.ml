@@ -6,34 +6,28 @@ let src =
 module Log = (val Logs.src_log src : Logs.LOG)
 
 let process_response client =
-  let messages = Claude.Client.receive_all client in
+  let responses = Claude.Client.receive_all client in
   List.iter
-    (fun msg ->
-      match msg with
-      | Claude.Message.Assistant msg ->
-          List.iter
-            (function
-              | Claude.Content_block.Text t ->
-                  let text = Claude.Content_block.Text.text t in
-                  Log.app (fun m ->
-                      m "Claude: %s"
-                        (if String.length text > 100 then
-                           String.sub text 0 100 ^ "..."
-                         else text))
-              | Claude.Content_block.Tool_use t ->
-                  Log.info (fun m ->
-                      m "Tool use: %s" (Claude.Content_block.Tool_use.name t))
-              | _ -> ())
-            (Claude.Message.Assistant.content msg)
-      | Claude.Message.Result msg -> (
-          if Claude.Message.Result.is_error msg then
-            Log.err (fun m -> m "Error occurred!")
-          else
-            match Claude.Message.Result.total_cost_usd msg with
-            | Some cost -> Log.info (fun m -> m "Cost: $%.6f" cost)
-            | None -> ())
+    (fun resp ->
+      match resp with
+      | Claude.Response.Text text ->
+          let content = Claude.Response.Text.content text in
+          Log.app (fun m ->
+              m "Claude: %s"
+                (if String.length content > 100 then
+                   String.sub content 0 100 ^ "..."
+                 else content))
+      | Claude.Response.Tool_use t ->
+          Log.info (fun m ->
+              m "Tool use: %s" (Claude.Response.Tool_use.name t))
+      | Claude.Response.Error err ->
+          Log.err (fun m -> m "Error: %s" (Claude.Response.Error.message err))
+      | Claude.Response.Complete result ->
+          (match Claude.Response.Complete.total_cost_usd result with
+          | Some cost -> Log.info (fun m -> m "Cost: $%.6f" cost)
+          | None -> ())
       | _ -> ())
-    messages
+    responses
 
 let run_discovery ~sw ~env =
   Log.app (fun m -> m "🔍 Permission Discovery Demo");
@@ -42,12 +36,13 @@ let run_discovery ~sw ~env =
 
   (* Create client with discovery mode *)
   let options =
-    Claude.Options.create ~model:(Claude.Model.of_string "sonnet") ()
+    Claude.Options.default
+    |> Claude.Options.with_model (Claude.Proto.Model.of_string "sonnet")
   in
   let client =
-    Claude.Client.discover_permissions
-      (Claude.Client.create ~options ~sw ~process_mgr:env#process_mgr ())
+    Claude.Client.create ~options ~sw ~process_mgr:env#process_mgr ()
   in
+  Claude.Client.enable_permission_discovery client;
 
   (* Send a prompt that will need permissions *)
   Log.app (fun m -> m "Asking Claude to read a secret file...");
@@ -57,7 +52,7 @@ let run_discovery ~sw ~env =
   process_response client;
 
   (* Check what permissions were requested *)
-  let permissions = Claude.Client.get_discovered_permissions client in
+  let permissions = Claude.Client.discovered_permissions client in
   if permissions = [] then
     Log.app (fun m ->
         m

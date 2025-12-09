@@ -18,9 +18,9 @@ type t = {
 }
 
 let setting_source_to_string = function
-  | Options.User -> "user"
-  | Options.Project -> "project"
-  | Options.Local -> "local"
+  | Proto.Options.User -> "user"
+  | Proto.Options.Project -> "project"
+  | Proto.Options.Local -> "local"
 
 let build_command ~claude_path ~options =
   let cmd = [ claude_path; "--output-format"; "stream-json"; "--verbose" ] in
@@ -96,7 +96,7 @@ let build_command ~claude_path ~options =
   let cmd =
     match Options.output_format options with
     | Some format ->
-        let schema = Structured_output.json_schema format in
+        let schema = Proto.Structured_output.to_json_schema format in
         let schema_str =
           match Jsont_bytesrw.encode_string' Jsont.json schema with
           | Ok s -> s
@@ -230,40 +230,15 @@ let receive_line t =
          (Printf.sprintf "Failed to receive message: %s"
             (Printexc.to_string exn)))
 
-(** Wire codec for interrupt response messages. *)
-module Interrupt_wire = struct
-  type inner = { subtype : string; request_id : string }
-  type t = { type_ : string; response : inner }
-
-  let inner_jsont : inner Jsont.t =
-    let make subtype request_id = { subtype; request_id } in
-    Jsont.Object.map ~kind:"InterruptInner" make
-    |> Jsont.Object.mem "subtype" Jsont.string ~enc:(fun r -> r.subtype)
-    |> Jsont.Object.mem "request_id" Jsont.string ~enc:(fun r -> r.request_id)
-    |> Jsont.Object.finish
-
-  let jsont : t Jsont.t =
-    let make type_ response = { type_; response } in
-    Jsont.Object.map ~kind:"InterruptOuter" make
-    |> Jsont.Object.mem "type" Jsont.string ~enc:(fun r -> r.type_)
-    |> Jsont.Object.mem "response" inner_jsont ~enc:(fun r -> r.response)
-    |> Jsont.Object.finish
-
-  let encode () =
-    let wire =
-      {
-        type_ = "control_response";
-        response = { subtype = "interrupt"; request_id = "" };
-      }
-    in
-    match Jsont.Json.encode jsont wire with
-    | Ok json -> json
-    | Error msg -> failwith ("Interrupt_wire.encode: " ^ msg)
-end
-
 let interrupt t =
   Log.info (fun m -> m "Sending interrupt signal");
-  let interrupt_msg = Interrupt_wire.encode () in
+  (* Create interrupt request using Proto types *)
+  let request = Proto.Control.Request.interrupt () in
+  let envelope =
+    Proto.Control.create_request ~request_id:"" ~request ()
+  in
+  let outgoing = Proto.Outgoing.Control_request envelope in
+  let interrupt_msg = Proto.Outgoing.to_json outgoing in
   send t interrupt_msg
 
 let close t =

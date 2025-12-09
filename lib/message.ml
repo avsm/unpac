@@ -3,573 +3,137 @@ let src = Logs.Src.create "claude.message" ~doc:"Claude messages"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 module User = struct
-  type content = String of string | Blocks of Content_block.t list
-  type t = { content : content; unknown : Unknown.t }
+  type t = Proto.Message.User.t
 
-  let create_string s = { content = String s; unknown = Unknown.empty }
+  let of_string s = Proto.Message.User.create_string s
+  let of_blocks blocks = Proto.Message.User.create_blocks (List.map Content_block.to_proto blocks)
 
-  let create_blocks blocks =
-    { content = Blocks blocks; unknown = Unknown.empty }
+  let with_tool_result ~tool_use_id ~content ?is_error () =
+    Proto.Message.User.create_with_tool_result ~tool_use_id ~content ?is_error ()
 
-  let create_with_tool_result ~tool_use_id ~content ?is_error () =
-    let tool_result =
-      Content_block.tool_result ~tool_use_id ~content ?is_error ()
-    in
-    { content = Blocks [ tool_result ]; unknown = Unknown.empty }
+  let as_text t =
+    match Proto.Message.User.content t with
+    | Proto.Message.User.String s -> Some s
+    | Proto.Message.User.Blocks _ -> None
 
-  let create_mixed ~text ~tool_results =
-    let blocks =
-      let text_blocks =
-        match text with Some t -> [ Content_block.text t ] | None -> []
-      in
-      let tool_blocks =
-        List.map
-          (fun (tool_use_id, content, is_error) ->
-            Content_block.tool_result ~tool_use_id ~content ?is_error ())
-          tool_results
-      in
-      text_blocks @ tool_blocks
-    in
-    { content = Blocks blocks; unknown = Unknown.empty }
+  let blocks t =
+    match Proto.Message.User.content t with
+    | Proto.Message.User.String s -> [ Content_block.text s ]
+    | Proto.Message.User.Blocks bs -> List.map Content_block.of_proto bs
 
-  let make content unknown = { content; unknown }
-  let content t = t.content
-  let unknown t = t.unknown
-  let as_text t = match t.content with String s -> Some s | Blocks _ -> None
+  let of_proto proto = proto
+  let to_proto t = t
 
-  let get_blocks t =
-    match t.content with
-    | String s -> [ Content_block.text s ]
-    | Blocks blocks -> blocks
-
-  (* Decode content from json value *)
-  let decode_content json =
-    match json with
-    | Jsont.String (s, _) -> String s
-    | Jsont.Array (items, _) ->
-        let blocks =
-          List.map
-            (fun j ->
-              Jsont.Json.decode Content_block.jsont j
-              |> Err.get_ok ~msg:"Invalid content block: ")
-            items
-        in
-        Blocks blocks
-    | _ -> failwith "Content must be string or array"
-
-  (* Encode content to json value *)
-  let encode_content = function
-    | String s -> Jsont.String (s, Jsont.Meta.none)
-    | Blocks blocks ->
-        let jsons =
-          List.map
-            (fun b ->
-              Jsont.Json.encode Content_block.jsont b
-              |> Err.get_ok ~msg:"encode_content: ")
-            blocks
-        in
-        Jsont.Array (jsons, Jsont.Meta.none)
-
-  let jsont : t Jsont.t =
-    Jsont.Object.map ~kind:"User" (fun json_content unknown ->
-        let content = decode_content json_content in
-        make content unknown)
-    |> Jsont.Object.mem "content" Jsont.json ~enc:(fun t ->
-        encode_content (content t))
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
-    |> Jsont.Object.finish
-
-  (** Wire-format codec for outgoing user messages.
-      Format: {"type": "user", "message": {"role": "user", "content": ...}} *)
-  module Wire = struct
-    type inner = { role : string; content : Jsont.json }
-    type outer = { type_ : string; message : inner }
-
-    let inner_jsont : inner Jsont.t =
-      let make role content = { role; content } in
-      Jsont.Object.map ~kind:"UserMessageInner" make
-      |> Jsont.Object.mem "role" Jsont.string ~enc:(fun r -> r.role)
-      |> Jsont.Object.mem "content" Jsont.json ~enc:(fun r -> r.content)
-      |> Jsont.Object.finish
-
-    let outer_jsont : outer Jsont.t =
-      let make type_ message = { type_; message } in
-      Jsont.Object.map ~kind:"UserMessageOuter" make
-      |> Jsont.Object.mem "type" Jsont.string ~enc:(fun r -> r.type_)
-      |> Jsont.Object.mem "message" inner_jsont ~enc:(fun r -> r.message)
-      |> Jsont.Object.finish
-  end
+  (* Internal wire format functions *)
+  let incoming_jsont = Proto.Message.User.incoming_jsont
 
   let to_json t =
-    let content_json = encode_content t.content in
-    let wire =
-      Wire.
-        { type_ = "user"; message = { role = "user"; content = content_json } }
-    in
-    Jsont.Json.encode Wire.outer_jsont wire |> Err.get_ok ~msg:"User.to_json: "
-
-  (* Jsont codec for parsing incoming user messages from CLI *)
-  let incoming_jsont : t Jsont.t =
-    let message_jsont =
-      Jsont.Object.map ~kind:"UserMessage" (fun json_content ->
-          let content = decode_content json_content in
-          { content; unknown = Unknown.empty })
-      |> Jsont.Object.mem "content" Jsont.json ~enc:(fun t ->
-          encode_content (content t))
-      |> Jsont.Object.finish
-    in
-    Jsont.Object.map ~kind:"UserEnvelope" Fun.id
-    |> Jsont.Object.mem "message" message_jsont ~enc:Fun.id
-    |> Jsont.Object.finish
-
-  let of_json json =
-    Jsont.Json.decode incoming_jsont json |> Err.get_ok' ~msg:"User.of_json: "
+    match Jsont.Json.encode Proto.Message.User.jsont t with
+    | Ok json -> json
+    | Error e -> invalid_arg ("User.to_json: " ^ e)
 end
 
 module Assistant = struct
-  type error =
-    [ `Authentication_failed
-    | `Billing_error
-    | `Rate_limit
-    | `Invalid_request
-    | `Server_error
-    | `Unknown ]
+  type error = Proto.Message.Assistant.error
 
-  let error_to_string = function
-    | `Authentication_failed -> "authentication_failed"
-    | `Billing_error -> "billing_error"
-    | `Rate_limit -> "rate_limit"
-    | `Invalid_request -> "invalid_request"
-    | `Server_error -> "server_error"
-    | `Unknown -> "unknown"
+  type t = Proto.Message.Assistant.t
 
-  let error_of_string = function
-    | "authentication_failed" -> `Authentication_failed
-    | "billing_error" -> `Billing_error
-    | "rate_limit" -> `Rate_limit
-    | "invalid_request" -> `Invalid_request
-    | "server_error" -> `Server_error
-    | "unknown" | _ -> `Unknown
+  let content t = List.map Content_block.of_proto (Proto.Message.Assistant.content t)
+  let model t = Proto.Message.Assistant.model t
+  let error t = Proto.Message.Assistant.error t
 
-  let error_jsont : error Jsont.t =
-    Jsont.enum
-      [
-        ("authentication_failed", `Authentication_failed);
-        ("billing_error", `Billing_error);
-        ("rate_limit", `Rate_limit);
-        ("invalid_request", `Invalid_request);
-        ("server_error", `Server_error);
-        ("unknown", `Unknown);
-      ]
-
-  type t = {
-    content : Content_block.t list;
-    model : string;
-    error : error option;
-    unknown : Unknown.t;
-  }
-
-  let create ~content ~model ?error () =
-    { content; model; error; unknown = Unknown.empty }
-
-  let make content model error unknown = { content; model; error; unknown }
-  let content t = t.content
-  let model t = t.model
-  let error t = t.error
-  let unknown t = t.unknown
-
-  let get_text_blocks t =
+  let text_blocks t =
     List.filter_map
       (function
         | Content_block.Text text -> Some (Content_block.Text.text text)
         | _ -> None)
-      t.content
+      (content t)
 
-  let get_tool_uses t =
+  let tool_uses t =
     List.filter_map
       (function Content_block.Tool_use tool -> Some tool | _ -> None)
-      t.content
+      (content t)
 
-  let get_thinking t =
+  let thinking_blocks t =
     List.filter_map
       (function Content_block.Thinking thinking -> Some thinking | _ -> None)
-      t.content
+      (content t)
 
   let has_tool_use t =
-    List.exists
-      (function Content_block.Tool_use _ -> true | _ -> false)
-      t.content
+    List.exists (function Content_block.Tool_use _ -> true | _ -> false) (content t)
 
-  let combined_text t = String.concat "\n" (get_text_blocks t)
+  let combined_text t = String.concat "\n" (text_blocks t)
 
-  let jsont : t Jsont.t =
-    Jsont.Object.map ~kind:"Assistant" make
-    |> Jsont.Object.mem "content" (Jsont.list Content_block.jsont) ~enc:content
-    |> Jsont.Object.mem "model" Jsont.string ~enc:model
-    |> Jsont.Object.opt_mem "error" error_jsont ~enc:error
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
-    |> Jsont.Object.finish
+  let of_proto proto = proto
+  let to_proto t = t
 
-  let encode_content_blocks blocks =
-    let jsons =
-      List.map
-        (fun b ->
-          Jsont.Json.encode Content_block.jsont b
-          |> Err.get_ok ~msg:"encode_content_blocks: ")
-        blocks
-    in
-    Jsont.Array (jsons, Jsont.Meta.none)
-
-  (** Wire-format codec for outgoing assistant messages. *)
-  module Wire = struct
-    type inner = {
-      wire_content : Jsont.json;
-      wire_model : string;
-      wire_error : string option;
-    }
-
-    type outer = { wire_type : string; wire_message : inner }
-
-    let inner_jsont : inner Jsont.t =
-      let make wire_content wire_model wire_error =
-        { wire_content; wire_model; wire_error }
-      in
-      Jsont.Object.map ~kind:"AssistantMessageInner" make
-      |> Jsont.Object.mem "content" Jsont.json ~enc:(fun r -> r.wire_content)
-      |> Jsont.Object.mem "model" Jsont.string ~enc:(fun r -> r.wire_model)
-      |> Jsont.Object.opt_mem "error" Jsont.string ~enc:(fun r -> r.wire_error)
-      |> Jsont.Object.finish
-
-    let outer_jsont : outer Jsont.t =
-      let make wire_type wire_message = { wire_type; wire_message } in
-      Jsont.Object.map ~kind:"AssistantMessageOuter" make
-      |> Jsont.Object.mem "type" Jsont.string ~enc:(fun r -> r.wire_type)
-      |> Jsont.Object.mem "message" inner_jsont ~enc:(fun r -> r.wire_message)
-      |> Jsont.Object.finish
-  end
+  (* Internal wire format functions *)
+  let incoming_jsont = Proto.Message.Assistant.incoming_jsont
 
   let to_json t =
-    let wire =
-      Wire.
-        {
-          wire_type = "assistant";
-          wire_message =
-            {
-              wire_content = encode_content_blocks t.content;
-              wire_model = t.model;
-              wire_error = Option.map error_to_string t.error;
-            };
-        }
-    in
-    Jsont.Json.encode Wire.outer_jsont wire
-    |> Err.get_ok ~msg:"Assistant.to_json: "
-
-  (* Jsont codec for parsing incoming assistant messages from CLI *)
-  let incoming_jsont : t Jsont.t =
-    Jsont.Object.map ~kind:"AssistantEnvelope" Fun.id
-    |> Jsont.Object.mem "message" jsont ~enc:Fun.id
-    |> Jsont.Object.finish
-
-  let of_json json =
-    Jsont.Json.decode incoming_jsont json
-    |> Err.get_ok' ~msg:"Assistant.of_json: "
+    match Jsont.Json.encode Proto.Message.Assistant.jsont t with
+    | Ok json -> json
+    | Error e -> invalid_arg ("Assistant.to_json: " ^ e)
 end
 
 module System = struct
-  (** System messages as a discriminated union on "subtype" field *)
+  type t = Proto.Message.System.t
 
-  type init = {
-    session_id : string option;
-    model : string option;
-    cwd : string option;
-    unknown : Unknown.t;
-  }
+  let is_init = function Proto.Message.System.Init _ -> true | _ -> false
+  let is_error = function Proto.Message.System.Error _ -> true | _ -> false
+  let session_id = Proto.Message.System.session_id
+  let model = Proto.Message.System.model
+  let cwd = Proto.Message.System.cwd
+  let error_message = Proto.Message.System.error_msg
 
-  type error = { error : string; unknown : Unknown.t }
-  type t = Init of init | Error of error
+  let of_proto proto = proto
+  let to_proto t = t
 
-  (* Accessors *)
-  let session_id = function Init i -> i.session_id | _ -> None
-  let model = function Init i -> i.model | _ -> None
-  let cwd = function Init i -> i.cwd | _ -> None
-  let error_msg = function Error e -> Some e.error | _ -> None
-  let subtype = function Init _ -> "init" | Error _ -> "error"
-  let unknown = function Init i -> i.unknown | Error e -> e.unknown
-
-  (* Constructors *)
-  let init ?session_id ?model ?cwd () =
-    Init { session_id; model; cwd; unknown = Unknown.empty }
-
-  let error ~error = Error { error; unknown = Unknown.empty }
-
-  (* Individual record codecs *)
-  let init_jsont : init Jsont.t =
-    let make session_id model cwd unknown : init =
-      { session_id; model; cwd; unknown }
-    in
-    Jsont.Object.map ~kind:"SystemInit" make
-    |> Jsont.Object.opt_mem "session_id" Jsont.string ~enc:(fun (r : init) ->
-        r.session_id)
-    |> Jsont.Object.opt_mem "model" Jsont.string ~enc:(fun (r : init) ->
-        r.model)
-    |> Jsont.Object.opt_mem "cwd" Jsont.string ~enc:(fun (r : init) -> r.cwd)
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:(fun (r : init) ->
-        r.unknown)
-    |> Jsont.Object.finish
-
-  let error_jsont : error Jsont.t =
-    let make err unknown : error = { error = err; unknown } in
-    Jsont.Object.map ~kind:"SystemError" make
-    |> Jsont.Object.mem "error" Jsont.string ~enc:(fun (r : error) -> r.error)
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:(fun (r : error) ->
-        r.unknown)
-    |> Jsont.Object.finish
-
-  (* Main codec using case_mem for "subtype" discriminator *)
-  let jsont : t Jsont.t =
-    let case_init =
-      Jsont.Object.Case.map "init" init_jsont ~dec:(fun v -> Init v)
-    in
-    let case_error =
-      Jsont.Object.Case.map "error" error_jsont ~dec:(fun v -> Error v)
-    in
-    let enc_case = function
-      | Init v -> Jsont.Object.Case.value case_init v
-      | Error v -> Jsont.Object.Case.value case_error v
-    in
-    let cases = Jsont.Object.Case.[ make case_init; make case_error ] in
-    Jsont.Object.map ~kind:"System" Fun.id
-    |> Jsont.Object.case_mem "subtype" Jsont.string ~enc:Fun.id ~enc_case cases
-         ~tag_to_string:Fun.id ~tag_compare:String.compare
-    |> Jsont.Object.finish
+  (* Internal wire format functions *)
+  let jsont = Proto.Message.System.jsont
 
   let to_json t =
-    Jsont.Json.encode jsont t |> Err.get_ok ~msg:"System.to_json: "
-
-  let of_json json =
-    Jsont.Json.decode jsont json |> Err.get_ok' ~msg:"System.of_json: "
+    match Jsont.Json.encode Proto.Message.System.jsont t with
+    | Ok json -> json
+    | Error e -> invalid_arg ("System.to_json: " ^ e)
 end
 
 module Result = struct
   module Usage = struct
-    type t = {
-      input_tokens : int option;
-      output_tokens : int option;
-      total_tokens : int option;
-      cache_creation_input_tokens : int option;
-      cache_read_input_tokens : int option;
-      unknown : Unknown.t;
-    }
+    type t = Proto.Message.Result.Usage.t
 
-    let make input_tokens output_tokens total_tokens cache_creation_input_tokens
-        cache_read_input_tokens unknown =
-      {
-        input_tokens;
-        output_tokens;
-        total_tokens;
-        cache_creation_input_tokens;
-        cache_read_input_tokens;
-        unknown;
-      }
+    let input_tokens = Proto.Message.Result.Usage.input_tokens
+    let output_tokens = Proto.Message.Result.Usage.output_tokens
+    let total_tokens = Proto.Message.Result.Usage.total_tokens
+    let cache_creation_input_tokens = Proto.Message.Result.Usage.cache_creation_input_tokens
+    let cache_read_input_tokens = Proto.Message.Result.Usage.cache_read_input_tokens
 
-    let create ?input_tokens ?output_tokens ?total_tokens
-        ?cache_creation_input_tokens ?cache_read_input_tokens () =
-      {
-        input_tokens;
-        output_tokens;
-        total_tokens;
-        cache_creation_input_tokens;
-        cache_read_input_tokens;
-        unknown = Unknown.empty;
-      }
-
-    let input_tokens t = t.input_tokens
-    let output_tokens t = t.output_tokens
-    let total_tokens t = t.total_tokens
-    let cache_creation_input_tokens t = t.cache_creation_input_tokens
-    let cache_read_input_tokens t = t.cache_read_input_tokens
-    let unknown t = t.unknown
-
-    let jsont : t Jsont.t =
-      Jsont.Object.map ~kind:"Usage" make
-      |> Jsont.Object.opt_mem "input_tokens" Jsont.int ~enc:input_tokens
-      |> Jsont.Object.opt_mem "output_tokens" Jsont.int ~enc:output_tokens
-      |> Jsont.Object.opt_mem "total_tokens" Jsont.int ~enc:total_tokens
-      |> Jsont.Object.opt_mem "cache_creation_input_tokens" Jsont.int
-           ~enc:cache_creation_input_tokens
-      |> Jsont.Object.opt_mem "cache_read_input_tokens" Jsont.int
-           ~enc:cache_read_input_tokens
-      |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
-      |> Jsont.Object.finish
-
-    let effective_input_tokens t =
-      match t.input_tokens with
-      | None -> 0
-      | Some input ->
-          let cached = Option.value t.cache_read_input_tokens ~default:0 in
-          max 0 (input - cached)
-
-    let total_cost_estimate t ~input_price ~output_price =
-      match (t.input_tokens, t.output_tokens) with
-      | Some input, Some output ->
-          let input_cost = float_of_int input *. input_price /. 1_000_000. in
-          let output_cost = float_of_int output *. output_price /. 1_000_000. in
-          Some (input_cost +. output_cost)
-      | _ -> None
+    let of_proto proto = proto
   end
 
-  type t = {
-    subtype : string;
-    duration_ms : int;
-    duration_api_ms : int;
-    is_error : bool;
-    num_turns : int;
-    session_id : string;
-    total_cost_usd : float option;
-    usage : Usage.t option;
-    result : string option;
-    structured_output : Jsont.json option;
-    unknown : Unknown.t;
-  }
+  type t = Proto.Message.Result.t
 
-  let create ~subtype ~duration_ms ~duration_api_ms ~is_error ~num_turns
-      ~session_id ?total_cost_usd ?usage ?result ?structured_output () =
-    {
-      subtype;
-      duration_ms;
-      duration_api_ms;
-      is_error;
-      num_turns;
-      session_id;
-      total_cost_usd;
-      usage;
-      result;
-      structured_output;
-      unknown = Unknown.empty;
-    }
+  let duration_ms = Proto.Message.Result.duration_ms
+  let duration_api_ms = Proto.Message.Result.duration_api_ms
+  let is_error = Proto.Message.Result.is_error
+  let num_turns = Proto.Message.Result.num_turns
+  let session_id = Proto.Message.Result.session_id
+  let total_cost_usd = Proto.Message.Result.total_cost_usd
 
-  let make subtype duration_ms duration_api_ms is_error num_turns session_id
-      total_cost_usd usage result structured_output unknown =
-    {
-      subtype;
-      duration_ms;
-      duration_api_ms;
-      is_error;
-      num_turns;
-      session_id;
-      total_cost_usd;
-      usage;
-      result;
-      structured_output;
-      unknown;
-    }
+  let usage t = Option.map Usage.of_proto (Proto.Message.Result.usage t)
+  let result_text = Proto.Message.Result.result
+  let structured_output = Proto.Message.Result.structured_output
 
-  let subtype t = t.subtype
-  let duration_ms t = t.duration_ms
-  let duration_api_ms t = t.duration_api_ms
-  let is_error t = t.is_error
-  let num_turns t = t.num_turns
-  let session_id t = t.session_id
-  let total_cost_usd t = t.total_cost_usd
-  let usage t = t.usage
-  let result t = t.result
-  let structured_output t = t.structured_output
-  let unknown t = t.unknown
+  let of_proto proto = proto
+  let to_proto t = t
 
-  let jsont : t Jsont.t =
-    Jsont.Object.map ~kind:"Result" make
-    |> Jsont.Object.mem "subtype" Jsont.string ~enc:subtype
-    |> Jsont.Object.mem "duration_ms" Jsont.int ~enc:duration_ms
-    |> Jsont.Object.mem "duration_api_ms" Jsont.int ~enc:duration_api_ms
-    |> Jsont.Object.mem "is_error" Jsont.bool ~enc:is_error
-    |> Jsont.Object.mem "num_turns" Jsont.int ~enc:num_turns
-    |> Jsont.Object.mem "session_id" Jsont.string ~enc:session_id
-    |> Jsont.Object.opt_mem "total_cost_usd" Jsont.number ~enc:total_cost_usd
-    |> Jsont.Object.opt_mem "usage" Usage.jsont ~enc:usage
-    |> Jsont.Object.opt_mem "result" Jsont.string ~enc:result
-    |> Jsont.Object.opt_mem "structured_output" Jsont.json
-         ~enc:structured_output
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
-    |> Jsont.Object.finish
-
-  (** Wire-format codec for outgoing result messages (adds "type" field). *)
-  module Wire = struct
-    type wire = {
-      type_ : string;
-      subtype : string;
-      duration_ms : int;
-      duration_api_ms : int;
-      is_error : bool;
-      num_turns : int;
-      session_id : string;
-      total_cost_usd : float option;
-      usage : Jsont.json option;
-      result : string option;
-      structured_output : Jsont.json option;
-    }
-
-    let jsont : wire Jsont.t =
-      let make type_ subtype duration_ms duration_api_ms is_error num_turns
-          session_id total_cost_usd usage result structured_output =
-        {
-          type_;
-          subtype;
-          duration_ms;
-          duration_api_ms;
-          is_error;
-          num_turns;
-          session_id;
-          total_cost_usd;
-          usage;
-          result;
-          structured_output;
-        }
-      in
-      Jsont.Object.map ~kind:"ResultWire" make
-      |> Jsont.Object.mem "type" Jsont.string ~enc:(fun r -> r.type_)
-      |> Jsont.Object.mem "subtype" Jsont.string ~enc:(fun r -> r.subtype)
-      |> Jsont.Object.mem "duration_ms" Jsont.int ~enc:(fun r -> r.duration_ms)
-      |> Jsont.Object.mem "duration_api_ms" Jsont.int ~enc:(fun r ->
-          r.duration_api_ms)
-      |> Jsont.Object.mem "is_error" Jsont.bool ~enc:(fun r -> r.is_error)
-      |> Jsont.Object.mem "num_turns" Jsont.int ~enc:(fun r -> r.num_turns)
-      |> Jsont.Object.mem "session_id" Jsont.string ~enc:(fun r -> r.session_id)
-      |> Jsont.Object.opt_mem "total_cost_usd" Jsont.number ~enc:(fun r ->
-          r.total_cost_usd)
-      |> Jsont.Object.opt_mem "usage" Jsont.json ~enc:(fun r -> r.usage)
-      |> Jsont.Object.opt_mem "result" Jsont.string ~enc:(fun r -> r.result)
-      |> Jsont.Object.opt_mem "structured_output" Jsont.json ~enc:(fun r ->
-          r.structured_output)
-      |> Jsont.Object.finish
-  end
+  (* Internal wire format functions *)
+  let jsont = Proto.Message.Result.jsont
 
   let to_json t =
-    let usage_json =
-      t.usage
-      |> Option.map (fun u ->
-          Jsont.Json.encode Usage.jsont u
-          |> Err.get_ok ~msg:"Result.to_json: usage: ")
-    in
-    let wire =
-      Wire.
-        {
-          type_ = "result";
-          subtype = t.subtype;
-          duration_ms = t.duration_ms;
-          duration_api_ms = t.duration_api_ms;
-          is_error = t.is_error;
-          num_turns = t.num_turns;
-          session_id = t.session_id;
-          total_cost_usd = t.total_cost_usd;
-          usage = usage_json;
-          result = t.result;
-          structured_output = t.structured_output;
-        }
-    in
-    Jsont.Json.encode Wire.jsont wire |> Err.get_ok ~msg:"Result.to_json: "
-
-  let of_json json =
-    Jsont.Json.decode jsont json |> Err.get_ok' ~msg:"Result.of_json: "
+    match Jsont.Json.encode Proto.Message.Result.jsont t with
+    | Ok json -> json
+    | Error e -> invalid_arg ("Result.to_json: " ^ e)
 end
 
 type t =
@@ -578,63 +142,17 @@ type t =
   | System of System.t
   | Result of Result.t
 
-let user_string s = User (User.create_string s)
-let user_blocks blocks = User (User.create_blocks blocks)
+let of_proto = function
+  | Proto.Message.User u -> User (User.of_proto u)
+  | Proto.Message.Assistant a -> Assistant (Assistant.of_proto a)
+  | Proto.Message.System s -> System (System.of_proto s)
+  | Proto.Message.Result r -> Result (Result.of_proto r)
 
-let user_with_tool_result ~tool_use_id ~content ?is_error () =
-  User (User.create_with_tool_result ~tool_use_id ~content ?is_error ())
-
-let assistant ~content ~model ?error () =
-  Assistant (Assistant.create ~content ~model ?error ())
-
-let assistant_text ~text ~model ?error () =
-  Assistant
-    (Assistant.create ~content:[ Content_block.text text ] ~model ?error ())
-
-let system_init ~session_id = System (System.init ~session_id ())
-let system_error ~error = System (System.error ~error)
-
-let result ~subtype ~duration_ms ~duration_api_ms ~is_error ~num_turns
-    ~session_id ?total_cost_usd ?usage ?result ?structured_output () =
-  Result
-    (Result.create ~subtype ~duration_ms ~duration_api_ms ~is_error ~num_turns
-       ~session_id ?total_cost_usd ?usage ?result ?structured_output ())
-
-let to_json = function
-  | User t -> User.to_json t
-  | Assistant t -> Assistant.to_json t
-  | System t -> System.to_json t
-  | Result t -> Result.to_json t
-
-(* Jsont codec for the main Message variant type.
-   Uses case_mem for discriminated union based on "type" field. *)
-let jsont : t Jsont.t =
-  let case_map kind obj dec = Jsont.Object.Case.map kind obj ~dec in
-  let case_user = case_map "user" User.incoming_jsont (fun v -> User v) in
-  let case_assistant =
-    case_map "assistant" Assistant.incoming_jsont (fun v -> Assistant v)
-  in
-  let case_system = case_map "system" System.jsont (fun v -> System v) in
-  let case_result = case_map "result" Result.jsont (fun v -> Result v) in
-  let enc_case = function
-    | User v -> Jsont.Object.Case.value case_user v
-    | Assistant v -> Jsont.Object.Case.value case_assistant v
-    | System v -> Jsont.Object.Case.value case_system v
-    | Result v -> Jsont.Object.Case.value case_result v
-  in
-  let cases =
-    Jsont.Object.Case.
-      [
-        make case_user; make case_assistant; make case_system; make case_result;
-      ]
-  in
-  Jsont.Object.map ~kind:"Message" Fun.id
-  |> Jsont.Object.case_mem "type" Jsont.string ~enc:Fun.id ~enc_case cases
-       ~tag_to_string:Fun.id ~tag_compare:String.compare
-  |> Jsont.Object.finish
-
-let of_json json =
-  Jsont.Json.decode jsont json |> Err.get_ok' ~msg:"Message.of_json: "
+let to_proto = function
+  | User u -> Proto.Message.User (User.to_proto u)
+  | Assistant a -> Proto.Message.Assistant (Assistant.to_proto a)
+  | System s -> Proto.Message.System (System.to_proto s)
+  | Result r -> Proto.Message.Result (Result.to_proto r)
 
 let is_user = function User _ -> true | _ -> false
 let is_assistant = function Assistant _ -> true | _ -> false
@@ -643,7 +161,7 @@ let is_result = function Result _ -> true | _ -> false
 
 let is_error = function
   | Result r -> Result.is_error r
-  | System (System.Error _) -> true
+  | System s -> System.is_error s
   | _ -> false
 
 let extract_text = function
@@ -653,16 +171,24 @@ let extract_text = function
       if text = "" then None else Some text
   | _ -> None
 
-let extract_tool_uses = function
-  | Assistant a -> Assistant.get_tool_uses a
-  | _ -> []
+let extract_tool_uses = function Assistant a -> Assistant.tool_uses a | _ -> []
 
 let get_session_id = function
   | System s -> System.session_id s
   | Result r -> Some (Result.session_id r)
   | _ -> None
 
-let pp = Jsont.pp_value jsont ()
+(* Wire format conversion *)
+let to_json = function
+  | User u -> User.to_json u
+  | Assistant a -> Assistant.to_json a
+  | System s -> System.to_json s
+  | Result r -> Result.to_json r
+
+(* Convenience constructors *)
+let user_string s = User (User.of_string s)
+let user_blocks blocks = User (User.of_blocks blocks)
+
+let pp fmt t = Jsont.pp_value Proto.Message.jsont () fmt (to_proto t)
 let log_received t = Log.info (fun m -> m "← %a" pp t)
 let log_sending t = Log.info (fun m -> m "→ %a" pp t)
-let log_error msg t = Log.err (fun m -> m "%s: %a" msg pp t)

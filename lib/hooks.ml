@@ -2,558 +2,488 @@ let src = Logs.Src.create "claude.hooks" ~doc:"Claude hooks system"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
-(** Hook events that can be intercepted *)
-type event =
-  | Pre_tool_use
-  | Post_tool_use
-  | User_prompt_submit
-  | Stop
-  | Subagent_stop
-  | Pre_compact
-
-let event_to_string = function
-  | Pre_tool_use -> "PreToolUse"
-  | Post_tool_use -> "PostToolUse"
-  | User_prompt_submit -> "UserPromptSubmit"
-  | Stop -> "Stop"
-  | Subagent_stop -> "SubagentStop"
-  | Pre_compact -> "PreCompact"
-
-let event_of_string = function
-  | "PreToolUse" -> Pre_tool_use
-  | "PostToolUse" -> Post_tool_use
-  | "UserPromptSubmit" -> User_prompt_submit
-  | "Stop" -> Stop
-  | "SubagentStop" -> Subagent_stop
-  | "PreCompact" -> Pre_compact
-  | s -> raise (Invalid_argument (Printf.sprintf "Unknown hook event: %s" s))
-
-let event_jsont : event Jsont.t =
-  Jsont.enum
-    [
-      ("PreToolUse", Pre_tool_use);
-      ("PostToolUse", Post_tool_use);
-      ("UserPromptSubmit", User_prompt_submit);
-      ("Stop", Stop);
-      ("SubagentStop", Subagent_stop);
-      ("PreCompact", Pre_compact);
-    ]
-
-(** Context provided to hook callbacks *)
-module Context = struct
-  type t = {
-    signal : unit option; (* Future: abort signal support *)
-    unknown : Unknown.t;
-  }
-
-  let create ?(signal = None) ?(unknown = Unknown.empty) () =
-    { signal; unknown }
-
-  let signal t = t.signal
-  let unknown t = t.unknown
-
-  let jsont : t Jsont.t =
-    let make unknown = { signal = None; unknown } in
-    Jsont.Object.map ~kind:"Context" make
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
-    |> Jsont.Object.finish
-end
-
-(** Hook decision control *)
-type decision = Continue | Block
-
-let decision_jsont : decision Jsont.t =
-  Jsont.enum [ ("continue", Continue); ("block", Block) ]
-
-(** Wire format for hook-specific output that includes hookEventName *)
-module Hook_specific_output = struct
-  type t = { hook_event_name : event; output : Jsont.json }
-
-  let create ~event ~output = { hook_event_name = event; output }
-
-  let to_json t =
-    (* Encode the event name *)
-    let event_name_json =
-      Jsont.Json.encode event_jsont t.hook_event_name
-      |> Err.get_ok ~msg:"Hook_specific_output.to_json: event_name encoding"
-    in
-    (* Merge hookEventName into the output object *)
-    match t.output with
-    | Jsont.Object (members, meta) ->
-        let hook_event_name_member =
-          (Jsont.Json.name "hookEventName", event_name_json)
-        in
-        Jsont.Object (hook_event_name_member :: members, meta)
-    | _ ->
-        (* If output is not an object, wrap it *)
-        Jsont.Object
-          ( [
-              ( Jsont.Json.name "hookEventName",
-                event_name_json );
-            ],
-            Jsont.Meta.none )
-end
-
-type result = {
-  decision : decision option;
-  system_message : string option;
-  hook_specific_output : Jsont.json option;
-  unknown : Unknown.t;
-}
-(** Generic hook result *)
-
-let result_jsont : result Jsont.t =
-  let make decision system_message hook_specific_output unknown =
-    { decision; system_message; hook_specific_output; unknown }
-  in
-  Jsont.Object.map ~kind:"Result" make
-  |> Jsont.Object.opt_mem "decision" decision_jsont ~enc:(fun r -> r.decision)
-  |> Jsont.Object.opt_mem "systemMessage" Jsont.string ~enc:(fun r ->
-      r.system_message)
-  |> Jsont.Object.opt_mem "hookSpecificOutput" Jsont.json ~enc:(fun r ->
-      r.hook_specific_output)
-  |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:(fun r -> r.unknown)
-  |> Jsont.Object.finish
-
 (** {1 PreToolUse Hook} *)
+
 module PreToolUse = struct
   type input = {
     session_id : string;
     transcript_path : string;
     tool_name : string;
-    tool_input : Jsont.json;
-    unknown : Unknown.t;
+    tool_input : Tool_input.t;
   }
 
-  type t = input
-
-  let session_id t = t.session_id
-  let transcript_path t = t.transcript_path
-  let tool_name t = t.tool_name
-  let tool_input t = t.tool_input
-  let unknown t = t.unknown
-
-  let input_jsont : input Jsont.t =
-    let make session_id transcript_path tool_name tool_input unknown =
-      { session_id; transcript_path; tool_name; tool_input; unknown }
-    in
-    Jsont.Object.map ~kind:"PreToolUseInput" make
-    |> Jsont.Object.mem "session_id" Jsont.string ~enc:session_id
-    |> Jsont.Object.mem "transcript_path" Jsont.string ~enc:transcript_path
-    |> Jsont.Object.mem "tool_name" Jsont.string ~enc:tool_name
-    |> Jsont.Object.mem "tool_input" Jsont.json ~enc:tool_input
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
-    |> Jsont.Object.finish
-
-  let of_json json =
-    match Jsont.Json.decode input_jsont json with
-    | Ok v -> v
-    | Error msg -> raise (Invalid_argument ("PreToolUse: " ^ msg))
-
-  type permission_decision = [ `Allow | `Deny | `Ask ]
-
-  let permission_decision_jsont : permission_decision Jsont.t =
-    Jsont.enum [ ("allow", `Allow); ("deny", `Deny); ("ask", `Ask) ]
+  type decision = Allow | Deny | Ask
 
   type output = {
-    permission_decision : permission_decision option;
-    permission_decision_reason : string option;
-    updated_input : Jsont.json option;
-    unknown : Unknown.t;
+    decision : decision option;
+    reason : string option;
+    updated_input : Tool_input.t option;
   }
 
-  let output_jsont : output Jsont.t =
-    let make permission_decision permission_decision_reason updated_input
-        unknown =
-      {
-        permission_decision;
-        permission_decision_reason;
-        updated_input;
-        unknown;
-      }
-    in
-    Jsont.Object.map ~kind:"PreToolUseOutput" make
-    |> Jsont.Object.opt_mem "permissionDecision" permission_decision_jsont
-         ~enc:(fun o -> o.permission_decision)
-    |> Jsont.Object.opt_mem "permissionDecisionReason" Jsont.string
-         ~enc:(fun o -> o.permission_decision_reason)
-    |> Jsont.Object.opt_mem "updatedInput" Jsont.json ~enc:(fun o ->
-        o.updated_input)
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:(fun o -> o.unknown)
-    |> Jsont.Object.finish
+  let allow ?reason ?updated_input () =
+    { decision = Some Allow; reason; updated_input }
 
-  let output_to_json output =
-    let inner =
-      Jsont.Json.encode output_jsont output
-      |> Err.get_ok ~msg:"PreToolUse.output_to_json: "
-    in
-    Hook_specific_output.(create ~event:Pre_tool_use ~output:inner |> to_json)
+  let deny ?reason () = { decision = Some Deny; reason; updated_input = None }
+  let ask ?reason () = { decision = Some Ask; reason; updated_input = None }
 
-  let allow ?reason ?updated_input ?(unknown = Unknown.empty) () =
+  let continue () =
+    { decision = None; reason = None; updated_input = None }
+
+  type callback = input -> output
+
+  let input_of_proto proto =
     {
-      permission_decision = Some `Allow;
-      permission_decision_reason = reason;
-      updated_input;
-      unknown;
+      session_id = Proto.Hooks.PreToolUse.Input.session_id proto;
+      transcript_path = Proto.Hooks.PreToolUse.Input.transcript_path proto;
+      tool_name = Proto.Hooks.PreToolUse.Input.tool_name proto;
+      tool_input =
+        Tool_input.of_json (Proto.Hooks.PreToolUse.Input.tool_input proto);
     }
 
-  let deny ?reason ?(unknown = Unknown.empty) () =
-    {
-      permission_decision = Some `Deny;
-      permission_decision_reason = reason;
-      updated_input = None;
-      unknown;
-    }
-
-  let ask ?reason ?(unknown = Unknown.empty) () =
-    {
-      permission_decision = Some `Ask;
-      permission_decision_reason = reason;
-      updated_input = None;
-      unknown;
-    }
-
-  let continue ?(unknown = Unknown.empty) () =
-    {
-      permission_decision = None;
-      permission_decision_reason = None;
-      updated_input = None;
-      unknown;
-    }
+  let output_to_proto output =
+    match output.decision with
+    | None -> Proto.Hooks.PreToolUse.Output.continue ()
+    | Some Allow ->
+        let updated_input =
+          Option.map Tool_input.to_json output.updated_input
+        in
+        Proto.Hooks.PreToolUse.Output.allow ?reason:output.reason
+          ?updated_input ()
+    | Some Deny -> Proto.Hooks.PreToolUse.Output.deny ?reason:output.reason ()
+    | Some Ask -> Proto.Hooks.PreToolUse.Output.ask ?reason:output.reason ()
 end
 
 (** {1 PostToolUse Hook} *)
+
 module PostToolUse = struct
   type input = {
     session_id : string;
     transcript_path : string;
     tool_name : string;
-    tool_input : Jsont.json;
+    tool_input : Tool_input.t;
     tool_response : Jsont.json;
-    unknown : Unknown.t;
   }
-
-  type t = input
-
-  let session_id t = t.session_id
-  let transcript_path t = t.transcript_path
-  let tool_name t = t.tool_name
-  let tool_input t = t.tool_input
-  let tool_response t = t.tool_response
-  let unknown t = t.unknown
-
-  let input_jsont : input Jsont.t =
-    let make session_id transcript_path tool_name tool_input tool_response
-        unknown =
-      {
-        session_id;
-        transcript_path;
-        tool_name;
-        tool_input;
-        tool_response;
-        unknown;
-      }
-    in
-    Jsont.Object.map ~kind:"PostToolUseInput" make
-    |> Jsont.Object.mem "session_id" Jsont.string ~enc:session_id
-    |> Jsont.Object.mem "transcript_path" Jsont.string ~enc:transcript_path
-    |> Jsont.Object.mem "tool_name" Jsont.string ~enc:tool_name
-    |> Jsont.Object.mem "tool_input" Jsont.json ~enc:tool_input
-    |> Jsont.Object.mem "tool_response" Jsont.json ~enc:tool_response
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
-    |> Jsont.Object.finish
-
-  let of_json json =
-    match Jsont.Json.decode input_jsont json with
-    | Ok v -> v
-    | Error msg -> raise (Invalid_argument ("PostToolUse: " ^ msg))
 
   type output = {
-    decision : decision option;
+    block : bool;
     reason : string option;
     additional_context : string option;
-    unknown : Unknown.t;
   }
 
-  let output_jsont : output Jsont.t =
-    let make decision reason additional_context unknown =
-      { decision; reason; additional_context; unknown }
-    in
-    Jsont.Object.map ~kind:"PostToolUseOutput" make
-    |> Jsont.Object.opt_mem "decision" decision_jsont ~enc:(fun o -> o.decision)
-    |> Jsont.Object.opt_mem "reason" Jsont.string ~enc:(fun o -> o.reason)
-    |> Jsont.Object.opt_mem "additionalContext" Jsont.string ~enc:(fun o ->
-        o.additional_context)
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:(fun o -> o.unknown)
-    |> Jsont.Object.finish
+  let continue ?additional_context () =
+    { block = false; reason = None; additional_context }
 
-  let output_to_json output =
-    let inner =
-      Jsont.Json.encode output_jsont output
-      |> Err.get_ok ~msg:"PostToolUse.output_to_json: "
-    in
-    Hook_specific_output.(create ~event:Post_tool_use ~output:inner |> to_json)
+  let block ?reason ?additional_context () =
+    { block = true; reason; additional_context }
 
-  let continue ?additional_context ?(unknown = Unknown.empty) () =
-    { decision = None; reason = None; additional_context; unknown }
+  type callback = input -> output
 
-  let block ?reason ?additional_context ?(unknown = Unknown.empty) () =
-    { decision = Some Block; reason; additional_context; unknown }
+  let input_of_proto proto =
+    {
+      session_id = Proto.Hooks.PostToolUse.Input.session_id proto;
+      transcript_path = Proto.Hooks.PostToolUse.Input.transcript_path proto;
+      tool_name = Proto.Hooks.PostToolUse.Input.tool_name proto;
+      tool_input =
+        Tool_input.of_json (Proto.Hooks.PostToolUse.Input.tool_input proto);
+      tool_response = Proto.Hooks.PostToolUse.Input.tool_response proto;
+    }
+
+  let output_to_proto output =
+    if output.block then
+      Proto.Hooks.PostToolUse.Output.block ?reason:output.reason
+        ?additional_context:output.additional_context ()
+    else
+      Proto.Hooks.PostToolUse.Output.continue
+        ?additional_context:output.additional_context ()
 end
 
 (** {1 UserPromptSubmit Hook} *)
+
 module UserPromptSubmit = struct
   type input = {
     session_id : string;
     transcript_path : string;
     prompt : string;
-    unknown : Unknown.t;
   }
-
-  type t = input
-
-  let session_id t = t.session_id
-  let transcript_path t = t.transcript_path
-  let prompt t = t.prompt
-  let unknown t = t.unknown
-
-  let input_jsont : input Jsont.t =
-    let make session_id transcript_path prompt unknown =
-      { session_id; transcript_path; prompt; unknown }
-    in
-    Jsont.Object.map ~kind:"UserPromptSubmitInput" make
-    |> Jsont.Object.mem "session_id" Jsont.string ~enc:session_id
-    |> Jsont.Object.mem "transcript_path" Jsont.string ~enc:transcript_path
-    |> Jsont.Object.mem "prompt" Jsont.string ~enc:prompt
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
-    |> Jsont.Object.finish
-
-  let of_json json =
-    match Jsont.Json.decode input_jsont json with
-    | Ok v -> v
-    | Error msg -> raise (Invalid_argument ("UserPromptSubmit: " ^ msg))
 
   type output = {
-    decision : decision option;
+    block : bool;
     reason : string option;
     additional_context : string option;
-    unknown : Unknown.t;
   }
 
-  let output_jsont : output Jsont.t =
-    let make decision reason additional_context unknown =
-      { decision; reason; additional_context; unknown }
-    in
-    Jsont.Object.map ~kind:"UserPromptSubmitOutput" make
-    |> Jsont.Object.opt_mem "decision" decision_jsont ~enc:(fun o -> o.decision)
-    |> Jsont.Object.opt_mem "reason" Jsont.string ~enc:(fun o -> o.reason)
-    |> Jsont.Object.opt_mem "additionalContext" Jsont.string ~enc:(fun o ->
-        o.additional_context)
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:(fun o -> o.unknown)
-    |> Jsont.Object.finish
+  let continue ?additional_context () =
+    { block = false; reason = None; additional_context }
 
-  let output_to_json output =
-    let inner =
-      Jsont.Json.encode output_jsont output
-      |> Err.get_ok ~msg:"UserPromptSubmit.output_to_json: "
-    in
-    Hook_specific_output.(
-      create ~event:User_prompt_submit ~output:inner |> to_json)
+  let block ?reason () = { block = true; reason; additional_context = None }
 
-  let continue ?additional_context ?(unknown = Unknown.empty) () =
-    { decision = None; reason = None; additional_context; unknown }
+  type callback = input -> output
 
-  let block ?reason ?(unknown = Unknown.empty) () =
-    { decision = Some Block; reason; additional_context = None; unknown }
+  let input_of_proto proto =
+    {
+      session_id = Proto.Hooks.UserPromptSubmit.Input.session_id proto;
+      transcript_path =
+        Proto.Hooks.UserPromptSubmit.Input.transcript_path proto;
+      prompt = Proto.Hooks.UserPromptSubmit.Input.prompt proto;
+    }
+
+  let output_to_proto output =
+    if output.block then
+      Proto.Hooks.UserPromptSubmit.Output.block ?reason:output.reason ()
+    else
+      Proto.Hooks.UserPromptSubmit.Output.continue
+        ?additional_context:output.additional_context ()
 end
 
 (** {1 Stop Hook} *)
+
 module Stop = struct
   type input = {
     session_id : string;
     transcript_path : string;
     stop_hook_active : bool;
-    unknown : Unknown.t;
   }
 
-  type t = input
+  type output = { block : bool; reason : string option }
 
-  let session_id t = t.session_id
-  let transcript_path t = t.transcript_path
-  let stop_hook_active t = t.stop_hook_active
-  let unknown t = t.unknown
+  let continue () = { block = false; reason = None }
+  let block ?reason () = { block = true; reason }
 
-  let input_jsont : input Jsont.t =
-    let make session_id transcript_path stop_hook_active unknown =
-      { session_id; transcript_path; stop_hook_active; unknown }
-    in
-    Jsont.Object.map ~kind:"StopInput" make
-    |> Jsont.Object.mem "session_id" Jsont.string ~enc:session_id
-    |> Jsont.Object.mem "transcript_path" Jsont.string ~enc:transcript_path
-    |> Jsont.Object.mem "stop_hook_active" Jsont.bool ~enc:stop_hook_active
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
-    |> Jsont.Object.finish
+  type callback = input -> output
 
-  let of_json json =
-    match Jsont.Json.decode input_jsont json with
-    | Ok v -> v
-    | Error msg -> raise (Invalid_argument ("Stop: " ^ msg))
+  let input_of_proto proto =
+    {
+      session_id = Proto.Hooks.Stop.Input.session_id proto;
+      transcript_path = Proto.Hooks.Stop.Input.transcript_path proto;
+      stop_hook_active = Proto.Hooks.Stop.Input.stop_hook_active proto;
+    }
 
-  type output = {
-    decision : decision option;
-    reason : string option;
-    unknown : Unknown.t;
-  }
-
-  let output_jsont : output Jsont.t =
-    let make decision reason unknown = { decision; reason; unknown } in
-    Jsont.Object.map ~kind:"StopOutput" make
-    |> Jsont.Object.opt_mem "decision" decision_jsont ~enc:(fun o -> o.decision)
-    |> Jsont.Object.opt_mem "reason" Jsont.string ~enc:(fun o -> o.reason)
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:(fun o -> o.unknown)
-    |> Jsont.Object.finish
-
-  let output_to_json output =
-    let inner =
-      Jsont.Json.encode output_jsont output
-      |> Err.get_ok ~msg:"Stop.output_to_json: "
-    in
-    Hook_specific_output.(create ~event:Stop ~output:inner |> to_json)
-
-  let continue ?(unknown = Unknown.empty) () =
-    { decision = None; reason = None; unknown }
-
-  let block ?reason ?(unknown = Unknown.empty) () =
-    { decision = Some Block; reason; unknown }
+  let output_to_proto output =
+    if output.block then
+      Proto.Hooks.Stop.Output.block ?reason:output.reason ()
+    else Proto.Hooks.Stop.Output.continue ()
 end
 
-(** {1 SubagentStop Hook} - Same structure as Stop *)
+(** {1 SubagentStop Hook} *)
+
 module SubagentStop = struct
   type input = Stop.input
-  type t = input
   type output = Stop.output
 
-  let session_id = Stop.session_id
-  let transcript_path = Stop.transcript_path
-  let stop_hook_active = Stop.stop_hook_active
-  let unknown = Stop.unknown
-  let input_jsont = Stop.input_jsont
-  let of_json = Stop.of_json
-  let output_jsont = Stop.output_jsont
   let continue = Stop.continue
   let block = Stop.block
 
-  let output_to_json output =
-    let inner =
-      Jsont.Json.encode output_jsont output
-      |> Err.get_ok ~msg:"SubagentStop.output_to_json: "
-    in
-    Hook_specific_output.(create ~event:Subagent_stop ~output:inner |> to_json)
+  type callback = input -> output
+
+  let input_of_proto = Stop.input_of_proto
+
+  (* Since Proto.Hooks.SubagentStop.Output.t = Proto.Hooks.Stop.Output.t,
+     we can use Stop.output_to_proto directly *)
+  let output_to_proto = Stop.output_to_proto
 end
 
 (** {1 PreCompact Hook} *)
+
 module PreCompact = struct
-  type input = {
-    session_id : string;
-    transcript_path : string;
-    unknown : Unknown.t;
-  }
+  type input = { session_id : string; transcript_path : string }
 
-  type t = input
+  type callback = input -> unit
 
-  let session_id t = t.session_id
-  let transcript_path t = t.transcript_path
-  let unknown t = t.unknown
-
-  let input_jsont : input Jsont.t =
-    let make session_id transcript_path unknown =
-      { session_id; transcript_path; unknown }
-    in
-    Jsont.Object.map ~kind:"PreCompactInput" make
-    |> Jsont.Object.mem "session_id" Jsont.string ~enc:session_id
-    |> Jsont.Object.mem "transcript_path" Jsont.string ~enc:transcript_path
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
-    |> Jsont.Object.finish
-
-  let of_json json =
-    match Jsont.Json.decode input_jsont json with
-    | Ok v -> v
-    | Error msg -> raise (Invalid_argument ("PreCompact: " ^ msg))
-
-  type output = unit (* No specific output for PreCompact *)
-
-  let output_to_json () =
-    let inner = Jsont.Object ([], Jsont.Meta.none) in
-    Hook_specific_output.(create ~event:Pre_compact ~output:inner |> to_json)
-
-  let continue () = ()
+  let input_of_proto proto =
+    {
+      session_id = Proto.Hooks.PreCompact.Input.session_id proto;
+      transcript_path = Proto.Hooks.PreCompact.Input.transcript_path proto;
+    }
 end
 
-type callback =
-  input:Jsont.json -> tool_use_id:string option -> context:Context.t -> result
-(** {1 Generic Callback Type} *)
+(** {1 Hook Configuration} *)
 
-type matcher = { matcher : string option; callbacks : callback list }
-(** {1 Matcher Configuration} *)
+(* Internal representation of hooks *)
+type hook_entry =
+  | PreToolUseHook of (string option * PreToolUse.callback)
+  | PostToolUseHook of (string option * PostToolUse.callback)
+  | UserPromptSubmitHook of UserPromptSubmit.callback
+  | StopHook of Stop.callback
+  | SubagentStopHook of SubagentStop.callback
+  | PreCompactHook of PreCompact.callback
 
-type config = (event * matcher list) list
+type t = hook_entry list
 
-(** {1 Result Builders} *)
-let continue ?system_message ?hook_specific_output ?(unknown = Unknown.empty) ()
-    =
-  { decision = None; system_message; hook_specific_output; unknown }
-
-let block ?system_message ?hook_specific_output ?(unknown = Unknown.empty) () =
-  { decision = Some Block; system_message; hook_specific_output; unknown }
-
-(** {1 Matcher Builders} *)
-let matcher ?pattern callbacks = { matcher = pattern; callbacks }
-
-(** {1 Config Builders} *)
 let empty = []
 
-let add event matchers config = (event, matchers) :: config
+let on_pre_tool_use ?pattern callback config =
+  PreToolUseHook (pattern, callback) :: config
 
-(** {1 JSON Conversion} *)
-let result_to_json result =
-  match Jsont.Json.encode result_jsont result with
-  | Ok json -> json
-  | Error msg -> failwith ("result_to_json: " ^ msg)
+let on_post_tool_use ?pattern callback config =
+  PostToolUseHook (pattern, callback) :: config
 
-(** Wire codec for hook matcher in protocol format *)
-module Protocol_matcher_wire = struct
-  type t = { matcher : string option; callbacks : Jsont.json list }
+let on_user_prompt_submit callback config =
+  UserPromptSubmitHook callback :: config
 
-  let jsont : t Jsont.t =
-    let make matcher callbacks = { matcher; callbacks } in
-    Jsont.Object.map ~kind:"ProtocolMatcher" make
-    |> Jsont.Object.opt_mem "matcher" Jsont.string ~enc:(fun r -> r.matcher)
-    |> Jsont.Object.mem "callbacks" (Jsont.list Jsont.json) ~enc:(fun r ->
-        r.callbacks)
-    |> Jsont.Object.finish
+let on_stop callback config = StopHook callback :: config
+let on_subagent_stop callback config = SubagentStopHook callback :: config
+let on_pre_compact callback config = PreCompactHook callback :: config
 
-  let encode m =
-    match Jsont.Json.encode jsont m with
-    | Ok json -> json
-    | Error msg -> failwith ("Protocol_matcher_wire.encode: " ^ msg)
-end
+(** {1 Internal - Conversion to Wire Format} *)
 
-let config_to_protocol_format config =
-  let hooks_dict =
-    List.map
-      (fun (event, matchers) ->
-        let event_name = event_to_string event in
-        let matchers_json =
-          List.map
-            (fun m ->
-              (* matcher and hookCallbackIds will be filled in by client *)
-              Protocol_matcher_wire.encode
-                { matcher = m.matcher; callbacks = [] })
-            matchers
-        in
-        Jsont.Json.mem
-          (Jsont.Json.name event_name)
-          (Jsont.Json.list matchers_json))
-      config
+let get_callbacks config =
+  (* Group hooks by event type *)
+  let pre_tool_use_hooks = ref [] in
+  let post_tool_use_hooks = ref [] in
+  let user_prompt_submit_hooks = ref [] in
+  let stop_hooks = ref [] in
+  let subagent_stop_hooks = ref [] in
+  let pre_compact_hooks = ref [] in
+
+  List.iter
+    (function
+      | PreToolUseHook (pattern, callback) ->
+          pre_tool_use_hooks := (pattern, callback) :: !pre_tool_use_hooks
+      | PostToolUseHook (pattern, callback) ->
+          post_tool_use_hooks := (pattern, callback) :: !post_tool_use_hooks
+      | UserPromptSubmitHook callback ->
+          user_prompt_submit_hooks := (None, callback) :: !user_prompt_submit_hooks
+      | StopHook callback -> stop_hooks := (None, callback) :: !stop_hooks
+      | SubagentStopHook callback ->
+          subagent_stop_hooks := (None, callback) :: !subagent_stop_hooks
+      | PreCompactHook callback ->
+          pre_compact_hooks := (None, callback) :: !pre_compact_hooks)
+    config;
+
+  (* Convert each group to wire format *)
+  let result = [] in
+
+  (* PreToolUse *)
+  let result =
+    if !pre_tool_use_hooks <> [] then
+      let wire_callbacks =
+        List.map
+          (fun (pattern, callback) ->
+            let wire_callback json =
+              (* Decode JSON to Proto input *)
+              let proto_input =
+                match
+                  Jsont.Json.decode Proto.Hooks.PreToolUse.Input.jsont json
+                with
+                | Ok input -> input
+                | Error msg ->
+                    Log.err (fun m ->
+                        m "PreToolUse: failed to decode input: %s" msg);
+                    raise (Invalid_argument ("PreToolUse input: " ^ msg))
+              in
+              (* Convert to typed input *)
+              let typed_input = PreToolUse.input_of_proto proto_input in
+              (* Invoke user callback *)
+              let typed_output = callback typed_input in
+              (* Convert back to Proto output *)
+              let proto_output = PreToolUse.output_to_proto typed_output in
+              (* Encode as hook_specific_output *)
+              let hook_specific_output =
+                match
+                  Jsont.Json.encode Proto.Hooks.PreToolUse.Output.jsont
+                    proto_output
+                with
+                | Ok json -> json
+                | Error msg ->
+                    failwith ("PreToolUse output encoding: " ^ msg)
+              in
+              (* Return wire format result *)
+              Proto.Hooks.continue ~hook_specific_output ()
+            in
+            (pattern, wire_callback))
+          !pre_tool_use_hooks
+      in
+      (Proto.Hooks.Pre_tool_use, wire_callbacks) :: result
+    else result
   in
-  Jsont.Json.object' hooks_dict
+
+  (* PostToolUse *)
+  let result =
+    if !post_tool_use_hooks <> [] then
+      let wire_callbacks =
+        List.map
+          (fun (pattern, callback) ->
+            let wire_callback json =
+              let proto_input =
+                match
+                  Jsont.Json.decode Proto.Hooks.PostToolUse.Input.jsont json
+                with
+                | Ok input -> input
+                | Error msg ->
+                    Log.err (fun m ->
+                        m "PostToolUse: failed to decode input: %s" msg);
+                    raise (Invalid_argument ("PostToolUse input: " ^ msg))
+              in
+              let typed_input = PostToolUse.input_of_proto proto_input in
+              let typed_output = callback typed_input in
+              let proto_output = PostToolUse.output_to_proto typed_output in
+              let hook_specific_output =
+                match
+                  Jsont.Json.encode Proto.Hooks.PostToolUse.Output.jsont
+                    proto_output
+                with
+                | Ok json -> json
+                | Error msg ->
+                    failwith ("PostToolUse output encoding: " ^ msg)
+              in
+              if typed_output.block then
+                Proto.Hooks.block ~hook_specific_output ()
+              else Proto.Hooks.continue ~hook_specific_output ()
+            in
+            (pattern, wire_callback))
+          !post_tool_use_hooks
+      in
+      (Proto.Hooks.Post_tool_use, wire_callbacks) :: result
+    else result
+  in
+
+  (* UserPromptSubmit *)
+  let result =
+    if !user_prompt_submit_hooks <> [] then
+      let wire_callbacks =
+        List.map
+          (fun (pattern, callback) ->
+            let wire_callback json =
+              let proto_input =
+                match
+                  Jsont.Json.decode Proto.Hooks.UserPromptSubmit.Input.jsont
+                    json
+                with
+                | Ok input -> input
+                | Error msg ->
+                    Log.err (fun m ->
+                        m "UserPromptSubmit: failed to decode input: %s" msg);
+                    raise (Invalid_argument ("UserPromptSubmit input: " ^ msg))
+              in
+              let typed_input = UserPromptSubmit.input_of_proto proto_input in
+              let typed_output = callback typed_input in
+              let proto_output =
+                UserPromptSubmit.output_to_proto typed_output
+              in
+              let hook_specific_output =
+                match
+                  Jsont.Json.encode Proto.Hooks.UserPromptSubmit.Output.jsont
+                    proto_output
+                with
+                | Ok json -> json
+                | Error msg ->
+                    failwith ("UserPromptSubmit output encoding: " ^ msg)
+              in
+              if typed_output.block then
+                Proto.Hooks.block ~hook_specific_output ()
+              else Proto.Hooks.continue ~hook_specific_output ()
+            in
+            (pattern, wire_callback))
+          !user_prompt_submit_hooks
+      in
+      (Proto.Hooks.User_prompt_submit, wire_callbacks) :: result
+    else result
+  in
+
+  (* Stop *)
+  let result =
+    if !stop_hooks <> [] then
+      let wire_callbacks =
+        List.map
+          (fun (pattern, callback) ->
+            let wire_callback json =
+              let proto_input =
+                match Jsont.Json.decode Proto.Hooks.Stop.Input.jsont json with
+                | Ok input -> input
+                | Error msg ->
+                    Log.err (fun m ->
+                        m "Stop: failed to decode input: %s" msg);
+                    raise (Invalid_argument ("Stop input: " ^ msg))
+              in
+              let typed_input = Stop.input_of_proto proto_input in
+              let typed_output = callback typed_input in
+              let proto_output = Stop.output_to_proto typed_output in
+              let hook_specific_output =
+                match
+                  Jsont.Json.encode Proto.Hooks.Stop.Output.jsont proto_output
+                with
+                | Ok json -> json
+                | Error msg -> failwith ("Stop output encoding: " ^ msg)
+              in
+              if typed_output.block then
+                Proto.Hooks.block ~hook_specific_output ()
+              else Proto.Hooks.continue ~hook_specific_output ()
+            in
+            (pattern, wire_callback))
+          !stop_hooks
+      in
+      (Proto.Hooks.Stop, wire_callbacks) :: result
+    else result
+  in
+
+  (* SubagentStop *)
+  let result =
+    if !subagent_stop_hooks <> [] then
+      let wire_callbacks =
+        List.map
+          (fun (pattern, callback) ->
+            let wire_callback json =
+              let proto_input =
+                match
+                  Jsont.Json.decode Proto.Hooks.SubagentStop.Input.jsont json
+                with
+                | Ok input -> input
+                | Error msg ->
+                    Log.err (fun m ->
+                        m "SubagentStop: failed to decode input: %s" msg);
+                    raise (Invalid_argument ("SubagentStop input: " ^ msg))
+              in
+              let typed_input = SubagentStop.input_of_proto proto_input in
+              let typed_output = callback typed_input in
+              let proto_output = SubagentStop.output_to_proto typed_output in
+              let hook_specific_output =
+                match
+                  Jsont.Json.encode Proto.Hooks.SubagentStop.Output.jsont
+                    proto_output
+                with
+                | Ok json -> json
+                | Error msg ->
+                    failwith ("SubagentStop output encoding: " ^ msg)
+              in
+              if typed_output.block then
+                Proto.Hooks.block ~hook_specific_output ()
+              else Proto.Hooks.continue ~hook_specific_output ()
+            in
+            (pattern, wire_callback))
+          !subagent_stop_hooks
+      in
+      (Proto.Hooks.Subagent_stop, wire_callbacks) :: result
+    else result
+  in
+
+  (* PreCompact *)
+  let result =
+    if !pre_compact_hooks <> [] then
+      let wire_callbacks =
+        List.map
+          (fun (pattern, callback) ->
+            let wire_callback json =
+              let proto_input =
+                match
+                  Jsont.Json.decode Proto.Hooks.PreCompact.Input.jsont json
+                with
+                | Ok input -> input
+                | Error msg ->
+                    Log.err (fun m ->
+                        m "PreCompact: failed to decode input: %s" msg);
+                    raise (Invalid_argument ("PreCompact input: " ^ msg))
+              in
+              let typed_input = PreCompact.input_of_proto proto_input in
+              (* Invoke user callback (returns unit) *)
+              callback typed_input;
+              (* PreCompact has no specific output *)
+              Proto.Hooks.continue ()
+            in
+            (pattern, wire_callback))
+          !pre_compact_hooks
+      in
+      (Proto.Hooks.Pre_compact, wire_callbacks) :: result
+    else result
+  in
+
+  List.rev result

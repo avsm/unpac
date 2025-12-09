@@ -1,20 +1,41 @@
-(** Error handling for the Claude protocol.
+(** Error handling for claudeio. *)
 
-    This module provides a protocol-specific exception and Result combinators
-    for handling JSON encoding/decoding errors in the Claude SDK. *)
+type t =
+  | Cli_not_found of string
+  | Process_error of string
+  | Connection_error of string
+  | Protocol_error of string
+  | Timeout of string
+  | Permission_denied of { tool_name : string; message : string }
+  | Hook_error of { callback_id : string; message : string }
+  | Control_error of { request_id : string; message : string }
 
-exception Protocol_error of string
-(** Raised when there is an error in the Claude protocol, such as JSON
-    encoding/decoding failures or malformed messages. *)
+exception E of t
 
+val pp : Format.formatter -> t -> unit
+(** Pretty-print an error. *)
+
+val to_string : t -> string
+(** Convert error to string. *)
+
+val raise : t -> 'a
+(** [raise err] raises [E err]. *)
+
+(** {1 Convenience Raisers} *)
+
+val cli_not_found : string -> 'a
+val process_error : string -> 'a
+val connection_error : string -> 'a
 val protocol_error : string -> 'a
-(** [protocol_error msg] raises [Protocol_error msg]. *)
+val timeout : string -> 'a
+val permission_denied : tool_name:string -> message:string -> 'a
+val hook_error : callback_id:string -> message:string -> 'a
+val control_error : request_id:string -> message:string -> 'a
+
+(** {1 Result Helpers} *)
 
 val get_ok : msg:string -> ('a, string) result -> 'a
-(** [get_ok ~msg r] returns [x] if [r] is [Ok x], or raises
-    [Protocol_error (msg ^ e)] if [r] is [Error e]. *)
+(** [get_ok ~msg result] returns the Ok value or raises Protocol_error with msg prefix. *)
 
 val get_ok' : msg:string -> ('a, string) result -> 'a
-(** [get_ok' ~msg r] returns [x] if [r] is [Ok x], or raises
-    [Invalid_argument (msg ^ e)] if [r] is [Error e]. Use this for user-facing
-    parse errors where Invalid_argument is expected. *)
+(** [get_ok' ~msg result] returns the Ok value or raises Protocol_error with string error. *)

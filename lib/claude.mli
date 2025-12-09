@@ -15,54 +15,92 @@
 
     {1 Architecture}
 
-    The library is structured into several focused modules:
+    The library is structured into two layers:
 
-    - {!Content_block}: Defines content blocks (text, tool use, tool results,
-      thinking)
-    - {!Message}: Messages exchanged with Claude (user, assistant, system,
-      result)
-    - {!Control}: Control flow messages for session management
-    - {!Permissions}: Fine-grained permission system for tool usage
-    - {!Options}: Configuration options for Claude sessions
-    - {!Transport}: Low-level transport layer for CLI communication
+    {2 High-Level API}
     - {!Client}: High-level client interface for interacting with Claude
+    - {!Response}: High-level response events from Claude
+    - {!Handler}: Object-oriented response handler with sensible defaults
+    - {!Options}: Configuration options for Claude sessions
+    - {!Permissions}: Fine-grained permission system for tool usage
+    - {!Hooks}: Fully typed hook callbacks for event interception
 
-    {1 Basic Usage}
+    {2 Domain Types}
+    - {!Content_block}: Content blocks (text, tool use, tool results, thinking)
+    - {!Message}: Messages exchanged with Claude (user, assistant, system, result)
+    - {!Tool_input}: Opaque tool input with typed accessors
+    - {!Server_info}: Server capabilities and metadata
+
+    {2 Wire Format (Advanced)}
+    - {!Proto}: Direct access to wire-format types and JSON codecs
+
+    {1 Quick Start}
 
     {[
-      open Claude
+      open Eio.Std
 
-      (* Create a simple query *)
-      let query_claude ~sw env prompt =
-        let options = Options.default in
-        Client.query ~sw env ~options prompt
+      let () = Eio_main.run @@ fun env ->
+        Switch.run @@ fun sw ->
+        let client = Claude.Client.create ~sw
+          ~process_mgr:(Eio.Stdenv.process_mgr env) () in
 
-      (* Process streaming responses *)
-      let process_response messages =
-        Seq.iter
-          (function
-            | Message.Assistant msg ->
-                List.iter
-                  (function
-                    | Content_block.Text t ->
-                        print_endline (Content_block.Text.text t)
-                    | _ -> ())
-                  (Message.Assistant.content msg)
-            | _ -> ())
-          messages
+        Claude.Client.query client "What is 2+2?";
+
+        let handler = object
+          inherit Claude.Handler.default
+          method! on_text t = print_endline (Claude.Response.Text.content t)
+        end in
+
+        Claude.Client.run client ~handler
     ]}
 
-    {1 Advanced Features}
+    {1 Response Handling}
 
-    {2 Tool Permissions}
+    The library provides two ways to handle responses:
 
-    Control which tools Claude can use and how:
+    {2 Object-Oriented Handler (Recommended)}
+
+    Subclass {!Handler.default} and override only the methods you need:
+
+    {[
+      let my_handler = object
+        inherit Claude.Handler.default
+
+        method! on_text t =
+          print_endline (Claude.Response.Text.content t)
+
+        method! on_tool_use t =
+          Printf.printf "Tool: %s\n" (Claude.Response.Tool_use.name t)
+
+        method! on_complete c =
+          Printf.printf "Done! Cost: $%.4f\n"
+            (Option.value ~default:0.0 (Claude.Response.Complete.total_cost_usd c))
+      end in
+
+      Claude.Client.run client ~handler:my_handler
+    ]}
+
+    {2 Functional Sequence}
+
+    For more control, use {!Client.receive} to get a lazy sequence:
+
+    {[
+      Claude.Client.receive client
+      |> Seq.iter (function
+        | Claude.Response.Text t -> print_endline (Claude.Response.Text.content t)
+        | Claude.Response.Complete c -> Printf.printf "Done!\n"
+        | _ -> ())
+    ]}
+
+    {1 Tool Permissions}
+
+    Control which tools Claude can use:
 
     {[
       let options =
-        Options.default
-        |> Options.with_allowed_tools [ "Read"; "Write"; "Bash" ]
-        |> Options.with_permission_mode Permissions.Mode.Accept_edits
+        Claude.Options.default
+        |> Claude.Options.with_allowed_tools [ "Read"; "Write"; "Bash" ]
+        |> Claude.Options.with_permission_mode Claude.Permissions.Mode.Accept_edits
     ]}
 
     {2 Custom Permission Callbacks}
@@ -70,85 +108,67 @@
     Implement custom logic for tool approval:
 
     {[
-      let my_callback ~tool_name ~input ~context =
-        if tool_name = "Bash" then
-          Permissions.Result.deny ~message:"Bash not allowed" ~interrupt:false
-        else Permissions.Result.allow ()
+      let my_callback ctx =
+        if ctx.Claude.Permissions.tool_name = "Bash" then
+          Claude.Permissions.Decision.deny ~message:"Bash not allowed" ~interrupt:false
+        else
+          Claude.Permissions.Decision.allow ()
 
       let options =
-        Options.default |> Options.with_permission_callback my_callback
+        Claude.Options.default
+        |> Claude.Options.with_permission_callback my_callback
     ]}
 
-    {2 System Prompts}
+    {1 Typed Hooks}
 
-    Customize Claude's behavior with system prompts:
+    Intercept and control tool execution with fully typed callbacks:
 
     {[
+      let hooks =
+        Claude.Hooks.empty
+        |> Claude.Hooks.on_pre_tool_use ~pattern:"Bash" (fun input ->
+            if String.is_prefix ~prefix:"rm" (input.tool_input |> Claude.Tool_input.get_string "command" |> Option.value ~default:"") then
+              Claude.Hooks.PreToolUse.deny ~reason:"Dangerous command" ()
+            else
+              Claude.Hooks.PreToolUse.continue ())
+
       let options =
-        Options.default
-        |> Options.with_system_prompt
-             "You are a helpful OCaml programming assistant."
-        |> Options.with_append_system_prompt "Always use Jane Street style."
-    ]}
-
-    {1 Logging}
-
-    The library uses the Logs library for structured logging. Each module has
-    its own log source (e.g., "claude.message", "claude.transport") allowing
-    fine-grained control over logging verbosity:
-
-    {[
-      (* Enable debug logging for message handling *)
-      Logs.Src.set_level Message.src (Some Logs.Debug);
-
-      (* Enable info logging for transport layer *)
-      Logs.Src.set_level Transport.src (Some Logs.Info)
+        Claude.Options.default |> Claude.Options.with_hooks hooks
     ]}
 
     {1 Error Handling}
 
-    The library uses exceptions for error handling. Common exceptions include:
-    - [Invalid_argument]: For malformed JSON or invalid parameters
-    - [Transport.Transport_error]: For CLI communication failures
-    - [Message.Message_parse_error]: For message parsing failures
-
-    {1 Example: Complete Session}
+    The library uses a structured exception type {!Err.E} for all errors:
 
     {[
-      let run_claude_session ~sw env =
-        let options =
-          Options.create ~allowed_tools:[ "Read"; "Write" ]
-            ~permission_mode:Permissions.Mode.Accept_edits
-            ~system_prompt:"You are an OCaml expert." ~max_thinking_tokens:10000
-            ()
-        in
+      try
+        Claude.Client.query client "Hello"
+      with Claude.Err.E err ->
+        Printf.eprintf "Error: %s\n" (Claude.Err.to_string err)
+    ]}
 
-        let prompt = "Write a function to calculate fibonacci numbers" in
-        let messages = Client.query ~sw env ~options prompt in
+    Error types include:
+    - {!Err.Cli_not_found}: Claude CLI not found
+    - {!Err.Process_error}: Process execution failure
+    - {!Err.Protocol_error}: JSON/protocol parsing error
+    - {!Err.Timeout}: Operation timed out
+    - {!Err.Permission_denied}: Tool permission denied
+    - {!Err.Hook_error}: Hook callback error
 
-        Seq.iter
-          (fun msg ->
-            Message.log_received msg;
-            match msg with
-            | Message.Assistant assistant ->
-                Printf.printf "Claude: %s\n" (Message.Assistant.model assistant);
-                List.iter
-                  (function
-                    | Content_block.Text t ->
-                        print_endline (Content_block.Text.text t)
-                    | Content_block.Tool_use t ->
-                        Printf.printf "Using tool: %s\n"
-                          (Content_block.Tool_use.name t)
-                    | _ -> ())
-                  (Message.Assistant.content assistant)
-            | Message.Result result ->
-                Printf.printf "Session complete. Duration: %dms\n"
-                  (Message.Result.duration_ms result)
-            | _ -> ())
-          messages
+    {1 Logging}
+
+    The library uses the Logs library for structured logging. Each module has
+    its own log source allowing fine-grained control:
+
+    {[
+      Logs.Src.set_level Claude.Client.src (Some Logs.Debug);
+      Logs.Src.set_level Claude.Transport.src (Some Logs.Info)
     ]} *)
 
-(** {1 Modules} *)
+(** {1 Core Modules} *)
+
+module Err = Err
+(** Error handling with structured exception type. *)
 
 module Client = Client
 (** High-level client interface for Claude interactions. *)
@@ -156,8 +176,16 @@ module Client = Client
 module Options = Options
 (** Configuration options for Claude sessions. *)
 
-module Model = Model
-(** Claude AI model identifiers with type-safe variants. *)
+module Response = Response
+(** High-level response events from Claude. *)
+
+module Handler = Handler
+(** Object-oriented response handler with sensible defaults. *)
+
+(** {1 Domain Types} *)
+
+module Tool_input = Tool_input
+(** Opaque tool input with typed accessors. *)
 
 module Content_block = Content_block
 (** Content blocks for messages (text, tool use, tool results, thinking). *)
@@ -165,23 +193,29 @@ module Content_block = Content_block
 module Message = Message
 (** Messages exchanged with Claude (user, assistant, system, result). *)
 
-module Control = Control
-(** Control messages for session management. *)
-
 module Permissions = Permissions
 (** Permission system for tool invocations. *)
 
 module Hooks = Hooks
-(** Hooks system for event interception. *)
+(** Fully typed hook callbacks for event interception. *)
 
-module Sdk_control = Sdk_control
-(** SDK control protocol for dynamic configuration. *)
+module Server_info = Server_info
+(** Server capabilities and metadata. *)
 
-module Incoming = Incoming
-(** Discriminated union of all incoming message types from Claude CLI. *)
+module Model = Model
+(** Claude AI model identifiers. *)
 
-module Structured_output = Structured_output
-(** Structured output support using JSON Schema. *)
+(** {1 Infrastructure} *)
 
 module Transport = Transport
 (** Low-level transport layer for CLI communication. *)
+
+(** {1 Wire Format (Advanced)}
+
+    The {!Proto} module provides direct access to wire-format types and JSON
+    codecs. Use this for advanced scenarios like custom transports or debugging.
+
+    Most users should use the high-level types above instead. *)
+
+module Proto = Proto
+(** Wire-format types and JSON codecs. *)

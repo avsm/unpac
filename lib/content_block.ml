@@ -3,123 +3,44 @@ let src = Logs.Src.create "claude.content_block" ~doc:"Claude content blocks"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 module Text = struct
-  type t = { text : string; unknown : Unknown.t }
+  type t = Proto.Content_block.Text.t
 
-  let create text = { text; unknown = Unknown.empty }
-  let make text unknown = { text; unknown }
-  let text t = t.text
-  let unknown t = t.unknown
-
-  let jsont : t Jsont.t =
-    Jsont.Object.map ~kind:"Text" make
-    |> Jsont.Object.mem "text" Jsont.string ~enc:text
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
-    |> Jsont.Object.finish
+  let text = Proto.Content_block.Text.text
+  let of_proto proto = proto
+  let to_proto t = t
 end
 
 module Tool_use = struct
-  module Input = struct
-    (* Dynamic JSON data for tool inputs with typed accessors using jsont decoders *)
-    type t = Jsont.json
+  type t = Proto.Content_block.Tool_use.t
 
-    let jsont = Jsont.json
+  let id = Proto.Content_block.Tool_use.id
+  let name = Proto.Content_block.Tool_use.name
 
-    let of_string_pairs pairs =
-      Jsont.Json.object'
-        (List.map
-           (fun (k, v) ->
-             Jsont.Json.mem (Jsont.Json.name k) (Jsont.Json.string v))
-           pairs)
+  let input t =
+    Proto.Content_block.Tool_use.input t |> Tool_input.of_json
 
-    let of_assoc (assoc : (string * Jsont.json) list) : t =
-      Jsont.Json.object'
-        (List.map (fun (k, v) -> Jsont.Json.mem (Jsont.Json.name k) v) assoc)
+  let of_proto proto = proto
 
-    (* Helper to decode an optional field with a given codec *)
-    let get_opt (type a) (codec : a Jsont.t) t key : a option =
-      let field_codec =
-        Jsont.Object.map ~kind:"field" (fun v -> v)
-        |> Jsont.Object.opt_mem key codec ~enc:Fun.id
-        |> Jsont.Object.finish
-      in
-      match Jsont.Json.decode field_codec t with Ok v -> v | Error _ -> None
-
-    let get_string t key = get_opt Jsont.string t key
-    let get_int t key = get_opt Jsont.int t key
-    let get_bool t key = get_opt Jsont.bool t key
-    let get_float t key = get_opt Jsont.number t key
-
-    let keys t =
-      (* Decode as object with all members captured as unknown *)
-      match t with
-      | Jsont.Object (members, _) ->
-          List.map (fun ((name, _), _) -> name) members
-      | _ -> []
-  end
-
-  type t = { id : string; name : string; input : Input.t; unknown : Unknown.t }
-
-  let create ~id ~name ~input = { id; name; input; unknown = Unknown.empty }
-  let make id name input unknown = { id; name; input; unknown }
-  let id t = t.id
-  let name t = t.name
-  let input t = t.input
-  let unknown t = t.unknown
-
-  let jsont : t Jsont.t =
-    Jsont.Object.map ~kind:"Tool_use" make
-    |> Jsont.Object.mem "id" Jsont.string ~enc:id
-    |> Jsont.Object.mem "name" Jsont.string ~enc:name
-    |> Jsont.Object.mem "input" Input.jsont ~enc:input
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
-    |> Jsont.Object.finish
+  let to_proto t = t
 end
 
 module Tool_result = struct
-  type t = {
-    tool_use_id : string;
-    content : string option;
-    is_error : bool option;
-    unknown : Unknown.t;
-  }
+  type t = Proto.Content_block.Tool_result.t
 
-  let create ~tool_use_id ?content ?is_error () =
-    { tool_use_id; content; is_error; unknown = Unknown.empty }
-
-  let make tool_use_id content is_error unknown =
-    { tool_use_id; content; is_error; unknown }
-
-  let tool_use_id t = t.tool_use_id
-  let content t = t.content
-  let is_error t = t.is_error
-  let unknown t = t.unknown
-
-  let jsont : t Jsont.t =
-    Jsont.Object.map ~kind:"Tool_result" make
-    |> Jsont.Object.mem "tool_use_id" Jsont.string ~enc:tool_use_id
-    |> Jsont.Object.opt_mem "content" Jsont.string ~enc:content
-    |> Jsont.Object.opt_mem "is_error" Jsont.bool ~enc:is_error
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
-    |> Jsont.Object.finish
+  let tool_use_id = Proto.Content_block.Tool_result.tool_use_id
+  let content = Proto.Content_block.Tool_result.content
+  let is_error = Proto.Content_block.Tool_result.is_error
+  let of_proto proto = proto
+  let to_proto t = t
 end
 
 module Thinking = struct
-  type t = { thinking : string; signature : string; unknown : Unknown.t }
+  type t = Proto.Content_block.Thinking.t
 
-  let create ~thinking ~signature =
-    { thinking; signature; unknown = Unknown.empty }
-
-  let make thinking signature unknown = { thinking; signature; unknown }
-  let thinking t = t.thinking
-  let signature t = t.signature
-  let unknown t = t.unknown
-
-  let jsont : t Jsont.t =
-    Jsont.Object.map ~kind:"Thinking" make
-    |> Jsont.Object.mem "thinking" Jsont.string ~enc:thinking
-    |> Jsont.Object.mem "signature" Jsont.string ~enc:signature
-    |> Jsont.Object.keep_unknown Jsont.json_mems ~enc:unknown
-    |> Jsont.Object.finish
+  let thinking = Proto.Content_block.Thinking.thinking
+  let signature = Proto.Content_block.Thinking.signature
+  let of_proto proto = proto
+  let to_proto t = t
 end
 
 type t =
@@ -128,54 +49,64 @@ type t =
   | Tool_result of Tool_result.t
   | Thinking of Thinking.t
 
-let text s = Text (Text.create s)
-let tool_use ~id ~name ~input = Tool_use (Tool_use.create ~id ~name ~input)
+let text s =
+  let proto = Proto.Content_block.text s in
+  match proto with
+  | Proto.Content_block.Text proto_text -> Text (Text.of_proto proto_text)
+  | _ -> failwith "Internal error: Proto.Content_block.text returned non-Text"
+
+let tool_use ~id ~name ~input =
+  let json_input = Tool_input.to_json input in
+  let proto = Proto.Content_block.tool_use ~id ~name ~input:json_input in
+  match proto with
+  | Proto.Content_block.Tool_use proto_tool_use ->
+      Tool_use (Tool_use.of_proto proto_tool_use)
+  | _ ->
+      failwith "Internal error: Proto.Content_block.tool_use returned non-Tool_use"
 
 let tool_result ~tool_use_id ?content ?is_error () =
-  Tool_result (Tool_result.create ~tool_use_id ?content ?is_error ())
+  let proto =
+    Proto.Content_block.tool_result ~tool_use_id ?content ?is_error ()
+  in
+  match proto with
+  | Proto.Content_block.Tool_result proto_tool_result ->
+      Tool_result (Tool_result.of_proto proto_tool_result)
+  | _ ->
+      failwith
+        "Internal error: Proto.Content_block.tool_result returned non-Tool_result"
 
 let thinking ~thinking ~signature =
-  Thinking (Thinking.create ~thinking ~signature)
+  let proto = Proto.Content_block.thinking ~thinking ~signature in
+  match proto with
+  | Proto.Content_block.Thinking proto_thinking ->
+      Thinking (Thinking.of_proto proto_thinking)
+  | _ ->
+      failwith
+        "Internal error: Proto.Content_block.thinking returned non-Thinking"
 
-let jsont : t Jsont.t =
-  let case_map kind obj dec = Jsont.Object.Case.map kind obj ~dec in
+let of_proto proto =
+  match proto with
+  | Proto.Content_block.Text t -> Text (Text.of_proto t)
+  | Proto.Content_block.Tool_use t -> Tool_use (Tool_use.of_proto t)
+  | Proto.Content_block.Tool_result t -> Tool_result (Tool_result.of_proto t)
+  | Proto.Content_block.Thinking t -> Thinking (Thinking.of_proto t)
 
-  let case_text = case_map "text" Text.jsont (fun v -> Text v) in
-  let case_tool_use =
-    case_map "tool_use" Tool_use.jsont (fun v -> Tool_use v)
-  in
-  let case_tool_result =
-    case_map "tool_result" Tool_result.jsont (fun v -> Tool_result v)
-  in
-  let case_thinking =
-    case_map "thinking" Thinking.jsont (fun v -> Thinking v)
-  in
-
-  let enc_case = function
-    | Text v -> Jsont.Object.Case.value case_text v
-    | Tool_use v -> Jsont.Object.Case.value case_tool_use v
-    | Tool_result v -> Jsont.Object.Case.value case_tool_result v
-    | Thinking v -> Jsont.Object.Case.value case_thinking v
-  in
-
-  let cases =
-    Jsont.Object.Case.
-      [
-        make case_text;
-        make case_tool_use;
-        make case_tool_result;
-        make case_thinking;
-      ]
-  in
-
-  Jsont.Object.map ~kind:"Content_block" Fun.id
-  |> Jsont.Object.case_mem "type" Jsont.string ~enc:Fun.id ~enc_case cases
-       ~tag_to_string:Fun.id ~tag_compare:String.compare
-  |> Jsont.Object.finish
+let to_proto = function
+  | Text t -> Proto.Content_block.Text (Text.to_proto t)
+  | Tool_use t -> Proto.Content_block.Tool_use (Tool_use.to_proto t)
+  | Tool_result t -> Proto.Content_block.Tool_result (Tool_result.to_proto t)
+  | Thinking t -> Proto.Content_block.Thinking (Thinking.to_proto t)
 
 let log_received t =
+  let proto = to_proto t in
   Log.debug (fun m ->
-      m "Received content block: %a" (Jsont.pp_value jsont ()) t)
+      m "Received content block: %a"
+        (Jsont.pp_value Proto.Content_block.jsont ())
+        proto)
 
 let log_sending t =
-  Log.debug (fun m -> m "Sending content block: %a" (Jsont.pp_value jsont ()) t)
+  let proto = to_proto t in
+  Log.debug (fun m ->
+      m "Sending content block: %a"
+        (Jsont.pp_value Proto.Content_block.jsont ())
+        proto)

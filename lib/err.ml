@@ -1,24 +1,60 @@
-(** Error handling for the Claude protocol.
+(** Error handling for claudeio. *)
 
-    This module provides a protocol-specific exception and Result combinators
-    for handling JSON encoding/decoding errors in the Claude SDK. *)
+type t =
+  | Cli_not_found of string
+  | Process_error of string
+  | Connection_error of string
+  | Protocol_error of string
+  | Timeout of string
+  | Permission_denied of { tool_name : string; message : string }
+  | Hook_error of { callback_id : string; message : string }
+  | Control_error of { request_id : string; message : string }
 
-exception Protocol_error of string
-(** Raised when there is an error in the Claude protocol, such as JSON
-    encoding/decoding failures or malformed messages. *)
+exception E of t
 
-(** [protocol_error msg] raises [Protocol_error msg]. *)
+let pp ppf = function
+  | Cli_not_found msg -> Fmt.pf ppf "CLI not found: %s" msg
+  | Process_error msg -> Fmt.pf ppf "Process error: %s" msg
+  | Connection_error msg -> Fmt.pf ppf "Connection error: %s" msg
+  | Protocol_error msg -> Fmt.pf ppf "Protocol error: %s" msg
+  | Timeout msg -> Fmt.pf ppf "Timeout: %s" msg
+  | Permission_denied { tool_name; message } ->
+      Fmt.pf ppf "Permission denied for tool '%s': %s" tool_name message
+  | Hook_error { callback_id; message } ->
+      Fmt.pf ppf "Hook error (callback_id=%s): %s" callback_id message
+  | Control_error { request_id; message } ->
+      Fmt.pf ppf "Control error (request_id=%s): %s" request_id message
+
+let to_string err = Fmt.str "%a" pp err
+
+let raise err = Stdlib.raise (E err)
+
+(* Register exception printer for better error messages *)
+let () =
+  Printexc.register_printer (function
+    | E err -> Some (to_string err)
+    | _ -> None)
+
+(** {1 Convenience Raisers} *)
+
+let cli_not_found msg = raise (Cli_not_found msg)
+let process_error msg = raise (Process_error msg)
+let connection_error msg = raise (Connection_error msg)
 let protocol_error msg = raise (Protocol_error msg)
+let timeout msg = raise (Timeout msg)
 
-(** [get_ok ~msg r] returns [x] if [r] is [Ok x], or raises
-    [Protocol_error (msg ^ e)] if [r] is [Error e]. *)
+let permission_denied ~tool_name ~message =
+  raise (Permission_denied { tool_name; message })
+
+let hook_error ~callback_id ~message = raise (Hook_error { callback_id; message })
+let control_error ~request_id ~message = raise (Control_error { request_id; message })
+
+(** {1 Result Helpers} *)
+
 let get_ok ~msg = function
   | Ok x -> x
   | Error e -> raise (Protocol_error (msg ^ e))
 
-(** [get_ok' ~msg r] returns [x] if [r] is [Ok x], or raises
-    [Invalid_argument (msg ^ e)] if [r] is [Error e]. Use this for user-facing
-    parse errors where Invalid_argument is expected. *)
 let get_ok' ~msg = function
   | Ok x -> x
-  | Error e -> raise (Invalid_argument (msg ^ e))
+  | Error e -> raise (Protocol_error (msg ^ e))

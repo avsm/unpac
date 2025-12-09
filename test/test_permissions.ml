@@ -5,9 +5,9 @@ let src = Logs.Src.create "test_permissions" ~doc:"Permission callback test"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 (* Simple auto-allow permission callback *)
-let auto_allow_callback ~tool_name ~input:_ ~context:_ =
-  Log.app (fun m -> m "✅ Auto-allowing tool: %s" tool_name);
-  Claude.Permissions.Result.allow ()
+let auto_allow_callback ctx =
+  Log.app (fun m -> m "✅ Auto-allowing tool: %s" ctx.Claude.Permissions.tool_name);
+  Claude.Permissions.Decision.allow ()
 
 let run_test ~sw ~env =
   Log.app (fun m -> m "🧪 Testing Permission Callbacks");
@@ -15,9 +15,9 @@ let run_test ~sw ~env =
 
   (* Create options with custom permission callback *)
   let options =
-    Claude.Options.create
-      ~model:(Claude.Model.of_string "sonnet")
-      ~permission_callback:auto_allow_callback ()
+    Claude.Options.default
+    |> Claude.Options.with_model (Claude.Model.of_string "sonnet")
+    |> Claude.Options.with_permission_callback auto_allow_callback
   in
 
   Log.app (fun m -> m "Creating client with permission callback...");
@@ -34,25 +34,19 @@ let run_test ~sw ~env =
   Log.app (fun m -> m "\n📨 Received %d messages" (List.length messages));
 
   List.iter
-    (fun msg ->
-      match msg with
-      | Claude.Message.Assistant msg ->
-          List.iter
-            (function
-              | Claude.Content_block.Text t ->
-                  let text = Claude.Content_block.Text.text t in
-                  Log.app (fun m -> m "Claude: %s" text)
-              | Claude.Content_block.Tool_use t ->
-                  Log.app (fun m ->
-                      m "🔧 Tool use: %s" (Claude.Content_block.Tool_use.name t))
-              | _ -> ())
-            (Claude.Message.Assistant.content msg)
-      | Claude.Message.Result msg ->
-          if Claude.Message.Result.is_error msg then
-            Log.err (fun m -> m "❌ Error occurred!")
-          else Log.app (fun m -> m "✅ Success!");
+    (fun resp ->
+      match resp with
+      | Claude.Response.Text text ->
+          Log.app (fun m -> m "Claude: %s" (Claude.Response.Text.content text))
+      | Claude.Response.Tool_use t ->
           Log.app (fun m ->
-              m "Duration: %dms" (Claude.Message.Result.duration_ms msg))
+              m "🔧 Tool use: %s" (Claude.Response.Tool_use.name t))
+      | Claude.Response.Complete result ->
+          Log.app (fun m -> m "✅ Success!");
+          Log.app (fun m ->
+              m "Duration: %dms" (Claude.Response.Complete.duration_ms result))
+      | Claude.Response.Error err ->
+          Log.err (fun m -> m "❌ Error: %s" (Claude.Response.Error.message err))
       | _ -> ())
     messages;
 

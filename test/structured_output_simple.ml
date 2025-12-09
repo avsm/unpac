@@ -44,7 +44,7 @@ let simple_example env =
         Meta.none )
   in
 
-  let output_format = C.Structured_output.of_json_schema person_schema in
+  let output_format = Claude.Proto.Structured_output.of_json_schema person_schema in
 
   let options =
     C.Options.default
@@ -62,18 +62,20 @@ let simple_example env =
     "Tell me about a famous computer scientist. Provide their name, age, and \
      occupation in the exact JSON structure I specified.";
 
-  let messages = C.Client.receive_all client in
+  let responses = C.Client.receive_all client in
   List.iter
     (function
-      | C.Message.Result result -> (
+      | C.Response.Complete result -> (
           Printf.printf "Response received!\n";
-          match C.Message.Result.structured_output result with
+          match C.Response.Complete.structured_output result with
           | Some json ->
               Printf.printf "\nStructured Output:\n%s\n"
                 (Test_json_utils.to_string ~minify:false json)
           | None -> Printf.printf "No structured output\n")
+      | C.Response.Error err ->
+          Printf.printf "Error: %s\n" (C.Response.Error.message err)
       | _ -> ())
-    messages
+    responses
 
 let () =
   Eio_main.run @@ fun env ->

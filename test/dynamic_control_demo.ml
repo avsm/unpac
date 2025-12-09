@@ -18,54 +18,43 @@ let run env =
   traceln "1. Initial query with default model";
   Client.query client "What model are you?";
 
-  (* Consume initial messages *)
-  let messages = Client.receive_all client in
+  (* Consume initial responses *)
+  let responses = Client.receive_all client in
   List.iter
     (function
-      | Message.Assistant msg ->
-          List.iter
-            (function
-              | Content_block.Text t ->
-                  traceln "Assistant: %s" (Content_block.Text.text t)
-              | _ -> ())
-            (Message.Assistant.content msg)
+      | Response.Text text ->
+          traceln "Assistant: %s" (Response.Text.content text)
       | _ -> ())
-    messages;
+    responses;
 
   traceln "\n2. Getting server info...";
   (try
      let info = Client.get_server_info client in
-     traceln "Server version: %s" (Sdk_control.Server_info.version info);
+     traceln "Server version: %s" (Claude.Server_info.version info);
      traceln "Capabilities: [%s]"
-       (String.concat ", " (Sdk_control.Server_info.capabilities info));
+       (String.concat ", " (Claude.Server_info.capabilities info));
      traceln "Commands: [%s]"
-       (String.concat ", " (Sdk_control.Server_info.commands info));
+       (String.concat ", " (Claude.Server_info.commands info));
      traceln "Output styles: [%s]"
-       (String.concat ", " (Sdk_control.Server_info.output_styles info))
+       (String.concat ", " (Claude.Server_info.output_styles info))
    with
   | Failure msg -> traceln "Failed to get server info: %s" msg
   | exn -> traceln "Error getting server info: %s" (Printexc.to_string exn));
 
   traceln "\n3. Switching to a different model (if available)...";
   (try
-     Client.set_model client (Model.of_string "claude-sonnet-4");
+     Client.set_model client (Proto.Model.of_string "claude-sonnet-4");
      traceln "Model switched successfully";
 
      (* Query with new model *)
      Client.query client "Confirm your model again please.";
-     let messages = Client.receive_all client in
+     let responses = Client.receive_all client in
      List.iter
        (function
-         | Message.Assistant msg ->
-             List.iter
-               (function
-                 | Content_block.Text t ->
-                     traceln "Assistant (new model): %s"
-                       (Content_block.Text.text t)
-                 | _ -> ())
-               (Message.Assistant.content msg)
+         | Response.Text text ->
+             traceln "Assistant (new model): %s" (Response.Text.content text)
          | _ -> ())
-       messages
+       responses
    with
   | Failure msg -> traceln "Failed to switch model: %s" msg
   | exn -> traceln "Error switching model: %s" (Printexc.to_string exn));

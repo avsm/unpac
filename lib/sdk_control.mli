@@ -66,7 +66,7 @@ module Request : sig
     subtype : [ `Can_use_tool ];
     tool_name : string;
     input : Jsont.json;
-    permission_suggestions : Permissions.Update.t list option;
+    permission_suggestions : Proto.Permissions.Update.t list option;
     blocked_path : string option;
     unknown : Unknown.t;
   }
@@ -81,7 +81,7 @@ module Request : sig
 
   type set_permission_mode = {
     subtype : [ `Set_permission_mode ];
-    mode : Permissions.Mode.t;
+    mode : Proto.Permissions.Mode.t;
     unknown : Unknown.t;
   }
   (** Request to change permission mode. *)
@@ -130,7 +130,7 @@ module Request : sig
   val permission :
     tool_name:string ->
     input:Jsont.json ->
-    ?permission_suggestions:Permissions.Update.t list ->
+    ?permission_suggestions:Proto.Permissions.Update.t list ->
     ?blocked_path:string ->
     ?unknown:Unknown.t ->
     unit ->
@@ -143,7 +143,7 @@ module Request : sig
   (** [initialize ?hooks ?unknown ()] creates an initialize request. *)
 
   val set_permission_mode :
-    mode:Permissions.Mode.t -> ?unknown:Unknown.t -> unit -> t
+    mode:Proto.Permissions.Mode.t -> ?unknown:Unknown.t -> unit -> t
   (** [set_permission_mode ~mode ?unknown] creates a permission mode change
       request. *)
 
