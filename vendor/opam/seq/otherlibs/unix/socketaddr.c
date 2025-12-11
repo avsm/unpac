@@ -57,6 +57,7 @@ void caml_unix_get_sockaddr(value vaddr,
   case 0:                       /* ADDR_UNIX */
     { value path;
       mlsize_t len;
+      int is_path;
       struct sockaddr_un *s_unix = (struct sockaddr_un *) addr;
       path = Field(vaddr, 0);
       len = caml_string_length(path);
@@ -64,12 +65,16 @@ void caml_unix_get_sockaddr(value vaddr,
       if (len >= sizeof(s_unix->sun_path)) {
         caml_unix_error(ENAMETOOLONG, "", path);
       }
-      /* "Abstract" sockets in Linux have names starting with '\0' */
-      if (Byte(path, 0) != 0 && ! caml_string_is_c_safe(path)) {
+      /* Pathname sockets have a non-empty name not starting with NUL, see
+         unix(7). */
+      is_path = Byte(path, 0) != 0;
+      if (is_path && ! caml_string_is_c_safe(path)) {
         caml_unix_error(ENOENT, "", path);
       }
       memmove(s_unix->sun_path, String_val(path), len + 1);
-      *addr_len = offsetof(struct sockaddr_un, sun_path) + len;
+      /* Pathname sockets should include the trailing NUL, see unix(7). */
+      *addr_len =
+        offsetof(struct sockaddr_un, sun_path) + len + (is_path ? 1 : 0);
       break;
     }
   case 1:                       /* ADDR_INET */
@@ -133,7 +138,7 @@ value caml_unix_alloc_sockaddr(struct sockaddr * addr /*in*/,
         /* paths _may_ be null-terminated, but Linux abstract sockets
          * start with a null, and may contain internal nulls. */
         path_length = (
-#ifdef __linux__
+#if defined(__linux__) || defined(__HAIKU__)
           (s_unix->sun_path[0] == '\0') ? path_length :
 #endif
           strnlen(s_unix->sun_path, path_length)
