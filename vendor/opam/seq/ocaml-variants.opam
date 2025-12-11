@@ -9,6 +9,7 @@ authors: [
   "Alain Frisch"
   "Jacques Garrigue"
   "Didier Rémy"
+  "KC Sivaramakrishnan"
   "Jérôme Vouillon"
 ]
 homepage: "https://github.com/ocaml/ocaml/"
@@ -76,6 +77,9 @@ build: [
     "--prefix=%{prefix}%"
     "--docdir=%{doc}%/ocaml"
     "--with-additional-stublibsdir"
+    "--with-relative-libdir"
+    "--enable-runtime-search"
+    "--enable-runtime-search-target=fallback"
     "--with-flexdll=%{flexdll:share}%" {os = "win32" & flexdll:installed}
     "--with-winpthreads-msvc=%{winpthreads:share}%" {system-msvc:installed}
     "-C"
