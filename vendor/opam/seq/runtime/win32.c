@@ -23,6 +23,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #define _CRT_RAND_S
+#include <windows.h>
 #include <wtypes.h>
 #include <winbase.h>
 #include <winsock2.h>
@@ -30,6 +31,7 @@
 #include <shlobj.h>
 #include <shlwapi.h>
 #include <direct.h>
+#include <process.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -1433,31 +1435,18 @@ CAMLextern char_os* caml_locate_standard_library (const wchar_t *exe_name,
 
 CAMLexport void caml_plat_mutex_init(caml_plat_mutex * m)
 {
-  int rc;
-  pthread_mutexattr_t attr;
-  rc = pthread_mutexattr_init(&attr);
-  if (rc != 0) goto error1;
-  rc = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
-  if (rc != 0) goto error2;
-  rc = pthread_mutex_init(m, &attr);
-  // fall through
-error2:
-  pthread_mutexattr_destroy(&attr);
-error1:
-  check_err("mutex_init", rc);
+  InitializeSRWLock(m);
 }
 
-void caml_plat_assert_locked(caml_plat_mutex* m)
+void caml_plat_assert_locked(caml_plat_mutex *m)
 {
 #ifdef DEBUG
-  int r = pthread_mutex_trylock(m);
-  if (r == EBUSY) {
+  BOOLEAN r = TryAcquireSRWLockExclusive(m);
+  if (r == 0) {
     /* ok, it was locked */
     return;
-  } else if (r == 0) {
-    caml_fatal_error("Required mutex not locked");
   } else {
-    check_err("assert_locked", r);
+    caml_fatal_error("Required mutex not locked");
   }
 #endif
 }
@@ -1466,53 +1455,41 @@ CAMLexport void caml_plat_lock_non_blocking_actual(caml_plat_mutex* m)
 {
   /* Avoid exceptions */
   caml_enter_blocking_section_no_pending();
-  int rc = pthread_mutex_lock(m);
+  AcquireSRWLockExclusive(m);
   caml_leave_blocking_section();
-  check_err("lock_non_blocking", rc);
   DEBUG_LOCK(m);
 }
 
 void caml_plat_mutex_free(caml_plat_mutex* m)
 {
-  check_err("mutex_free", pthread_mutex_destroy(m));
+  /* nothing to do */
 }
 
 /* Condition variables */
 
-static void caml_plat_cond_init_aux(caml_plat_cond *cond)
+void caml_plat_cond_init(caml_plat_cond *cond)
 {
-  pthread_condattr_t attr;
-  pthread_condattr_init(&attr);
-#if defined(_POSIX_TIMERS) &&                   \
-  defined(_POSIX_MONOTONIC_CLOCK) &&            \
-  _POSIX_MONOTONIC_CLOCK != (-1)
-  pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
-#endif
-  pthread_cond_init(cond, &attr);
+  InitializeConditionVariable(cond);
 }
 
-void caml_plat_cond_init(caml_plat_cond* cond)
-{
-  caml_plat_cond_init_aux(cond);
-}
-
-void caml_plat_wait(caml_plat_cond* cond, caml_plat_mutex* mut)
+void caml_plat_wait(caml_plat_cond *cond, caml_plat_mutex* mut)
 {
   caml_plat_assert_locked(mut);
-  check_err("wait", pthread_cond_wait(cond, mut));
+  BOOL rc = SleepConditionVariableSRW(cond, mut, INFINITE, 0 /* exclusive */);
+  check_err("wait", rc == 0);
 }
 
 void caml_plat_broadcast(caml_plat_cond* cond)
 {
-  check_err("cond_broadcast", pthread_cond_broadcast(cond));
+  WakeAllConditionVariable(cond);
 }
 
 void caml_plat_signal(caml_plat_cond* cond)
 {
-  check_err("cond_signal", pthread_cond_signal(cond));
+  WakeConditionVariable(cond);
 }
 
 void caml_plat_cond_free(caml_plat_cond* cond)
 {
-  check_err("cond_free", pthread_cond_destroy(cond));
+  /* nothing to do */
 }

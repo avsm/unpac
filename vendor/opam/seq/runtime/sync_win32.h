@@ -3,9 +3,11 @@
 /*                                 OCaml                                  */
 /*                                                                        */
 /*          Xavier Leroy and Damien Doligez, INRIA Rocquencourt           */
+/*                           Antonin Decimo, Tarides                      */
 /*                                                                        */
 /*   Copyright 1996 Institut National de Recherche en Informatique et     */
 /*     en Automatique.                                                    */
+/*   Copyright 2025 Tarides                                               */
 /*                                                                        */
 /*   All rights reserved.  This file is distributed under the terms of    */
 /*   the GNU Lesser General Public License version 2.1, with the          */
@@ -13,17 +15,17 @@
 /*                                                                        */
 /**************************************************************************/
 
-/* POSIX thread implementation of the user facing Mutex and Condition */
+/* Windows implementation of the user facing Mutex and Condition */
 /* To be included in runtime/sync.c */
 
-#ifndef CAML_SYNC_POSIX_H
-#define CAML_SYNC_POSIX_H
+#ifndef CAML_SYNC_WIN32_H
+#define CAML_SYNC_WIN32_H
 
-#include <errno.h>
-#include <pthread.h>
-#include <string.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
 #include "caml/sync.h"
+#include "caml/osdeps.h"
 
 typedef int sync_retcode;
 
@@ -31,40 +33,23 @@ typedef int sync_retcode;
 
 Caml_inline int sync_mutex_create(sync_mutex * res)
 {
-  int rc;
-  pthread_mutexattr_t attr;
-  sync_mutex m;
-
-  rc = pthread_mutexattr_init(&attr);
-  if (rc != 0) goto error1;
-  rc = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
-  if (rc != 0) goto error2;
-  m = caml_stat_alloc_noexc(sizeof(pthread_mutex_t));
-  if (m == NULL) { rc = ENOMEM; goto error2; }
-  rc = pthread_mutex_init(m, &attr);
-  if (rc != 0) goto error3;
-  pthread_mutexattr_destroy(&attr);
+  sync_mutex m = caml_stat_alloc_noexc(sizeof(SRWLOCK));
+  if (m == NULL) return ENOMEM;
+  InitializeSRWLock(m);
   *res = m;
   return 0;
-error3:
-  caml_stat_free(m);
-error2:
-  pthread_mutexattr_destroy(&attr);
-error1:
-  return rc;
 }
 
 Caml_inline int sync_mutex_destroy(sync_mutex m)
 {
-  int rc;
-  rc = pthread_mutex_destroy(m);
   caml_stat_free(m);
-  return rc;
+  return 0;
 }
 
 Caml_inline int sync_mutex_lock(sync_mutex m)
 {
-  return pthread_mutex_lock(m);
+  AcquireSRWLockExclusive(m);
+  return 0;
 }
 
 #define MUTEX_PREVIOUSLY_UNLOCKED 0
@@ -72,48 +57,52 @@ Caml_inline int sync_mutex_lock(sync_mutex m)
 
 Caml_inline int sync_mutex_trylock(sync_mutex m)
 {
-  return pthread_mutex_trylock(m);
+  return TryAcquireSRWLockExclusive(m) ?
+    MUTEX_PREVIOUSLY_UNLOCKED : MUTEX_ALREADY_LOCKED;
 }
 
 Caml_inline int sync_mutex_unlock(sync_mutex m)
 {
-  return pthread_mutex_unlock(m);
+  ReleaseSRWLockExclusive(m);
+  return 0;
 }
 
 /* Condition variables */
 
 Caml_inline int sync_condvar_create(sync_condvar * res)
 {
-  int rc;
-  sync_condvar c = caml_stat_alloc_noexc(sizeof(pthread_cond_t));
+  sync_condvar c = caml_stat_alloc_noexc(sizeof(CONDITION_VARIABLE));
   if (c == NULL) return ENOMEM;
-  rc = pthread_cond_init(c, NULL);
-  if (rc != 0) { caml_stat_free(c); return rc; }
+  InitializeConditionVariable(c);
   *res = c;
   return 0;
 }
 
 Caml_inline int sync_condvar_destroy(sync_condvar c)
 {
-  int rc;
-  rc = pthread_cond_destroy(c);
   caml_stat_free(c);
-  return rc;
+  return 0;
 }
 
 Caml_inline int sync_condvar_signal(sync_condvar c)
 {
- return pthread_cond_signal(c);
+  WakeConditionVariable(c);
+  return 0;
 }
 
 Caml_inline int sync_condvar_broadcast(sync_condvar c)
 {
-    return pthread_cond_broadcast(c);
+  WakeAllConditionVariable(c);
+  return 0;
 }
 
 Caml_inline int sync_condvar_wait(sync_condvar c, sync_mutex m)
 {
-  return pthread_cond_wait(c, m);
+  if (!SleepConditionVariableSRW(c, m, INFINITE, 0 /* exclusive */)) {
+    int rc = caml_posixerr_of_win32err(GetLastError());
+    return rc == 0 ? EINVAL : rc;
+  }
+  return 0;
 }
 
-#endif /* CAML_SYNC_POSIX_H */
+#endif /* CAML_SYNC_WIN32_H */
