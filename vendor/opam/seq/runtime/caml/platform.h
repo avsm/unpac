@@ -101,6 +101,8 @@ Caml_inline void cpu_relax(void) {
    functions from caml/sync.h should be used instead.
 */
 
+#ifdef _WIN32
+
 typedef pthread_mutex_t caml_plat_mutex;
 #define CAML_PLAT_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
 
@@ -158,6 +160,68 @@ int caml_plat_thread_cancel(caml_plat_thread t)
   return 0;
 #endif
 }
+
+#else
+
+typedef pthread_mutex_t caml_plat_mutex;
+#define CAML_PLAT_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
+
+typedef pthread_cond_t caml_plat_cond;
+#define CAML_PLAT_COND_INITIALIZER PTHREAD_COND_INITIALIZER
+
+typedef pthread_t caml_plat_thread;
+typedef pthread_attr_t caml_plat_thread_attr;
+
+Caml_inline
+int caml_plat_thread_create(caml_plat_thread *restrict thread,
+                            const caml_plat_thread_attr *restrict attr,
+                            void *(*start_routine)(void *),
+                            void *restrict arg)
+{
+  return pthread_create(thread, attr, start_routine, arg);
+}
+
+Caml_inline
+int caml_plat_thread_equal(caml_plat_thread t1, caml_plat_thread t2)
+{
+  return pthread_equal(t1, t2);
+}
+
+Caml_inline
+caml_plat_thread caml_plat_thread_self(void)
+{
+  return pthread_self();
+}
+
+Caml_inline
+int caml_plat_thread_detach(caml_plat_thread thread)
+{
+  return pthread_detach(thread);
+}
+
+Caml_inline
+int caml_plat_thread_join(caml_plat_thread thread)
+{
+  return pthread_join(thread, NULL);
+}
+
+Caml_inline
+void caml_plat_thread_exit(void)
+{
+  pthread_exit(NULL);
+}
+
+Caml_inline
+int caml_plat_thread_cancel(caml_plat_thread t)
+{
+#ifdef HAVE_PTHREAD_CANCEL
+  return pthread_cancel(t);
+#else
+  return 0;
+#endif
+}
+
+#endif  /* _WIN32 */
 
 CAMLextern void caml_plat_mutex_init(caml_plat_mutex*);
 Caml_inline void caml_plat_lock_blocking(caml_plat_mutex*);
@@ -506,6 +570,8 @@ CAMLextern CAMLthread_local int caml_lockdepth;
 #define DEBUG_UNLOCK(m)
 #endif
 
+#ifdef _WIN32
+
 Caml_inline void caml_plat_lock_blocking(caml_plat_mutex* m)
 {
   check_err("lock", pthread_mutex_lock(m));
@@ -529,6 +595,34 @@ Caml_inline void caml_plat_unlock(caml_plat_mutex* m)
   DEBUG_UNLOCK(m);
   check_err("unlock", pthread_mutex_unlock(m));
 }
+
+#else
+
+Caml_inline void caml_plat_lock_blocking(caml_plat_mutex* m)
+{
+  check_err("lock", pthread_mutex_lock(m));
+  DEBUG_LOCK(m);
+}
+
+Caml_inline int caml_plat_try_lock(caml_plat_mutex* m)
+{
+  int r = pthread_mutex_trylock(m);
+  if (r == EBUSY) {
+    return 0;
+  } else {
+    check_err("try_lock", r);
+    DEBUG_LOCK(m);
+    return 1;
+  }
+}
+
+Caml_inline void caml_plat_unlock(caml_plat_mutex* m)
+{
+  DEBUG_UNLOCK(m);
+  check_err("unlock", pthread_mutex_unlock(m));
+}
+
+#endif  /* _WIN32 */
 
 CAMLextern void caml_plat_lock_non_blocking_actual(caml_plat_mutex* m);
 
