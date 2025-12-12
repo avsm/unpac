@@ -77,7 +77,7 @@ let bindir_rules config file =
         (* If the launcher doesn't search for ocamlrun, then either the #! stub
            will include the absolute path or the RNTM section will *)
         match classification with
-        | Tendered _ when not config.launcher_searches_for_ocamlrun -> true
+        | Tendered _ when config.has_runtime_search <> Config.Enable -> true
         | _ -> false
       in
       if code_embeds_stdlib_location || linker_embeds_stdlib_location then
@@ -111,7 +111,7 @@ let bindir_rules config file =
       else
         (* Bytecode runtimes and ocamlyacc of which only ocamlrund is linked
            with -g *)
-        `Other, (basename = "ocamlrund")
+        `Other, (List.mem "ocamlrund" (String.split_on_char '-' basename))
     in
     (* Combine this with the properties of the platform to determine whether the
        executable will contain the build path. *)
@@ -182,11 +182,6 @@ let libdir_rules config file =
                                 "ocamlcommon.cma"] in
         (* The compiler's artefacts are all compiled with -g *)
         (~stdlib, ~ocaml_debug:true, ~c_debug:false, ~s:false)
-      else if basename = "runtime-launch-info" then
-        (* When the compiler is configured with a relative libdir,
-           runtime-launch-info just contains ".", rather than the prefix *)
-        let stdlib = (config.has_relative_libdir = None) in
-        (~stdlib, ~ocaml_debug:false, ~c_debug:false, ~s:false)
       else if ext = ".cmxs" then
         (* All the .cmxs files built by the distribution at present include C
            objects and obviously contain assembled objects. *)
@@ -493,17 +488,6 @@ let run ~reproducible config env =
     |> scan Environment.libdir "$libdir" libdir_rules
   in
   flush stderr;
-  (* Abort the harness if there are files which didn't match a ruleset *)
-  let () =
-    if results_are_reproducible && not consistent then
-      Harness.fail_because
-        "Internal error: bindir_rules and libdir_rules disagree with \
-         reproducible_rules"
-    else if results_are_reproducible <> reproducible then
-      Harness.fail_because
-        "The build is %sexpected to be reproducible"
-        (if not reproducible then "not " else "")
-  in
   (* Summarise the results, using wildcards to bring them to a readable
      length *)
   let sections =
@@ -622,7 +606,15 @@ let run ~reproducible config env =
     let pp_results = Format.(pp_print_list ~pp_sep pp_print_string) in
     Format.printf "@[<hov 4>  %a@]@." pp_results results
   in
+  (* Abort the harness if there are files which didn't match a ruleset *)
   if failed then
-    Harness.fail_because "Installed files don't match expectation"
-  else
-  List.iter display sections
+    Harness.fail_because "Installed files don't match expectation";
+  List.iter display sections;
+  if results_are_reproducible && not consistent then
+    Harness.fail_because
+      "Internal error: bindir_rules and libdir_rules disagree with \
+       reproducible_rules"
+  else if results_are_reproducible <> reproducible then
+    Harness.fail_because
+      "The build is %sexpected to be reproducible"
+      (if not reproducible then "not " else "")

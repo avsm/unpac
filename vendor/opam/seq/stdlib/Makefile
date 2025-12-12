@@ -54,7 +54,7 @@ NOSTDLIB= camlinternalFormatBasics.cmo stdlib.cmo
 OTHERS=$(filter-out $(NOSTDLIB),$(OBJS))
 
 .PHONY: all
-all: stdlib.cma std_exit.cmo $(HEADER_NAME) target_$(HEADER_NAME)
+all: stdlib.cma std_exit.cmo $(HEADER_NAME)
 
 .PHONY: allopt opt.opt # allopt and opt.opt are synonyms
 allopt: stdlib.cmxa std_exit.cmx
@@ -73,7 +73,7 @@ ifeq "$(INSTALL_SOURCE_ARTIFACTS)" "true"
 	  *.cmt *.cmti *.mli *.ml *.ml.in \
 	  "$(INSTALL_LIBDIR)"
 endif
-	$(INSTALL_DATA) target_$(HEADER_NAME) "$(INSTALL_LIBDIR)/$(HEADER_NAME)"
+	$(INSTALL_DATA) $(HEADER_NAME) "$(INSTALL_LIBDIR)/$(HEADER_NAME)"
 
 .PHONY: installopt
 installopt: installopt-default
@@ -84,8 +84,10 @@ installopt-default:
 	  stdlib.cmxa stdlib.$(A) std_exit.$(O) *.cmx \
 	  "$(INSTALL_LIBDIR)"
 
-%-launch-info: %.info tmpheader.exe
-	@cat $^ > $@
+MANGLING = $(filter true,$(SUFFIXING))
+runtime-launch-info: tmpheader.exe
+	@{ printf '$(if $(MANGLING),$(ZINC_RUNTIME_ID_HI),\000)'; \
+	   cat $^; } > $@
 
 # The mingw-w64 and MSVC versions of tmpheader.exe are linked with special flags
 # to reduce their size (considerably). In particular, the entry point is
@@ -135,11 +137,11 @@ stdlib.cmxa: $(OBJS:.cmo=.cmx)
 
 .PHONY: distclean
 distclean: clean
-	rm -f sys.ml META runtime.info target_runtime.info
+	rm -f sys.ml META
 
 .PHONY: clean
 clean::
-	rm -f $(HEADER_NAME) target_$(HEADER_NAME)
+	rm -f $(HEADER_NAME)
 
 export AWK
 

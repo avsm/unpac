@@ -800,6 +800,13 @@ build_os
 build_vendor
 build_cpu
 build
+runtime_search_target
+runtime_search
+suffixing
+native_runtime_id
+bytecode_runtime_id
+zinc_runtime_id_hi
+zinc_runtime_id_lo
 build_map_flags
 srcdir_abs_real
 srcdir_abs
@@ -884,6 +891,8 @@ natdynlink
 supports_shared_libraries
 mklib
 AR
+launch_method_target
+launch_method
 shebangscripts
 winpthreads_source_include_dir
 winpthreads_source_dir
@@ -958,6 +967,7 @@ CMO_MAGIC_NUMBER
 CMI_MAGIC_NUMBER
 EXEC_MAGIC_NUMBER
 MAGIC_LENGTH
+OCAML_RELEASE_NUMBER
 OCAML_VERSION_SHORT
 OCAML_VERSION_EXTRA
 OCAML_VERSION_PATCHLEVEL
@@ -1051,6 +1061,9 @@ enable_flat_float_array
 enable_function_sections
 enable_mmap_map_stack
 with_relative_libdir
+enable_suffixing
+enable_runtime_search
+enable_runtime_search_target
 with_afl
 with_flexdll
 with_winpthreads_msvc
@@ -1762,6 +1775,13 @@ Optional Features:
   --disable-function-sections
                           do not emit each function in a separate section
   --enable-mmap-map-stack use mmap to allocate stacks instead of malloc
+  --disable-suffixing     disable suffixing of runtime executables and shared
+                          libraries
+  --enable-runtime-search allow the distribution's bytecode executables to
+                          search for ocamlrun
+  --enable-runtime-search-target
+                          allow bytecode executables produced by ocamlc to
+                          search for ocamlrun
   --enable-shared[=PKGS]  build shared libraries [default=yes]
   --enable-static[=PKGS]  build static libraries [default=yes]
   --enable-pic[=PKGS]     try to use only PIC/non-PIC objects [default=use
@@ -3385,6 +3405,8 @@ target_libdir_is_relative=false
 srcdir_abs=''
 srcdir_abs_real=''
 build_map_flags=''
+runtime_search=''
+runtime_search_target=''
 
 # Information about the package
 
@@ -3414,6 +3436,8 @@ OCAML_VERSION_PATCHLEVEL=0
 OCAML_VERSION_EXTRA=dev0-2025-04-28
 
 OCAML_VERSION_SHORT=5.5
+
+OCAML_RELEASE_NUMBER=21
 
 printf "%s\n" "#define MAGIC_NUMBER_PREFIX \"Caml1999\"" >>confdefs.h
 
@@ -3457,6 +3481,8 @@ LINEAR_MAGIC_NUMBER=Caml1999L037
 # Note: This is present for the flexdll bootstrap where it exposed as the old
 # TOOLPREF variable. It would be better if flexdll where updated to require
 # WINDRES instead.
+
+
 
 
 
@@ -3597,6 +3623,13 @@ LINEAR_MAGIC_NUMBER=Caml1999L037
 
 
 
+
+
+
+
+
+
+
 ## Generated files
 
 ac_config_files="$ac_config_files Makefile.build_config"
@@ -3646,6 +3679,8 @@ printf "%s\n" "#define OCAML_VERSION_ADDITIONAL \"dev0-2025-04-28\"" >>confdefs.
 printf "%s\n" "#define OCAML_VERSION 50500" >>confdefs.h
 
 printf "%s\n" "#define OCAML_VERSION_STRING \"5.5.0+dev0-2025-04-28\"" >>confdefs.h
+
+printf "%s\n" "#define OCAML_RELEASE_NUMBER 21" >>confdefs.h
 
 
 # Works out how many "o"s are needed in quoted strings
@@ -4279,12 +4314,12 @@ if test ${with_target_sh+y}
 then :
   withval=$with_target_sh; if test x"$withval" = 'xno'
 then :
-  target_launch_method='exe'
+  launch_method_target='exe'
 else $as_nop
-  target_launch_method="$withval"
+  launch_method_target="$withval"
 fi
 else $as_nop
-  target_launch_method=''
+  launch_method_target=''
 fi
 
 
@@ -4390,6 +4425,61 @@ else $as_nop
   bindir_to_libdir=''
 fi
 
+
+# Check whether --enable-suffixing was given.
+if test ${enable_suffixing+y}
+then :
+  enableval=$enable_suffixing; if test "x$enableval" = 'xno'
+then :
+  suffixing=false
+else $as_nop
+  suffixing=true
+fi
+else $as_nop
+  suffixing=true
+fi
+
+
+# Check whether --enable-runtime-search was given.
+if test ${enable_runtime_search+y}
+then :
+  enableval=$enable_runtime_search; case $enableval in #(
+  no) :
+     ;; #(
+  yes) :
+    runtime_search='enable' ;; #(
+  fallback) :
+    runtime_search='fallback' ;; #(
+  *) :
+    as_fn_error $? "valid values are yes, no or fallback for --enable-runtime-search" "$LINENO" 5 ;;
+esac
+fi
+
+
+# Check whether --enable-runtime-search-target was given.
+if test ${enable_runtime_search_target+y}
+then :
+  enableval=$enable_runtime_search_target; case $enableval in #(
+  no) :
+     ;; #(
+  yes) :
+    runtime_search_target='enable' ;; #(
+  fallback) :
+    runtime_search_target='fallback' ;; #(
+  *) :
+    as_fn_error $? "valid values are yes, no or fallback for --enable-runtime-search-target" "$LINENO" 5 ;;
+esac
+fi
+
+
+case $suffixing,$runtime_search,$runtime_search_target in #(
+  true,*,*|false,,) :
+     ;; #(
+  false,*,*) :
+    as_fn_error $? "--disable-suffixed cannot be used with --enable-runtime-search or --enable-runtime-search-target" "$LINENO" 5 ;; #(
+  *) :
+     ;;
+esac
 
 
 # Check whether --with-afl was given.
@@ -15306,9 +15396,9 @@ then :
       # not use shebang scripts
       shebangscripts=true
       launch_method='sh'
-      if test x"$target_launch_method" = 'x'
+      if test x"$launch_method_target" = 'x'
 then :
-  target_launch_method='exe'
+  launch_method_target='exe'
 fi ;; #(
   *-w64-mingw32*|*-pc-windows) :
      ;; #(
@@ -15319,12 +15409,6 @@ fi ;; #(
 esac
 
 fi
-
-# stdlib/runtime.info and stdlib/target_runtime.info are generated by commands
-# in config.status, rather than by the .in mechanism, since the latter cannot
-# reliably process binary files.
-ac_config_commands="$ac_config_commands shebang"
-
 
 # Checks for programs
 
@@ -19912,6 +19996,15 @@ then :
 fi
 
 
+## strlcpy
+ac_fn_c_check_func "$LINENO" "strlcpy" "ac_cv_func_strlcpy"
+if test "x$ac_cv_func_strlcpy" = xyes
+then :
+  printf "%s\n" "#define HAS_STRLCPY 1" >>confdefs.h
+
+fi
+
+
 ## secure_getenv and __secure_getenv
 
 saved_CPPFLAGS="$CPPFLAGS"
@@ -24473,6 +24566,89 @@ case $target in #(
      ;;
 esac
 
+# Determine the three Runtime IDs (see runtime/Mangling.md)
+
+
+
+
+
+# Bits 0-4 (dev + low 4 bits of release)
+
+
+# Bits 5-6 (high 2 bits of release)
+
+
+# Bits 7-9 (low 3 bits of reserved)
+quintet1="1 + $(expr \( $reserved_header_bits \* 4 \) % 32)"
+quintet1="$(echo '0123456789abcdefghijklmnopqrstuv' | cut -c $(expr \( $quintet1 \) + 1))"
+
+# Bits 10-11 (high 2 bits of reserved)
+quintet2_byte="$(echo '0123456789abcdefghijklmnopqrstuv' | cut -c $(expr \( $reserved_header_bits / 8 \) + 1))"
+
+# Bit 12 (no-flat-float-array)
+if $flat_float_array
+then :
+  quintet2_zinc='0'
+else $as_nop
+  quintet2_byte="4 + $quintet2_byte"
+  quintet2_zinc='4'
+fi
+# Bit 13 (fp)
+if $frame_pointers
+then :
+  quintet2_native="8 + $quintet2_byte"
+else $as_nop
+  quintet2_native="$quintet2_byte"
+fi
+# Bit 14 (tsan)
+if $tsan
+then :
+  quintet2_native="16 + $quintet2_native"
+fi
+
+quintet2_zinc="$(echo '0123456789abcdefghijklmnopqrstuv' | cut -c $(expr \( $quintet2_zinc \) + 1))"
+quintet2_byte="$(echo '0123456789abcdefghijklmnopqrstuv' | cut -c $(expr \( $quintet2_byte \) + 1))"
+quintet2_native="$(echo '0123456789abcdefghijklmnopqrstuv' | cut -c $(expr \( $quintet2_native \) + 1))"
+
+# Bit 15 (int31)
+if $arch64
+then :
+  quintet3_zinc='0'
+else $as_nop
+  quintet3_zinc='1'
+fi
+# Bit 16 (static)
+if ! $supports_shared_libraries
+then :
+  quintet3_zinc="2 + $quintet3_zinc"
+fi
+# Bit 17 (no-compression)
+if test x"$zstd_status" != 'xok'
+then :
+  quintet3_zinc="4 + $quintet3_zinc"
+fi
+# Bit 18 (ansi)
+case $target,$windows_unicode in #(
+  *-*-mingw32,0|*-pc-windows,0) :
+    quintet3="8 + $quintet3_zinc" ;; #(
+  *) :
+    quintet3="$quintet3_zinc" ;;
+esac
+# Bit 19 (mutable-string) cannot be set since OCaml 5.0
+
+quintet3_zinc="$(echo '0123456789abcdefghijklmnopqrstuv' | cut -c $(expr \( $quintet3_zinc \) + 1))"
+quintet3="$(echo '0123456789abcdefghijklmnopqrstuv' | cut -c $(expr \( $quintet3 \) + 1))"
+
+zinc_runtime_id_lo="b1"
+zinc_runtime_id_hi="${quintet2_zinc}${quintet3_zinc}"
+bytecode_runtime_id="b${quintet1}${quintet2_byte}${quintet3}"
+native_runtime_id="b${quintet1}${quintet2_native}${quintet3}"
+
+# Update the values for is_official_release and release_number in
+# utils/config.common.ml.in (this is done when tools/autogen is run, not each
+# time configure is run!)
+
+
 # Do not permanently cache the result of flexdll.h
 unset ac_cv_header_flexdll_h
 
@@ -24638,18 +24814,16 @@ then :
   exec_prefix="$prefix"
 fi
   eval "exec_prefix=\"$exec_prefix\""
-  # Set variables necessary to create utils/config.generated.ml and the two
-  # runtime-launch-info templates in stdlib.
-  # $ocaml_bindir is used for utils/config.generated.ml and is _empty_ if the
+  # Set variables necessary to create utils/config.generated.ml.
+  # $HOST_BINDIR is always the absolute path to the binary directory, in host
+  #   format (i.e. potentially with backslashes on Windows).
+  # $TARGET_BINDIR can be specified by the caller when building cross-compilers,
+  #   and the value then is used unaltered. Otherwise, $TARGET_BINDIR is set to
+  #   '.' when the compiler is configured with --with-relative-libdir or the
+  #   value of $HOST_BINDIR otherwise.
+  # $ocaml_bindir is used in utils/config.generated.ml and is _empty_ if the
   #   compiler is configured with --with-relative-libdir (otherwise the path
   #   would be embedded in config.cmo)
-  # $HOST_BINDIR and $TARGET_BINDIR are used to generate the two
-  #   runtime-launch-info files. $HOST_BINDIR is always the absolute path to the
-  #   binary directory, in host format (i.e. potentially with backslashes on
-  #   Windows). $TARGET_BINDIR can be specified by the caller when building
-  #   cross-compilers, and the value then is used unaltered. Otherwise,
-  #   $TARGET_BINDIR is set to '.' when the compiler is configured with
-  #   --with-relative-libdir or the value of $HOST_BINDIR otherwise.
   eval "HOST_BINDIR=\"$ocaml_bindir\""
   if test "x$bindir_to_libdir" = 'x'
 then :
@@ -24676,9 +24850,9 @@ else $as_nop
   TARGET_LIBDIR="$bindir_to_libdir"
 fi
 fi
-  if test x"$target_launch_method" = 'x'
+  if test x"$launch_method_target" = 'x'
 then :
-  target_launch_method="$launch_method"
+  launch_method_target="$launch_method"
 fi
   prefix="$saved_prefix"
   exec_prefix="$saved_exec_prefix"
@@ -25635,11 +25809,6 @@ fi
 
 
 
-  launch_method='$(echo "$launch_method" | sed -e "s/'/'\"'\"'/g")'
-  target_launch_method=\
-'$(echo "$target_launch_method" | sed -e "s/'/'\"'\"'/g")'
-  HOST_BINDIR='$(echo "$HOST_BINDIR" | sed -e "s/'/'\"'\"'/g")'
-  TARGET_BINDIR='$(echo "$TARGET_BINDIR" | sed -e "s/'/'\"'\"'/g")'
 
   ocamltest_unix_mod='$ocamltest_unix_mod'
   unix_or_win32='$unix_or_win32'
@@ -25682,7 +25851,6 @@ do
     "otherlibs/unix/META") CONFIG_FILES="$CONFIG_FILES otherlibs/unix/META" ;;
     "otherlibs/unix/unix.ml") CONFIG_LINKS="$CONFIG_LINKS otherlibs/unix/unix.ml:otherlibs/unix/unix_${unix_or_win32}.ml" ;;
     "otherlibs/str/META") CONFIG_FILES="$CONFIG_FILES otherlibs/str/META" ;;
-    "shebang") CONFIG_COMMANDS="$CONFIG_COMMANDS shebang" ;;
     "otherlibs/systhreads/META") CONFIG_FILES="$CONFIG_FILES otherlibs/systhreads/META" ;;
     "links") CONFIG_COMMANDS="$CONFIG_COMMANDS links" ;;
     "ocamltest/ocamltest_config.ml") CONFIG_FILES="$CONFIG_FILES ocamltest/ocamltest_config.ml" ;;
@@ -26824,10 +26992,6 @@ ltmain=$ac_aux_dir/ltmain.sh
   chmod +x "$ofile"
 
  ;;
-    "shebang":C) printf '%s\n%s\000\n' "$launch_method" "$HOST_BINDIR" \
-    > stdlib/runtime.info
-  printf '%s\n%s\000\n' "$target_launch_method" "$TARGET_BINDIR" \
-    > stdlib/target_runtime.info ;;
     "runtime/ld.conf":C) rm -f runtime/ld.conf
   test x"$ocaml_additional_stublibs_dir" = 'x' || \
     echo "$ocaml_additional_stublibs_dir" > runtime/ld.conf

@@ -147,6 +147,7 @@ jobs:
             --enable-ocamltest
             ${{ endsWith(matrix.arch, '64') && '--enable-native-toplevel' || '--disable-native-toplevel' }}
             ${{ matrix.libdir == 'relative' && '--with-relative-libdir' || '--without-relative-libdir' }}
+            ${{ matrix.libdir == 'relative' && '--enable-runtime-search --enable-runtime-search-target=fallback' || '--disable-runtime-search --disable-runtime-search-target' }}
             ${{ matrix.config_arg }}
         run: |
           eval $(tools/msvs-promote-path)
