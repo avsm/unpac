@@ -104,6 +104,9 @@ Caml_inline void cpu_relax(void) {
 typedef pthread_mutex_t caml_plat_mutex;
 #define CAML_PLAT_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
 
+typedef pthread_cond_t caml_plat_cond;
+#define CAML_PLAT_COND_INITIALIZER PTHREAD_COND_INITIALIZER
+
 typedef pthread_t caml_plat_thread;
 typedef pthread_attr_t caml_plat_thread_attr;
 
@@ -165,8 +168,6 @@ void caml_plat_assert_all_locks_unlocked(void);
 Caml_inline void caml_plat_unlock(caml_plat_mutex*);
 void caml_plat_mutex_free(caml_plat_mutex*);
 CAMLextern void caml_plat_mutex_reinit(caml_plat_mutex*);
-typedef pthread_cond_t caml_plat_cond;
-#define CAML_PLAT_COND_INITIALIZER PTHREAD_COND_INITIALIZER
 void caml_plat_cond_init(caml_plat_cond*);
 void caml_plat_wait(caml_plat_cond*, caml_plat_mutex*); /* blocking */
 void caml_plat_broadcast(caml_plat_cond*);
@@ -523,6 +524,12 @@ Caml_inline int caml_plat_try_lock(caml_plat_mutex* m)
   }
 }
 
+Caml_inline void caml_plat_unlock(caml_plat_mutex* m)
+{
+  DEBUG_UNLOCK(m);
+  check_err("unlock", pthread_mutex_unlock(m));
+}
+
 CAMLextern void caml_plat_lock_non_blocking_actual(caml_plat_mutex* m);
 
 Caml_inline void caml_plat_lock_non_blocking(caml_plat_mutex* m)
@@ -530,12 +537,6 @@ Caml_inline void caml_plat_lock_non_blocking(caml_plat_mutex* m)
   if (!caml_plat_try_lock(m)) {
     caml_plat_lock_non_blocking_actual(m);
   }
-}
-
-Caml_inline void caml_plat_unlock(caml_plat_mutex* m)
-{
-  DEBUG_UNLOCK(m);
-  check_err("unlock", pthread_mutex_unlock(m));
 }
 
 extern intnat caml_plat_pagesize;
