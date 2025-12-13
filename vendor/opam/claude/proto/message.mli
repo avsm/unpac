@@ -42,9 +42,9 @@ module User : sig
   (** [create_blocks blocks] creates a user message with content blocks. *)
 
   val create_with_tool_result :
-    tool_use_id:string -> content:string -> ?is_error:bool -> unit -> t
+    tool_use_id:string -> content:Jsont.json -> ?is_error:bool -> unit -> t
   (** [create_with_tool_result ~tool_use_id ~content ?is_error ()] creates a
-      user message containing a tool result. *)
+      user message containing a tool result. Content can be a string or array. *)
 
   val content : t -> content
   (** [content t] returns the content of the user message. *)

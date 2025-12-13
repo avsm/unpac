@@ -81,26 +81,27 @@ val query : t -> string -> unit
     {!Advanced.send_message} instead. *)
 
 val respond_to_tool :
-  t -> tool_use_id:string -> content:string -> ?is_error:bool -> unit -> unit
+  t -> tool_use_id:string -> content:Jsont.json -> ?is_error:bool -> unit -> unit
 (** [respond_to_tool t ~tool_use_id ~content ?is_error ()] responds to a tool
     use request.
 
     @param tool_use_id The ID from the {!Response.Tool_use.t} event
-    @param content The result content (can be any string)
+    @param content The result content (can be a string or array of content blocks)
     @param is_error Whether this is an error response (default: false) *)
 
-val respond_to_tools : t -> (string * string * bool option) list -> unit
+val respond_to_tools : t -> (string * Jsont.json * bool option) list -> unit
 (** [respond_to_tools t responses] responds to multiple tool use requests at
     once.
 
-    Each tuple is [(tool_use_id, content, is_error option)].
+    Each tuple is [(tool_use_id, content, is_error option)] where content
+    can be a string or array of content blocks.
 
     Example:
     {[
       Client.respond_to_tools client
         [
-          ("tool_use_123", "Success", None);
-          ("tool_use_456", "Error occurred", Some true);
+          ("tool_use_123", Jsont.string "Success", None);
+          ("tool_use_456", Jsont.string "Error occurred", Some true);
         ]
     ]} *)
 
