@@ -66,7 +66,12 @@ let run_test ~sw ~env =
           if is_error then begin
             Log.app (fun m -> m "\n⚠️  Tool result error for %s:" tool_use_id);
             match Claude.Content_block.Tool_result.content r with
-            | Some s -> Log.app (fun m -> m "   %s" s)
+            | Some json ->
+                let s = match Jsont_bytesrw.encode_string' Jsont.json json with
+                  | Ok str -> str
+                  | Error _ -> "<encoding error>"
+                in
+                Log.app (fun m -> m "   %s" s)
             | None -> ()
           end
       | Claude.Response.Complete result ->

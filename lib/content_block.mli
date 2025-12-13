@@ -68,8 +68,8 @@ module Tool_result : sig
   val tool_use_id : t -> string
   (** [tool_use_id t] returns the ID of the corresponding tool use. *)
 
-  val content : t -> string option
-  (** [content t] returns the optional result content. *)
+  val content : t -> Jsont.json option
+  (** [content t] returns the optional result content as raw JSON. *)
 
   val is_error : t -> bool option
   (** [is_error t] returns whether this result represents an error. *)
@@ -125,9 +125,9 @@ val tool_use : id:string -> name:string -> input:Tool_input.t -> t
 (** [tool_use ~id ~name ~input] creates a tool use content block. *)
 
 val tool_result :
-  tool_use_id:string -> ?content:string -> ?is_error:bool -> unit -> t
+  tool_use_id:string -> ?content:Jsont.json -> ?is_error:bool -> unit -> t
 (** [tool_result ~tool_use_id ?content ?is_error ()] creates a tool result
-    content block. *)
+    content block. Content can be a string or array. *)
 
 val thinking : thinking:string -> signature:string -> t
 (** [thinking ~thinking ~signature] creates a thinking content block. *)

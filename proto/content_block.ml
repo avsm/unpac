@@ -40,7 +40,7 @@ end
 module Tool_result = struct
   type t = {
     tool_use_id : string;
-    content : string option;
+    content : Jsont.json option;
     is_error : bool option;
     unknown : Unknown.t;
   }
@@ -59,7 +59,7 @@ module Tool_result = struct
   let jsont : t Jsont.t =
     Jsont.Object.map ~kind:"Tool_result" make
     |> Jsont.Object.mem "tool_use_id" Jsont.string ~enc:tool_use_id
-    |> Jsont.Object.opt_mem "content" Jsont.string ~enc:content
+    |> Jsont.Object.opt_mem "content" Jsont.json ~enc:content
     |> Jsont.Object.opt_mem "is_error" Jsont.bool ~enc:is_error
     |> Jsont.Object.keep_unknown Unknown.mems ~enc:unknown
     |> Jsont.Object.finish
