@@ -18,9 +18,10 @@
  (depends
   (ocaml (>= 5.1.0))
   eio
-  (eio_main :with-test)
+  eio_main
   fmt
   logs
+  cmdliner
   (jsont (>= 0.2.0))
   (odoc :with-doc)
   (alcotest (and :with-test (>= 1.7.0)))))
