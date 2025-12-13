@@ -22,6 +22,7 @@
   fmt
   logs
   cmdliner
+  bytesrw
   (jsont (>= 0.2.0))
   (odoc :with-doc)
   (alcotest (and :with-test (>= 1.7.0)))))
