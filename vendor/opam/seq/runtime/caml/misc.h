@@ -773,7 +773,11 @@ CAMLextern int caml_snwprintf(wchar_t * buf,
 #else
 #  if defined(__SANITIZE_ADDRESS__)
 #    undef CAMLno_asan
-#    define CAMLno_asan __attribute__((no_sanitize_address))
+#    if (defined(_MSC_VER) && !defined(__clang__))
+#      define CAMLno_asan __declspec(no_sanitize_address)
+#    else
+#      define CAMLno_asan __attribute__((no_sanitize_address))
+#    endif
 #  endif
 #endif
 
