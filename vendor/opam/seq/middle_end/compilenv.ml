@@ -156,15 +156,6 @@ let current_unit_infos () =
 let current_unit_name () =
   current_unit.ui_name
 
-let symbol_in_current_unit name =
-  let prefix = "caml" ^ current_unit.ui_symbol in
-  name = prefix ||
-  (let lp = String.length prefix in
-   String.length name >= 2 + lp
-   && String.sub name 0 lp = prefix
-   && name.[lp] = '_'
-   && name.[lp + 1] = '_')
-
 let read_unit_info filename =
   let ic = open_in_bin filename in
   try
