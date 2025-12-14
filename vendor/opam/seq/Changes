@@ -35,6 +35,10 @@ Working version
 
 ### Runtime system:
 
+- #14416: Spawned domains will record backtraces if the parent domain has
+  enabled it.
+  (Nathan Taylor, review by Gabriel Scherer)
+
 - #13616: Change free list representation in shared heap
   (Sadiq Jaffer, review by Damien Doligez)
 
