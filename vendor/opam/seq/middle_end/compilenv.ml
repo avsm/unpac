@@ -121,7 +121,8 @@ let current_unit_linkage_name () =
 let reset ?packname name =
   let packname =
     Option.map
-      (Misc.replace_substring ~before:"." ~after:(String.make 1 symbol_separator))
+      (Misc.replace_substring ~before:"."
+         ~after:(String.make 1 symbol_separator))
       packname
   in
   Hashtbl.clear global_infos_table;
