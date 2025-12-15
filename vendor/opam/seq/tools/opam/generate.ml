@@ -54,6 +54,20 @@ let output_section oc section =
     remove_file file
   end
 
+(* See note in Makefile.common *)
+let valid_in_path = function '\'' | '"' | '\\' -> false | _ -> true
+let valid_in_section c = c <> '@' && valid_in_path c
+let valid_path path =
+  if String.for_all valid_in_path path then
+    path
+  else
+    exit_because "%S contains characters invalid in a path" path
+let valid_section dir =
+  if String.for_all valid_in_section dir then
+    dir
+  else
+    exit_because "%S contains characters invalid in a section" dir
+
 (* [generate_install file] processes then erases opam-bin, opam-lib opam-libexec
    and opam-man to produce [file] *)
 let generate_install file =
@@ -74,6 +88,7 @@ let process_clone oc process =
       let dir =
         String.map (function '@' -> '/' | c -> c)
                    (String.sub file 6 (String.length file - 6))
+        |> valid_section
       in
       output_endline oc {|mkdir -p "$1"'/%s'|} dir;
       In_channel.with_open_text file @@ process oc dir;
@@ -96,7 +111,7 @@ let process_symlinks oc ~mkdir =
       let parse acc line =
         match String.split_on_char ' ' line with
         | [dir; target; source] ->
-            (dir, target, source)::acc
+            (valid_section dir, valid_path target, valid_path source)::acc
         | _ ->
             exit_because "Invalid line encountered in create-symlinks"
       in
@@ -142,6 +157,8 @@ let copy_files oc dir =
   In_channel.fold_lines (fun _ line ->
     match String.split_on_char ' ' line with
     | [source; dest] ->
+        let source = valid_path source in
+        let dest = valid_path dest in
         output_endline oc {|cp '%s' "$1"'/%s/%s'|} source dir dest
     | _ ->
         exit_because "Invalid line encountered in clone files") ()
