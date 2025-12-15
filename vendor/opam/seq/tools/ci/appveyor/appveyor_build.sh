@@ -26,6 +26,10 @@ else
   MAKE=make
 fi
 
+# The environment is too large for xargs!
+unset ORIGINAL_PATH
+unset __VSCMD_PREINIT_PATH
+
 git config --global --add safe.directory '*'
 
 function run {
@@ -158,6 +162,16 @@ case "$1" in
           $FULL_BUILD_PREFIX-$PORT/runtime/*.a \
           $FULL_BUILD_PREFIX-$PORT/otherlibs/*/lib*.a
     fi
+    # Check that libwinpthread-1.dll is not linked
+    cd "$FULL_BUILD_PREFIX-$PORT"
+    find . -name \*.exe | xargs ldd > results
+    winpthreads='^[[:blank:]]libwinpthread-[^.]\+\.dll =>'
+    if grep -q "$winpthreads" results; then
+      echo 'winpthreads is not being linked statically:'
+      grep ':$\|'"$winpthreads" results | grep -B 1 "$winpthreads"
+      exit 1
+    fi
+    rm -f results
     run_testsuite=true
     if [[ -n $APPVEYOR_PULL_REQUEST_NUMBER ]]; then
       API_URL="https://api.github.com/repos/$APPVEYOR_REPO_NAME/issues/$APPVEYOR_PULL_REQUEST_NUMBER"
@@ -267,7 +281,8 @@ case "$1" in
         script --quiet --return --command \
           "$MAKE -C ../$BUILD_PREFIX-$PORT" \
           "../$BUILD_PREFIX-$PORT/build.log" |
-            sed -e 's/\d027\[K//g' \
+            sed --unbuffered \
+                -e 's/\d027\[K//g' \
                 -e 's/\d027\[m/\d027[0m/g' \
                 -e 's/\d027\[01\([m;]\)/\d027[1\1/g'
         rm -f build.log;;
