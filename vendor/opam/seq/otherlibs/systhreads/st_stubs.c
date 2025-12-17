@@ -1055,13 +1055,16 @@ static st_retcode caml_threadstatus_wait (value wrapper)
 /* Set the current thread's name. */
 CAMLprim value caml_set_current_thread_name(value name)
 {
-#if defined(_WIN32) && defined(HAS_SETTHREADDESCRIPTION)
+#if defined(_WIN32)
+#if defined(HAS_SETTHREADDESCRIPTION)
   wchar_t *thread_name = caml_stat_strdup_to_utf16(String_val(name));
   HRESULT hr = SetThreadDescription(GetCurrentThread(), thread_name);
   caml_stat_free(thread_name);
   if (FAILED(hr))
     caml_set_current_thread_name_warning("SetThreadDescription failed!");
-
+#else
+  caml_set_current_thread_name_warning("set thread name not implemented");
+#endif
 #elif defined(HAS_PRCTL)
   char buf[1024];
   int ret = prctl(PR_SET_NAME, String_val(name));
