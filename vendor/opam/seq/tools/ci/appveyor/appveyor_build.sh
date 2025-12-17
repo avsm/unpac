@@ -20,11 +20,7 @@ BUILD_PID=0
 # This must correspond with the entry in appveyor.yml
 CACHE_DIRECTORY=/cygdrive/c/projects/cache
 
-if [[ -z $APPVEYOR_PULL_REQUEST_HEAD_COMMIT ]] ; then
-  MAKE="make -j$NUMBER_OF_PROCESSORS"
-else
-  MAKE=make
-fi
+MAKE=make
 
 # The environment is too large for xargs!
 unset ORIGINAL_PATH
@@ -242,7 +238,7 @@ case "$1" in
     )
     run "test $PORT in prefix" \
       $MAKE -f Makefile.test -C "$FULL_BUILD_PREFIX-$PORT/testsuite/in_prefix" \
-            test-in-prefix
+            -j test-in-prefix
     if [[ $PORT = 'msvc64' ]] ; then
       run "$MAKE check_all_arches" \
            $MAKE -C "$FULL_BUILD_PREFIX-$PORT" check_all_arches
@@ -289,8 +285,9 @@ case "$1" in
         set -o pipefail
         # For an explanation of the sed command, see
         # https://github.com/appveyor/ci/issues/1824
+        build="-C ../$BUILD_PREFIX-$PORT"
         script --quiet --return --command \
-          "$MAKE -C ../$BUILD_PREFIX-$PORT" \
+          "if ! $MAKE -j $build; then $MAKE $build; exit 1; fi" \
           "../$BUILD_PREFIX-$PORT/build.log" |
             sed --unbuffered \
                 -e 's/\d027\[K//g' \
