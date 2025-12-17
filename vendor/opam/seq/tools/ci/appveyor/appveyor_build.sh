@@ -30,6 +30,17 @@ fi
 unset ORIGINAL_PATH
 unset __VSCMD_PREINIT_PATH
 
+# There are some utilities on the AppVeyor runner which include mingw-w64
+# runtime DLLs which we don't want to be available in the build.
+export PATH="$(tr ':' '\n' <<<"$PATH" |
+               grep -vxFf <(which -a libwinpthread-1.dll |
+               xargs -r dirname) |
+               paste -sd:)"
+if which 'libwinpthread-1.dll' 2>/dev/null; then
+  echo 'Failed to remove libwinpthread-1.dll from PATH'
+  exit 1
+fi
+
 git config --global --add safe.directory '*'
 
 function run {
