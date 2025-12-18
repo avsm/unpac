@@ -22,9 +22,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <time.h>
-#ifndef _WIN32
 #include <unistd.h>
-#endif
 
 
 typedef pthread_t st_thread_id;
