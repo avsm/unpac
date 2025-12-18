@@ -224,8 +224,7 @@ jobs:
           opam switch create '${{ env.OPAMSWITCH }}' --empty
           opam pin add --no-action --kind=path ocaml-variants .
           opam pin add --no-action flexdll flexdll
-          opam pin add --no-action winpthreads winpthreads
-          opam install --yes flexdll winpthreads
+          opam install --yes flexdll
           opam install --yes --assume-built ocaml-variants
           opam exec -- ocamlc -v
 
