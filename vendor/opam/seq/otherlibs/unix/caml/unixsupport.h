@@ -30,9 +30,7 @@
 #include <ws2tcpip.h>
 #include <wspiapi.h>
 #else /* Unix */
-#ifndef _WIN32
 #include <unistd.h>
-#endif
 #endif
 
 #ifdef __cplusplus
