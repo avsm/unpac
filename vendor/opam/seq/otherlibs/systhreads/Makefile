@@ -84,12 +84,20 @@ $(LIBNAME).cmxa: $(THREADS_NCOBJS)
 # twice, each time with different options).
 
 ifeq "$(COMPUTE_DEPS)" "true"
-st_stubs.%.$(O): st_stubs.c
+st_stubs.%.$(O): st_stubs.c | $(DEPDIR)
 else
 st_stubs.%.$(O): st_stubs.c $(RUNTIME_HEADERS) $(wildcard *.h)
 endif
 	$(V_CC)$(CC) $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) \
-	  $(OUTPUTOBJ)$@ -c $<
+	  $(OUTPUTOBJ)$@ $(call DEP_FLAGS,$@,$(DEPDIR)/$(@:.$(O)=.$(D))) -c $<
+ifeq "$(COMPUTE_DEPS)" "true"
+# MSVC doesn't emit usable dependency information, but if GCC is available
+# then it can instead be called in order to generate the .d file.
+ifneq "$(CC)" "$(DEP_CC)"
+	$(V_CCDEPS)$(DEP_CC) $(DEP_CPPFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) $< \
+   -MM -MT $@ -MF $(DEPDIR)/$(@:.$(O)=.$(D))
+endif # ifneq "$(CC)" "$(DEP_CC)"
+endif # ifeq "$(COMPUTE_DEPS)" "true"
 
 .PHONY: partialclean
 partialclean:
@@ -130,28 +138,19 @@ installopt:
 %.cmx: %.ml
 	$(V_OCAMLOPT)$(CAMLOPT) -c $(COMPFLAGS) $(OPTCOMPFLAGS) $<
 
-DEP_FILES := st_stubs.b.$(D)
-ifeq "$(NATIVE_COMPILER)" "true"
-DEP_FILES += st_stubs.n.$(D)
-endif
-
 ifeq "$(COMPUTE_DEPS)" "true"
-include $(addprefix $(DEPDIR)/, $(DEP_FILES))
+GENERATED_DEPEND_FILES := $(wildcard $(DEPDIR)/*.$(D))
+.PHONY: $(GENERATED_DEPEND_FILES)
+include $(GENERATED_DEPEND_FILES)
 endif
 
 %.b.$(D): OC_CPPFLAGS = $(OC_BYTECODE_CPPFLAGS)
 %.n.$(O): OC_CPPFLAGS = $(OC_NATIVE_CPPFLAGS)
 %.n.$(D): OC_CPPFLAGS = $(OC_NATIVE_CPPFLAGS)
 
-define GEN_RULE
-$(DEPDIR)/%.$(1).$(D): %.c | $(DEPDIR)
-	$$(V_CCDEPS)$$(DEP_CC) $$(OC_CPPFLAGS) $$(CPPFLAGS) $$< -MT '$$*.$(1).$(O)' -MF $$@
-endef
-
-$(foreach object_type, b n, $(eval $(call GEN_RULE,$(object_type))))
-
 .PHONY: depend
 depend:
 	$(V_GEN)$(OCAMLRUN) $(ROOTDIR)/boot/ocamlc -depend -slash *.mli *.ml > .depend
 
+.PHONY: .depend
 include .depend

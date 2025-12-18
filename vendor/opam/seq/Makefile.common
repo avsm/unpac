@@ -537,9 +537,10 @@ OC_COMMON_LINKFLAGS += \
 
 # The rule to compile C files
 
-# This rule is similar to GNU make's implicit rule, except that it is more
-# general (it supports both .o and .obj)
+# Cancel GNU Make's implicit C compilation rule
+%.o: %.c
 
+# These are still here as they are shared with otherlibs/
 ifeq "$(COMPUTE_DEPS)" "true"
 RUNTIME_HEADERS :=
 REQUIRED_HEADERS :=
@@ -548,10 +549,6 @@ RUNTIME_HEADERS := $(wildcard $(ROOTDIR)/runtime/caml/*.tbl) \
                    $(wildcard $(ROOTDIR)/runtime/caml/*.h)
 REQUIRED_HEADERS := $(RUNTIME_HEADERS) $(wildcard *.h)
 endif
-
-%.$(O): %.c $(REQUIRED_HEADERS)
-	$(V_CC)$(CC) $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) \
-	  $(OUTPUTOBJ)$@ -c $<
 
 $(DEPDIR):
 	$(MKDIR) $@

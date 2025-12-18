@@ -22,6 +22,10 @@ OCAMLDEP ?= $(BOOT_OCAMLDEP)
 
 include $(ROOTDIR)/Makefile.common
 
+%.$(O): %.c $(REQUIRED_HEADERS)
+	$(V_CC)$(CC) $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) \
+	  $(OUTPUTOBJ)$@ -c $<
+
 # There are three ways the Standard Library is compiled in bytecode:
 # 1. During coldstart
 #      - using ../boot/ocamlc which runs on ../boot/ocamlrun
@@ -184,6 +188,7 @@ $(OTHERS:.cmo=.cmx) std_exit.cmx: stdlib.cmx
 clean::
 	rm -f *.cm* *.o *.obj *.a *.lib *.odoc
 
+.PHONY: .depend
 include .depend
 
 STDLIB_NAMESPACE_MODULES = $(subst $(SPACE),|,$(STDLIB_PREFIXED_MODULES))
