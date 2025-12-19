@@ -187,6 +187,9 @@ Working version
   (Émile Trotignon, review by Nicolás Ojeda Bär, Jan Midtgaard and
    Damien Doligez)
 
+- #14084: Future-proof Dynarray implementation against a smarter compiler
+  (Basile Clément, review by Gabriel Scherer)
+
 ### Type system:
 
 - #13781: Set scope of internal type nodes during abbreviation expansion
