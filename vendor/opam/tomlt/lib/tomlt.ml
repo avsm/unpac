@@ -1995,9 +1995,12 @@ let decode_tagged_json_string s =
         match s.[!pos] with
         | '"' -> Buffer.add_char buf '"'; incr pos
         | '\\' -> Buffer.add_char buf '\\'; incr pos
+        | '/' -> Buffer.add_char buf '/'; incr pos
         | 'n' -> Buffer.add_char buf '\n'; incr pos
         | 'r' -> Buffer.add_char buf '\r'; incr pos
         | 't' -> Buffer.add_char buf '\t'; incr pos
+        | 'b' -> Buffer.add_char buf '\b'; incr pos
+        | 'f' -> Buffer.add_char buf (Char.chr 0x0C); incr pos
         | 'u' ->
             incr pos;
             if !pos + 3 >= len then failwith "Invalid unicode escape";
@@ -2013,6 +2016,29 @@ let decode_tagged_json_string s =
     done;
     expect '"';
     Buffer.contents buf
+  in
+
+  (* Convert a tagged JSON object to a TOML primitive if applicable *)
+  let convert_tagged_value value =
+    match value with
+    | Toml_table [("type", Toml_string typ); ("value", Toml_string v)]
+    | Toml_table [("value", Toml_string v); ("type", Toml_string typ)] ->
+        (match typ with
+        | "string" -> Toml_string v
+        | "integer" -> Toml_int (Int64.of_string v)
+        | "float" ->
+            (match v with
+            | "inf" -> Toml_float Float.infinity
+            | "-inf" -> Toml_float Float.neg_infinity
+            | "nan" -> Toml_float Float.nan
+            | _ -> Toml_float (float_of_string v))
+        | "bool" -> Toml_bool (v = "true")
+        | "datetime" -> Toml_datetime v
+        | "datetime-local" -> Toml_datetime_local v
+        | "date-local" -> Toml_date_local v
+        | "time-local" -> Toml_time_local v
+        | _ -> failwith (Printf.sprintf "Unknown type: %s" typ))
+    | _ -> value
   in
 
   let rec parse_value () =
@@ -2039,29 +2065,7 @@ let decode_tagged_json_string s =
         let key = parse_json_string () in
         expect ':';
         let value = parse_value () in
-        (* Check if this is a tagged value *)
-        (match value with
-        | Toml_table [("type", Toml_string typ); ("value", Toml_string v)]
-        | Toml_table [("value", Toml_string v); ("type", Toml_string typ)] ->
-            let typed_value = match typ with
-              | "string" -> Toml_string v
-              | "integer" -> Toml_int (Int64.of_string v)
-              | "float" ->
-                  (match v with
-                  | "inf" -> Toml_float Float.infinity
-                  | "-inf" -> Toml_float Float.neg_infinity
-                  | "nan" -> Toml_float Float.nan
-                  | _ -> Toml_float (float_of_string v))
-              | "bool" -> Toml_bool (v = "true")
-              | "datetime" -> Toml_datetime v
-              | "datetime-local" -> Toml_datetime_local v
-              | "date-local" -> Toml_date_local v
-              | "time-local" -> Toml_time_local v
-              | _ -> failwith (Printf.sprintf "Unknown type: %s" typ)
-            in
-            pairs := (key, typed_value) :: !pairs
-        | _ ->
-            pairs := (key, value) :: !pairs)
+        pairs := (key, convert_tagged_value value) :: !pairs
       done;
       expect '}';
       Toml_table (List.rev !pairs)
@@ -2079,7 +2083,7 @@ let decode_tagged_json_string s =
       while peek () <> Some ']' do
         if not !first then expect ',';
         first := false;
-        items := parse_value () :: !items
+        items := convert_tagged_value (parse_value ()) :: !items
       done;
       expect ']';
       Toml_array (List.rev !items)
@@ -2120,8 +2124,9 @@ let rec encode_toml_value ?(inline=false) value =
 and encode_toml_string s =
   (* Check if we need to escape *)
   let needs_escape = String.exists (fun c ->
+    let code = Char.code c in
     c = '"' || c = '\\' || c = '\n' || c = '\r' || c = '\t' ||
-    Char.code c < 0x20
+    code < 0x20 || code = 0x7F
   ) s in
   if needs_escape then begin
     let buf = Buffer.create (String.length s + 2) in
@@ -2133,7 +2138,9 @@ and encode_toml_string s =
       | '\n' -> Buffer.add_string buf "\\n"
       | '\r' -> Buffer.add_string buf "\\r"
       | '\t' -> Buffer.add_string buf "\\t"
-      | c when Char.code c < 0x20 ->
+      | '\b' -> Buffer.add_string buf "\\b"
+      | c when Char.code c = 0x0C -> Buffer.add_string buf "\\f"
+      | c when Char.code c < 0x20 || Char.code c = 0x7F ->
           Buffer.add_string buf (Printf.sprintf "\\u%04X" (Char.code c))
       | c -> Buffer.add_char buf c
     ) s;
@@ -2155,11 +2162,15 @@ let encode_toml_to_buffer buf value =
     match value with
     | Toml_table pairs ->
         (* Separate simple values from nested tables *)
+        (* Only PURE table arrays (all items are tables) use [[array]] syntax.
+           Mixed arrays (primitives + tables) must be encoded inline. *)
+        let is_pure_table_array items =
+          items <> [] && List.for_all (function Toml_table _ -> true | _ -> false) items
+        in
         let simple, nested = List.partition (fun (_, v) ->
           match v with
           | Toml_table _ -> false
-          | Toml_array items ->
-              not (List.exists (function Toml_table _ -> true | _ -> false) items)
+          | Toml_array items -> not (is_pure_table_array items)
           | _ -> true
         ) pairs in
 
@@ -2183,7 +2194,8 @@ let encode_toml_to_buffer buf value =
               Buffer.add_string buf "]\n";
               has_content := true;
               encode_at_path new_path v
-          | Toml_array items when List.exists (function Toml_table _ -> true | _ -> false) items ->
+          | Toml_array items when items <> [] && List.for_all (function Toml_table _ -> true | _ -> false) items ->
+              (* Pure table array - use [[array]] syntax *)
               List.iter (fun item ->
                 match item with
                 | Toml_table _ ->
@@ -2193,12 +2205,7 @@ let encode_toml_to_buffer buf value =
                     Buffer.add_string buf "]]\n";
                     has_content := true;
                     encode_at_path new_path item
-                | _ ->
-                    Buffer.add_string buf (encode_toml_key k);
-                    Buffer.add_string buf " = ";
-                    Buffer.add_string buf (encode_toml_value ~inline:true item);
-                    Buffer.add_char buf '\n';
-                    has_content := true
+                | _ -> assert false  (* Impossible - we checked for_all above *)
               ) items
           | _ ->
               Buffer.add_string buf (encode_toml_key k);
