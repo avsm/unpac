@@ -6,27 +6,28 @@
 }
 
 let ws = [' ''\t']
-let nl = '\n'
+let eol = '\n'
+let to_eol = [^'\n']* eol
 let constr = ['A'-'Z']['a'-'z''A'-'Z''0'-'9''_']*
 let int = ['0'-'9']+
 let mnemo = ['a'-'z']['a'-'z''-']*['a'-'z']
 
 rule seek_let_number_function = parse
-| ws* "let" ws+ "number" ws* "=" ws* "function" ws* '\n'
+| ws* "let" ws+ "number" ws* "=" ws* "function" ws* eol
   { () }
-| [^'\n']* '\n'
+| to_eol
   { seek_let_number_function lexbuf }
 
 and constructors = parse
-| ws* '|' ws* (constr as c) (ws* '_')? ws* "->" ws* (int as n) [^'\n']* '\n'
+| ws* '|' ws* (constr as c) (ws* '_')? ws* "->" ws* (int as n) to_eol
   { (c, int_of_string n) :: constructors lexbuf }
-| ws* ";;" ws* '\n'
+| ws* ";;" ws* eol
   { [] }
 
 and mnemonics = parse
-| ws* (int as n) ws+ '[' (mnemo as s) ']' [^'\n']* '\n'
+| ws* (int as n) ws+ '[' (mnemo as s) ']' to_eol
   { (s, int_of_string n) :: mnemonics lexbuf }
-| [^'\n']* '\n'
+| to_eol
   { mnemonics lexbuf }
 | eof
   { [] }
