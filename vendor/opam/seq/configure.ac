@@ -2250,7 +2250,9 @@ AS_CASE([$target],
     AC_CHECK_FUNC([socketpair], [AC_DEFINE([HAS_SOCKETPAIR], [1])])],
   [*-pc-windows],
     [cclibs="$cclibs ws2_32.lib"
-    AC_SEARCH_LIBS([socket], [ws2_32])
+    dnl AC_SEARCH_LIBS doesn't work with MSVC; manually update LIBS
+    AS_ECHO(["checking for library containing socket... (cached) ws2_32.lib"])
+    LIBS="ws2_32.lib $LIBS"
     AC_CHECK_FUNC([socketpair], [AC_DEFINE([HAS_SOCKETPAIR], [1])])],
   [*-*-haiku],
     [cclibs="$cclibs -lnetwork"
@@ -2313,11 +2315,9 @@ AC_CHECK_FUNC([getcwd], [AC_DEFINE([HAS_GETCWD], [1])])
 AC_CHECK_FUNC([system], [AC_DEFINE([HAS_SYSTEM], [1])])
 
 ## utime
-## Note: this was defined in config/s-nt.h but the autoconf macros do not
-# seem to detect it properly on Windows so we hardcode the definition
-# of HAS_UTIME on Windows but this will probably need to be clarified
 AS_CASE([$target],
-  [*-w64-mingw32*|*-pc-windows], [AC_DEFINE([HAS_UTIME], [1])],
+  # SetFileTime is used instead of _utime,
+  [*-w64-mingw32*|*-pc-windows], [],
   [AC_CHECK_HEADER([sys/types.h],
     [AC_CHECK_HEADER([utime.h],
       [AC_CHECK_FUNC([utime], [AC_DEFINE([HAS_UTIME], [1])])])])])
@@ -2390,11 +2390,7 @@ AC_CHECK_FUNC([setitimer],
   [setitimer=false])
 
 ## gethostname
-# Note: detection fails on Windows so hardcoding the result
-# (should be debugged later)
-AS_CASE([$target],
-  [*-w64-mingw32*|*-pc-windows], [AC_DEFINE([HAS_GETHOSTNAME], [1])],
-  [AC_CHECK_FUNC([gethostname], [AC_DEFINE([HAS_GETHOSTNAME], [1])])])
+AC_CHECK_FUNC([gethostname], [AC_DEFINE([HAS_GETHOSTNAME], [1])])
 
 ## uname
 
@@ -3075,14 +3071,9 @@ AS_IF([test x"$bindir_to_libdir" != 'x' && test x"$TARGET_LIBDIR" != 'x'],
 # but whose value is not guessed properly by configure
 # (all this should be understood and fixed)
 AS_CASE([$target],
-  [*-w64-mingw32*],
+  [*-w64-mingw32*|*-pc-windows],
     [AC_DEFINE([HAS_BROKEN_PRINTF], [1])
-    AC_DEFINE([HAS_IPV6], [1])
-    AC_DEFINE([HAS_NICE], [1])],
-  [*-pc-windows],
-    [AC_DEFINE([HAS_BROKEN_PRINTF], [1])
-    AC_DEFINE([HAS_IPV6], [1])
-    AC_DEFINE([HAS_NICE], [1])],
+    AC_DEFINE([HAS_IPV6], [1])],
   [*-*-solaris*],
     # This is required as otherwise floats are printed
     # as "Infinity" and "Inf" instead of the expected "inf"

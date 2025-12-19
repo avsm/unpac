@@ -20586,65 +20586,8 @@ fi
  ;; #(
   *-pc-windows) :
     cclibs="$cclibs ws2_32.lib"
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for library containing socket" >&5
-printf %s "checking for library containing socket... " >&6; }
-if test ${ac_cv_search_socket+y}
-then :
-  printf %s "(cached) " >&6
-else $as_nop
-  ac_func_search_save_LIBS=$LIBS
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-char socket ();
-int
-main (void)
-{
-return socket ();
-  ;
-  return 0;
-}
-_ACEOF
-for ac_lib in '' ws2_32
-do
-  if test -z "$ac_lib"; then
-    ac_res="none required"
-  else
-    ac_res=-l$ac_lib
-    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
-  fi
-  if ac_fn_c_try_link "$LINENO"
-then :
-  ac_cv_search_socket=$ac_res
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.beam \
-    conftest$ac_exeext
-  if test ${ac_cv_search_socket+y}
-then :
-  break
-fi
-done
-if test ${ac_cv_search_socket+y}
-then :
-
-else $as_nop
-  ac_cv_search_socket=no
-fi
-rm conftest.$ac_ext
-LIBS=$ac_func_search_save_LIBS
-fi
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_socket" >&5
-printf "%s\n" "$ac_cv_search_socket" >&6; }
-ac_res=$ac_cv_search_socket
-if test "$ac_res" != no
-then :
-  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
-
-fi
-
+        printf "%s\n" "checking for library containing socket... (cached) ws2_32.lib"
+    LIBS="ws2_32.lib $LIBS"
     ac_fn_c_check_func "$LINENO" "socketpair" "ac_cv_func_socketpair"
 if test "x$ac_cv_func_socketpair" = xyes
 then :
@@ -20988,13 +20931,10 @@ fi
 
 
 ## utime
-## Note: this was defined in config/s-nt.h but the autoconf macros do not
-# seem to detect it properly on Windows so we hardcode the definition
-# of HAS_UTIME on Windows but this will probably need to be clarified
 case $target in #(
+  # SetFileTime is used instead of _utime,
   *-w64-mingw32*|*-pc-windows) :
-    printf "%s\n" "#define HAS_UTIME 1" >>confdefs.h
- ;; #(
+     ;; #(
   *) :
     ac_fn_c_check_header_compile "$LINENO" "sys/types.h" "ac_cv_header_sys_types_h" "$ac_includes_default"
 if test "x$ac_cv_header_sys_types_h" = xyes
@@ -21204,21 +21144,13 @@ fi
 
 
 ## gethostname
-# Note: detection fails on Windows so hardcoding the result
-# (should be debugged later)
-case $target in #(
-  *-w64-mingw32*|*-pc-windows) :
-    printf "%s\n" "#define HAS_GETHOSTNAME 1" >>confdefs.h
- ;; #(
-  *) :
-    ac_fn_c_check_func "$LINENO" "gethostname" "ac_cv_func_gethostname"
+ac_fn_c_check_func "$LINENO" "gethostname" "ac_cv_func_gethostname"
 if test "x$ac_cv_func_gethostname" = xyes
 then :
   printf "%s\n" "#define HAS_GETHOSTNAME 1" >>confdefs.h
 
 fi
- ;;
-esac
+
 
 ## uname
 
@@ -24464,19 +24396,10 @@ fi
 # but whose value is not guessed properly by configure
 # (all this should be understood and fixed)
 case $target in #(
-  *-w64-mingw32*) :
+  *-w64-mingw32*|*-pc-windows) :
     printf "%s\n" "#define HAS_BROKEN_PRINTF 1" >>confdefs.h
 
     printf "%s\n" "#define HAS_IPV6 1" >>confdefs.h
-
-    printf "%s\n" "#define HAS_NICE 1" >>confdefs.h
- ;; #(
-  *-pc-windows) :
-    printf "%s\n" "#define HAS_BROKEN_PRINTF 1" >>confdefs.h
-
-    printf "%s\n" "#define HAS_IPV6 1" >>confdefs.h
-
-    printf "%s\n" "#define HAS_NICE 1" >>confdefs.h
  ;; #(
   *-*-solaris*) :
     # This is required as otherwise floats are printed
