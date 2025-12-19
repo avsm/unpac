@@ -717,6 +717,7 @@ ac_includes_default="\
 ac_header_c_list=
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+DIFF_FLAGS
 DIFF
 PTHREAD_CFLAGS
 PTHREAD_LIBS
@@ -863,7 +864,7 @@ build_ocamltex
 build_ocamldebug
 with_debugger
 as_is_cc
-as_has_debug_prefix_map
+ocaml_cv_prog_as_debug_prefix_map
 cc_has_debug_prefix_map
 unix_directory
 unix_library
@@ -945,8 +946,7 @@ libext
 ac_tool_prefix
 CSCFLAGS
 CSC
-diff_supports_color
-DIFF_FLAGS
+ocaml_cv_prog_diff_supports_color
 encode_C_literal
 SAK
 SAK_BUILD
@@ -3397,7 +3397,6 @@ ocamltest_libunix=None
 ocamltest_unix_impl="dummy"
 unix_library=""
 unix_directory=""
-diff_supports_color=false
 target_libdir_is_relative=false
 srcdir_abs=''
 srcdir_abs_real=''
@@ -3465,7 +3464,6 @@ CMXS_MAGIC_NUMBER=Caml1999D037
 CMT_MAGIC_NUMBER=Caml1999T037
 
 LINEAR_MAGIC_NUMBER=Caml1999L037
-
 
 
 
@@ -18475,6 +18473,14 @@ fi
 # Support for C11 atomic types
 
 
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for options needed to enable C11 atomic support" >&5
+printf %s "checking for options needed to enable C11 atomic support... " >&6; }
+  if test ${ocaml_cv_prog_cc_c11_atomic_cflags+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
+  ocaml_cv_prog_cc_c11_atomic_cflags=no
+    for ocaml_arg in         ''        '-experimental:c11atomics'        '-std:c11'        '-std:c11 -experimental:c11atomics'    ; do
 
   saved_CC="$CC"
   saved_CFLAGS="$CFLAGS"
@@ -18487,20 +18493,12 @@ fi
   mv confdefs.h confdefs.h.bak
   touch confdefs.h
 
-
-  opts=""
-  if test -n ""
+      CFLAGS="$CFLAGS $ocaml_arg"
+      if test -n "$cclibs"
 then :
-  CFLAGS="$CFLAGS "; opts=""
+  LIBS="$LIBS $cclibs"
 fi
-  if test -n "$cclibs"
-then :
-  LIBS="$LIBS $cclibs"; opts="${opts:+$opts }$cclibs"
-fi
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking if $CC supports _Atomic types with ${opts:-no additional options}" >&5
-printf %s "checking if $CC supports _Atomic types with ${opts:-no additional options}... " >&6; }
-
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+      cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
 #include <stdint.h>
@@ -18524,17 +18522,12 @@ main (void)
 _ACEOF
 if ac_fn_c_try_link "$LINENO"
 then :
-  cc_supports_atomic=true
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
+  if test x"$ocaml_arg" = x
+then :
+  ocaml_cv_prog_cc_c11_atomic_cflags=''
 else $as_nop
-  cc_supports_atomic=false
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
+  ocaml_cv_prog_cc_c11_atomic_cflags="$ocaml_arg"
 fi
-rm -f core conftest.err conftest.$ac_objext conftest.beam \
-    conftest$ac_exeext conftest.$ac_ext
-
 
   # Restore the content of confdefs.h
   mv confdefs.h.bak confdefs.h
@@ -18545,70 +18538,10 @@ rm -f core conftest.err conftest.$ac_objext conftest.beam \
   CC="$saved_CC"
   LIBS="$saved_LIBS"
 
-
-case $cc_supports_atomic,$ocaml_cc_vendor in #(
-  false,msvc-*) :
-
-
-  saved_CC="$CC"
-  saved_CFLAGS="$CFLAGS"
-  saved_CPPFLAGS="$CPPFLAGS"
-  saved_LIBS="$LIBS"
-  saved_ac_ext="$ac_ext"
-  saved_ac_compile="$ac_compile"
-  # Move the content of confdefs.h to another file so it does not
-  # get included
-  mv confdefs.h confdefs.h.bak
-  touch confdefs.h
-
-
-  opts=""
-  if test -n "-std:c11"
-then :
-  CFLAGS="$CFLAGS -std:c11"; opts="-std:c11"
-fi
-  if test -n ""
-then :
-  LIBS="$LIBS "; opts="${opts:+$opts }"
-fi
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking if $CC supports _Atomic types with ${opts:-no additional options}" >&5
-printf %s "checking if $CC supports _Atomic types with ${opts:-no additional options}... " >&6; }
-
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-#include <stdint.h>
-#include <stdatomic.h>
-
-int
-main (void)
-{
-
-  _Atomic int64_t n;
-  int m;
-  int * _Atomic p = &m;
-  atomic_store_explicit(&n, 123, memory_order_release);
-  * atomic_exchange(&p, 0) = 45;
-  if (atomic_load_explicit(&n, memory_order_acquire))
-    return 1;
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"
-then :
-  cc_supports_atomic=true
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-else $as_nop
-  cc_supports_atomic=false
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
+      break
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam \
     conftest$ac_exeext conftest.$ac_ext
-
 
   # Restore the content of confdefs.h
   mv confdefs.h.bak confdefs.h
@@ -18619,99 +18552,27 @@ rm -f core conftest.err conftest.$ac_objext conftest.beam \
   CC="$saved_CC"
   LIBS="$saved_LIBS"
 
-
-     if $cc_supports_atomic
-then :
-  common_cflags="$common_cflags -std:c11"
-else $as_nop
-
-
-  saved_CC="$CC"
-  saved_CFLAGS="$CFLAGS"
-  saved_CPPFLAGS="$CPPFLAGS"
-  saved_LIBS="$LIBS"
-  saved_ac_ext="$ac_ext"
-  saved_ac_compile="$ac_compile"
-  # Move the content of confdefs.h to another file so it does not
-  # get included
-  mv confdefs.h confdefs.h.bak
-  touch confdefs.h
-
-
-  opts=""
-  if test -n "-std:c11 -experimental:c11atomics"
-then :
-  CFLAGS="$CFLAGS -std:c11 -experimental:c11atomics"; opts="-std:c11 -experimental:c11atomics"
-fi
-  if test -n ""
-then :
-  LIBS="$LIBS "; opts="${opts:+$opts }"
-fi
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking if $CC supports _Atomic types with ${opts:-no additional options}" >&5
-printf %s "checking if $CC supports _Atomic types with ${opts:-no additional options}... " >&6; }
-
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-#include <stdint.h>
-#include <stdatomic.h>
-
-int
-main (void)
-{
-
-  _Atomic int64_t n;
-  int m;
-  int * _Atomic p = &m;
-  atomic_store_explicit(&n, 123, memory_order_release);
-  * atomic_exchange(&p, 0) = 45;
-  if (atomic_load_explicit(&n, memory_order_acquire))
-    return 1;
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"
-then :
-  cc_supports_atomic=true
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-else $as_nop
-  cc_supports_atomic=false
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.beam \
-    conftest$ac_exeext conftest.$ac_ext
-
-
-  # Restore the content of confdefs.h
-  mv confdefs.h.bak confdefs.h
-  ac_compile="$saved_ac_compile"
-  ac_ext="$saved_ac_ext"
-  CPPFLAGS="$saved_CPPFLAGS"
-  CFLAGS="$saved_CFLAGS"
-  CC="$saved_CC"
-  LIBS="$saved_LIBS"
-
-
-        if $cc_supports_atomic
-then :
-  common_cflags="$common_cflags -std:c11 -experimental:c11atomics"
+    done
 fi
 
-fi ;; #(
-  *) :
-     ;;
-esac
-if ! $cc_supports_atomic
+  if test "x$ocaml_cv_prog_cc_c11_atomic_cflags" = xno
 then :
   { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
 printf "%s\n" "$as_me: error: in \`$ac_pwd':" >&2;}
 as_fn_error $? "C11 atomic support is required, use another C compiler
 See \`config.log' for more details" "$LINENO" 5; }
+else $as_nop
+  if test "x$ocaml_cv_prog_cc_c11_atomic_cflags" = x
+then :
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: none needed" >&5
+printf "%s\n" "none needed" >&6; }
+else $as_nop
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ocaml_cv_prog_cc_c11_atomic_cflags" >&5
+printf "%s\n" "$ocaml_cv_prog_cc_c11_atomic_cflags" >&6; }
+      common_cflags="$common_cflags $ocaml_cv_prog_cc_c11_atomic_cflags"
 fi
+fi
+
 
 # Full support for thread local storage
 # macOS and MinGW-w64 have problems with thread local storage accessed from DLLs
@@ -18952,9 +18813,13 @@ esac
 
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler supports __attribute__((optimize(\"tree-vectorize\")))" >&5
 printf %s "checking whether the C compiler supports __attribute__((optimize(\"tree-vectorize\")))... " >&6; }
+if test ${ocaml_cv_prog_cc_optimize_tree_vectorize+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
   saved_CFLAGS="$CFLAGS"
-  CFLAGS="$warn_error_flag $CFLAGS"
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+    CFLAGS="$warn_error_flag $CFLAGS"
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 __attribute__((optimize("tree-vectorize"))) void f(void) {}
 int
@@ -18967,16 +18832,20 @@ f();
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"
 then :
-  printf "%s\n" "#define SUPPORTS_TREE_VECTORIZE 1" >>confdefs.h
-
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
+  ocaml_cv_prog_cc_optimize_tree_vectorize=yes
 else $as_nop
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
+  ocaml_cv_prog_cc_optimize_tree_vectorize=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
-  CFLAGS="$saved_CFLAGS"
+    CFLAGS="$saved_CFLAGS"
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ocaml_cv_prog_cc_optimize_tree_vectorize" >&5
+printf "%s\n" "$ocaml_cv_prog_cc_optimize_tree_vectorize" >&6; }
+  if test "x$ocaml_cv_prog_cc_optimize_tree_vectorize" = xyes
+then :
+  printf "%s\n" "#define SUPPORTS_TREE_VECTORIZE 1" >>confdefs.h
+
+fi
 
 
 # Check whether the C compiler supports the labels as values extension.
@@ -23615,8 +23484,6 @@ printf "%s\n" "$as_me: the threads library is supported" >&6;} ;;
 esac
 
 ## Does the assembler support debug prefix map and CFI directives
-as_has_debug_prefix_map=false
-asm_cfi_supported=false
 if $native_compiler
 then :
   case $target in #(
@@ -23626,66 +23493,9 @@ then :
 
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the assembler supports --debug-prefix-map" >&5
 printf %s "checking whether the assembler supports --debug-prefix-map... " >&6; }
-
-
-  saved_CC="$CC"
-  saved_CFLAGS="$CFLAGS"
-  saved_CPPFLAGS="$CPPFLAGS"
-  saved_LIBS="$LIBS"
-  saved_ac_ext="$ac_ext"
-  saved_ac_compile="$ac_compile"
-  # Move the content of confdefs.h to another file so it does not
-  # get included
-  mv confdefs.h confdefs.h.bak
-  touch confdefs.h
-
-
-  # Modify C-compiler variables to use the assembler
-  CC="$AS"
-  CFLAGS="--debug-prefix-map old=new -o conftest.$ac_objext"
-  CPPFLAGS=""
-  ac_ext="S"
-  ac_compile='$CC $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
-
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-camlPervasives__loop_1128:
-        .file   1       "pervasives.ml"
-        .loc    1       193
-
-_ACEOF
-if ac_fn_c_try_compile "$LINENO"
+if test ${ocaml_cv_prog_as_debug_prefix_map+y}
 then :
-  as_has_debug_prefix_map=true
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-else $as_nop
-  as_has_debug_prefix_map=false
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
-
-
-  # Restore the content of confdefs.h
-  mv confdefs.h.bak confdefs.h
-  ac_compile="$saved_ac_compile"
-  ac_ext="$saved_ac_ext"
-  CPPFLAGS="$saved_CPPFLAGS"
-  CFLAGS="$saved_CFLAGS"
-  CC="$saved_CC"
-  LIBS="$saved_LIBS"
-
-
-
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the assembler supports CFI directives" >&5
-printf %s "checking whether the assembler supports CFI directives... " >&6; }
-
-  if test x"$enable_cfi" = "xno"
-then :
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
-printf "%s\n" "disabled" >&6; }
+  printf %s "(cached) " >&6
 else $as_nop
 
   saved_CC="$CC"
@@ -23701,8 +23511,8 @@ else $as_nop
 
 
     # Modify C-compiler variables to use the assembler
-    CC="$ASPP"
-    CFLAGS="-o conftest.$ac_objext"
+    CC="$AS"
+    CFLAGS="--debug-prefix-map old=new -o conftest.$ac_objext"
     CPPFLAGS=""
     ac_ext="S"
     ac_compile='$CC $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
@@ -23713,26 +23523,85 @@ else $as_nop
 camlPervasives__loop_1128:
         .file   1       "pervasives.ml"
         .loc    1       193
-        .cfi_startproc
-        .cfi_adjust_cfa_offset 8
-        .cfi_endproc
 
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"
 then :
-  aspp_ok=true
+  ocaml_cv_prog_as_debug_prefix_map=true
 else $as_nop
-  aspp_ok=false
+  ocaml_cv_prog_as_debug_prefix_map=false
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
 
-    if test "$AS" = "$ASPP"
+
+  # Restore the content of confdefs.h
+  mv confdefs.h.bak confdefs.h
+  ac_compile="$saved_ac_compile"
+  ac_ext="$saved_ac_ext"
+  CPPFLAGS="$saved_CPPFLAGS"
+  CFLAGS="$saved_CFLAGS"
+  CC="$saved_CC"
+  LIBS="$saved_LIBS"
+
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ocaml_cv_prog_as_debug_prefix_map" >&5
+printf "%s\n" "$ocaml_cv_prog_as_debug_prefix_map" >&6; }
+
+
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the assembler supports CFI directives" >&5
+printf %s "checking whether the assembler supports CFI directives... " >&6; }
+  if test "x$enable_cfi" != xno
 then :
-  as_ok="$aspp_ok"
+  if test ${ocaml_cv_prog_as_cfi_directives+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
+  ocaml_cv_prog_as_cfi_directives=no
+
+  saved_CC="$CC"
+  saved_CFLAGS="$CFLAGS"
+  saved_CPPFLAGS="$CPPFLAGS"
+  saved_LIBS="$LIBS"
+  saved_ac_ext="$ac_ext"
+  saved_ac_compile="$ac_compile"
+  # Move the content of confdefs.h to another file so it does not
+  # get included
+  mv confdefs.h confdefs.h.bak
+  touch confdefs.h
+
+      # Modify C-compiler variables to use the assembler
+      CC="$ASPP"
+      CFLAGS="-o conftest.$ac_objext"
+      CPPFLAGS=""
+      ac_ext="S"
+      ac_compile='$CC $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+
+        cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+  camlPervasives__loop_1128:
+          .file   1       "pervasives.ml"
+          .loc    1       193
+          .cfi_startproc
+          .cfi_adjust_cfa_offset 8
+          .cfi_endproc
+
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"
+then :
+  prog_aspp_ok=true
+else $as_nop
+  prog_aspp_ok=false
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+
+      if test "$AS" = "$ASPP"
+then :
+  prog_as_ok="$prog_aspp_ok"
 else $as_nop
   CC="$AS"
-      ac_compile='$CC $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
-      cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+        ac_compile='$CC $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+        cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
 camlPervasives__loop_1128:
@@ -23745,9 +23614,9 @@ camlPervasives__loop_1128:
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"
 then :
-  as_ok=true
+  prog_as_ok=true
 else $as_nop
-  as_ok=false
+  prog_as_ok=false
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
 fi
@@ -23763,7 +23632,13 @@ fi
   LIBS="$saved_LIBS"
 
 
-    if $aspp_ok && $as_ok
+      if $prog_aspp_ok && $prog_as_ok
+then :
+  ocaml_cv_prog_as_cfi_directives=yes
+fi
+fi
+
+    if test "x$ocaml_cv_prog_as_cfi_directives" = xyes
 then :
   asm_cfi_supported=true
       printf "%s\n" "#define ASM_CFI_SUPPORTED 1" >>confdefs.h
@@ -23771,22 +23646,22 @@ then :
       { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf "%s\n" "yes" >&6; }
 else $as_nop
-  if test x"$enable_cfi" = "xyes"
-then :
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: requested but not available
-        as_fn_error $? "exiting" "$LINENO" 5" >&5
+      as_fn_error $? "exiting" "$LINENO" 5" >&5
 printf "%s\n" "requested but not available
-        as_fn_error $? "exiting" "$LINENO" 5" >&6; }
+      as_fn_error $? "exiting" "$LINENO" 5" >&6; }
+fi
 else $as_nop
   asm_cfi_supported=false
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
+printf "%s\n" "disabled" >&6; }
 fi
-fi
-
-fi ;;
+ ;;
 esac
 fi
+# Always assign a valid default OCaml value
+: ${ocaml_cv_prog_as_debug_prefix_map:=false}
+: ${asm_cfi_supported:=false}
 
 ## Frame pointers
 
@@ -23820,10 +23695,13 @@ fi
 
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether mmap supports huge pages" >&5
 printf %s "checking whether mmap supports huge pages... " >&6; }
+  if test ${ocaml_cv_func_mmap_huge_pages+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
   if test "$cross_compiling" = yes
 then :
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no assumed" >&5
-printf "%s\n" "no assumed" >&6; }
+  ocaml_cv_func_mmap_huge_pages=no
 else $as_nop
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
@@ -23872,6 +23750,18 @@ main (void)
 _ACEOF
 if ac_fn_c_try_run "$LINENO"
 then :
+  ocaml_cv_func_mmap_huge_pages=yes
+else $as_nop
+  ocaml_cv_func_mmap_huge_pages=no
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+fi
+
+  if test x"$ocaml_cv_func_mmap_huge_pages" = "xyes"
+then :
   printf "%s\n" "#define HAS_HUGE_PAGES 1" >>confdefs.h
 
     printf "%s\n" "#define HUGE_PAGE_SIZE (4 * 1024 * 1024)" >>confdefs.h
@@ -23879,13 +23769,15 @@ then :
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf "%s\n" "yes" >&6; }
 else $as_nop
+  if test $cross_compiling = yes
+then :
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no assumed" >&5
+printf "%s\n" "no assumed" >&6; }
+else $as_nop
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
 printf "%s\n" "no" >&6; }
 fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
 fi
-
 
 
 printf "%s\n" "#define HEADER_RESERVED_BITS $reserved_header_bits" >>confdefs.h
@@ -24023,42 +23915,47 @@ fi
 
   test -n "$DIFF" && break
 done
-test -n "$DIFF" || DIFF="none"
+test -n "$DIFF" || DIFF="as_fn_error $? "ocamltest requires a diff tool" "$LINENO" 5"
 
-  DIFF_FLAGS=""
-  flags=""
   case $DIFF in #(
   diff) :
-    flags="--strip-trailing-cr -u" ;; #(
-  none) :
-    as_fn_error $? "ocamltest requires a diff tool" "$LINENO" 5 ;; #(
+    flags_to_test='--strip-trailing-cr -u' ;; #(
   *) :
      ;;
 esac
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for extra $DIFF flags" >&5
+printf %s "checking for extra $DIFF flags... " >&6; }
+if test ${ocaml_cv_prog_diff_flags+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
+  flags=""
+    for flag in ${flags_to_test}; do
+      "$DIFF" $flag /dev/zero /dev/zero >/dev/null 2>&1 && \
+        flags="${flags:+$flags }$flag"
+    done
+    ocaml_cv_prog_diff_flags="$flags"
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ocaml_cv_prog_diff_flags" >&5
+printf "%s\n" "$ocaml_cv_prog_diff_flags" >&6; }
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether $DIFF supports --color={auto,always,never}" >&5
 printf %s "checking whether $DIFF supports --color={auto,always,never}... " >&6; }
+if test ${ocaml_cv_prog_diff_supports_color+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
   if $DIFF --color=auto $0 $0 > /dev/null 2>&1
 then :
-  diff_supports_color=true; { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-else $as_nop
-  diff_supports_color=false; { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
+  ocaml_cv_prog_diff_supports_color=true
 fi
-  for flag in ${flags}; do
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether $DIFF supports $flag" >&5
-printf %s "checking whether $DIFF supports $flag... " >&6; };
-    if $DIFF $DIFF_FLAGS $flag $0 $0 > /dev/null 2>&1
-then :
-  DIFF_FLAGS="$DIFF_FLAGS $flag"
-      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-else $as_nop
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
 fi
-  done
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ocaml_cv_prog_diff_supports_color" >&5
+printf "%s\n" "$ocaml_cv_prog_diff_supports_color" >&6; }
 fi
+DIFF_FLAGS=$ocaml_cv_prog_diff_flags
+
+# Always assign a valid default OCaml value
+: ${ocaml_cv_prog_diff_supports_color:=false}
 
 if test x"$enable_flambda" = "xyes"
 then :
@@ -24102,10 +23999,13 @@ fi
 
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether mmap supports MAP_STACK" >&5
 printf %s "checking whether mmap supports MAP_STACK... " >&6; }
+  if test ${ocaml_cv_func_mmap_MAP_STACK+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
   if test "$cross_compiling" = yes
 then :
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no assumed" >&5
-printf "%s\n" "no assumed" >&6; }
+  ocaml_cv_func_mmap_MAP_STACK=no
 else $as_nop
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
@@ -24131,45 +24031,55 @@ main (void)
 _ACEOF
 if ac_fn_c_try_run "$LINENO"
 then :
-  has_mmap_map_stack=true
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
+  ocaml_cv_func_mmap_MAP_STACK=yes
 else $as_nop
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
+  ocaml_cv_func_mmap_MAP_STACK=no
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
   conftest.$ac_objext conftest.beam conftest.$ac_ext
 fi
 
+fi
 
-if test x"$enable_mmap_map_stack" = "xyes"
+  if test $cross_compiling = yes && \
+         test "x$ocaml_cv_func_mmap_MAP_STACK" = xno
 then :
-  if test x"$has_mmap_map_stack" = "xtrue"
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no assumed" >&5
+printf "%s\n" "no assumed" >&6; }
+else $as_nop
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ocaml_cv_func_mmap_MAP_STACK" >&5
+printf "%s\n" "$ocaml_cv_func_mmap_MAP_STACK" >&6; }
+fi
+
+if test "x$enable_mmap_map_stack" = xyes
+then :
+  if test "x$ocaml_cv_func_mmap_MAP_STACK" = xyes
 then :
   case $target in #(
   *-freebsd*) :
-    as_fn_error $? "mmap MAP_STACK not supported on FreeBSD" "$LINENO" 5 ;; #(
+    as_fn_error $? "mmap MAP_STACK is not supported on FreeBSD" "$LINENO" 5 ;; #(
   *) :
-    with_mmap_map_stack=true;
-        printf "%s\n" "#define USE_MMAP_MAP_STACK 1" >>confdefs.h
- ;;
+     ;;
 esac
 else $as_nop
   as_fn_error $? "mmap MAP_STACK requested but not found on $target" "$LINENO" 5
 fi
-
 else $as_nop
-  case $target in #(
-  *-openbsd*) :
-    with_mmap_map_stack=true;
-      printf "%s\n" "#define USE_MMAP_MAP_STACK 1" >>confdefs.h
-
-      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: using MAP_STACK on OpenBSD due to stack checking" >&5
-printf "%s\n" "$as_me: using MAP_STACK on OpenBSD due to stack checking" >&6;} ;; #(
+  case $target,$ocaml_cv_func_mmap_MAP_STACK,$enable_mmap_map_stack in #(
+  *-openbsd*,no,*|*-openbsd-*,*,no) :
+    as_fn_error $? "mmap MAP_STACK is required on OpenBSD" "$LINENO" 5 ;; #(
+  *-openbsd*,*,*) :
+    enable_mmap_map_stack=yes
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: Using MAP_STACK on OpenBSD due to stack checking" >&5
+printf "%s\n" "$as_me: Using MAP_STACK on OpenBSD due to stack checking" >&6;} ;; #(
   *) :
-    with_mmap_map_stack=false ;;
+     ;;
 esac
+fi
+if test x"$ocaml_cv_func_mmap_MAP_STACK$enable_mmap_map_stack" = xyesyes
+then :
+
+printf "%s\n" "#define USE_MMAP_MAP_STACK 1" >>confdefs.h
 
 fi
 

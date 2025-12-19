@@ -83,7 +83,6 @@ ocamltest_libunix=None
 ocamltest_unix_impl="dummy"
 unix_library=""
 unix_directory=""
-diff_supports_color=false
 target_libdir_is_relative=false
 srcdir_abs=''
 srcdir_abs_real=''
@@ -137,8 +136,7 @@ AC_SUBST([DEP_CC_PREFIX])
 AC_SUBST([SAK_BUILD])
 AC_SUBST([SAK])
 AC_SUBST([encode_C_literal])
-AC_SUBST([DIFF_FLAGS])
-AC_SUBST([diff_supports_color])
+AC_SUBST([ocaml_cv_prog_diff_supports_color])
 AC_SUBST([CSC])
 AC_SUBST([CSCFLAGS])
 # Note: This is present for the flexdll bootstrap where it exposed as the old
@@ -225,7 +223,7 @@ AC_SUBST([ocamltest_libunix])
 AC_SUBST([unix_library])
 AC_SUBST([unix_directory])
 AC_SUBST([cc_has_debug_prefix_map])
-AC_SUBST([as_has_debug_prefix_map])
+AC_SUBST([ocaml_cv_prog_as_debug_prefix_map])
 AC_SUBST([as_is_cc])
 AC_SUBST([with_debugger]) # TODO: rename this variable
 AC_SUBST([build_ocamldebug])
@@ -1463,18 +1461,7 @@ AS_IF([! $arch64],
 
 # Support for C11 atomic types
 
-OCAML_CC_SUPPORTS_ATOMIC([], [$cclibs])
-AS_CASE([$cc_supports_atomic,$ocaml_cc_vendor],
-  [false,msvc-*],
-    [OCAML_CC_SUPPORTS_ATOMIC([-std:c11])
-     AS_IF([$cc_supports_atomic],
-       [common_cflags="$common_cflags -std:c11"],
-       [OCAML_CC_SUPPORTS_ATOMIC([-std:c11 -experimental:c11atomics])
-        AS_IF([$cc_supports_atomic],
-          [common_cflags="$common_cflags -std:c11 -experimental:c11atomics"])
-])])
-AS_IF([! $cc_supports_atomic],
-  [AC_MSG_FAILURE([C11 atomic support is required, use another C compiler])])
+OCAML_CC_C11_ATOMIC_CFLAGS([$cclibs])
 
 # Full support for thread local storage
 # macOS and MinGW-w64 have problems with thread local storage accessed from DLLs
@@ -1610,7 +1597,7 @@ AS_CASE(["$ocaml_cc_vendor,$target"],
       [$warn_error_flag])])
 
 ## Check whether __attribute__((optimize("tree-vectorize")))) is supported
-OCAML_CC_SUPPORTS_TREE_VECTORIZE([$warn_error_flag])
+OCAML_CC_SUPPORTS_TREE_VECTORIZE
 
 # Check whether the C compiler supports the labels as values extension.
 OCAML_CC_SUPPORTS_LABELS_AS_VALUES
@@ -2769,13 +2756,14 @@ AS_CASE([$enable_systhreads,$enable_unix_lib],
   AC_MSG_NOTICE([the threads library is supported])])
 
 ## Does the assembler support debug prefix map and CFI directives
-as_has_debug_prefix_map=false
-asm_cfi_supported=false
 AS_IF([$native_compiler],
   [AS_CASE([$target],
     [*-w64-mingw32*|*-pc-windows], [],
     [OCAML_AS_HAS_DEBUG_PREFIX_MAP
     OCAML_AS_HAS_CFI_DIRECTIVES])])
+# Always assign a valid default OCaml value
+: ${ocaml_cv_prog_as_debug_prefix_map:=false}
+: ${asm_cfi_supported:=false}
 
 ## Frame pointers
 
@@ -2856,24 +2844,24 @@ AS_IF([$build_ocamltest],
   AC_CONFIG_LINKS([
     ocamltest/ocamltest_unix.ml:${ocamltest_unix_mod}
   ])
-  AC_CHECK_PROGS([DIFF], [patdiff diff], [none])
-  DIFF_FLAGS=""
-  flags=""
-  AS_CASE([$DIFF],
-    [diff], [flags="--strip-trailing-cr -u"],
-    [none],
-      [AC_MSG_ERROR([ocamltest requires a diff tool])])
-  AC_MSG_CHECKING([whether $DIFF supports --color={auto,always,never}])
-  AS_IF([$DIFF --color=auto $0 $0 > /dev/null 2>&1],
-    [diff_supports_color=true; AC_MSG_RESULT([yes])],
-    [diff_supports_color=false; AC_MSG_RESULT([no])])
-  for flag in ${flags}; do
-    AC_MSG_CHECKING([whether $DIFF supports $flag]);
-    AS_IF([$DIFF $DIFF_FLAGS $flag $0 $0 > /dev/null 2>&1],
-      [DIFF_FLAGS="$DIFF_FLAGS $flag"
-      AC_MSG_RESULT([yes])],
-      [AC_MSG_RESULT([no])])
-  done])
+  AC_CHECK_PROGS([DIFF], [patdiff diff],
+    [AC_MSG_ERROR([ocamltest requires a diff tool])])
+  AS_CASE([$DIFF], [diff], [flags_to_test='--strip-trailing-cr -u'])
+  AC_CACHE_CHECK([for extra $DIFF flags],
+    [ocaml_cv_prog_diff_flags],
+    [flags=""
+    for flag in ${flags_to_test}; do
+      "$DIFF" $flag /dev/zero /dev/zero >/dev/null 2>&1 && \
+        flags="${flags:+$flags }$flag"
+    done
+    ocaml_cv_prog_diff_flags="$flags"])
+  AC_CACHE_CHECK([whether $DIFF supports --color={auto,always,never}],
+    [ocaml_cv_prog_diff_supports_color],
+    [AS_IF([$DIFF --color=auto $0 $0 > /dev/null 2>&1],
+      [ocaml_cv_prog_diff_supports_color=true])])])
+AC_SUBST([DIFF_FLAGS], [$ocaml_cv_prog_diff_flags])
+# Always assign a valid default OCaml value
+: ${ocaml_cv_prog_diff_supports_color:=false}
 
 AS_IF([test x"$enable_flambda" = "xyes"],
   [flambda=true
@@ -2899,22 +2887,20 @@ AS_IF([test x"$enable_flat_float_array" = "xno"],
   flat_float_array=true])
 
 OCAML_MMAP_SUPPORTS_MAP_STACK
-AS_IF([test x"$enable_mmap_map_stack" = "xyes"],
-  [AS_IF([test x"$has_mmap_map_stack" = "xtrue"],
+AS_IF([test "x$enable_mmap_map_stack" = xyes],
+  [AS_IF([test "x$ocaml_cv_func_mmap_MAP_STACK" = xyes],
     [AS_CASE([$target],
        [*-freebsd*],
-         [AC_MSG_ERROR([mmap MAP_STACK not supported on FreeBSD])],
-       [with_mmap_map_stack=true;
-        AC_DEFINE([USE_MMAP_MAP_STACK], [1])])],
-    [AC_MSG_ERROR([mmap MAP_STACK requested but not found on $target])])
-  ],
-  [AS_CASE([$target],
-    [*-openbsd*],
-     [with_mmap_map_stack=true;
-      AC_DEFINE([USE_MMAP_MAP_STACK], [1])
-      AC_MSG_NOTICE([using MAP_STACK on OpenBSD due to stack checking])],
-    [with_mmap_map_stack=false])
-  ])
+         [AC_MSG_ERROR([mmap MAP_STACK is not supported on FreeBSD])])],
+    [AC_MSG_ERROR([mmap MAP_STACK requested but not found on $target])])],
+  [AS_CASE([$target,$ocaml_cv_func_mmap_MAP_STACK,$enable_mmap_map_stack],
+    [*-openbsd*,no,*|*-openbsd-*,*,no],
+      [AC_MSG_ERROR([mmap MAP_STACK is required on OpenBSD])],
+    [*-openbsd*,*,*],
+      [enable_mmap_map_stack=yes
+      AC_MSG_NOTICE([Using MAP_STACK on OpenBSD due to stack checking])])])
+AS_IF([test x"$ocaml_cv_func_mmap_MAP_STACK$enable_mmap_map_stack" = xyesyes],
+  [AC_DEFINE([USE_MMAP_MAP_STACK], [1], [Define to use mmap MAP_STACK.])])
 
 oc_native_compflags=''
 
