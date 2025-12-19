@@ -1,3 +1,11 @@
 (test
  (name test_tomlt)
  (libraries tomlt alcotest))
+
+(test
+ (name test_codec)
+ (libraries tomlt alcotest))
+
+(executable
+ (name test_debug)
+ (libraries tomlt))

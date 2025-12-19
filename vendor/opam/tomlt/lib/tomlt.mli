@@ -1,323 +1,520 @@
 (*---------------------------------------------------------------------------
-  Copyright (c) 2025 Anil Madhavapeddy <anil@recoil.org>. All rights reserved.
-  SPDX-License-Identifier: ISC
- ---------------------------------------------------------------------------*)
+   Copyright (c) 2025 Anil Madhavapeddy <anil@recoil.org>. All rights reserved.
+   SPDX-License-Identifier: ISC
+  ---------------------------------------------------------------------------*)
 
-(** TOML 1.1 codec.
+(** Declarative TOML 1.1 codecs.
 
-    Tomlt provides TOML 1.1 parsing and encoding with efficient streaming
-    support via {{:https://erratique.ch/software/bytesrw}Bytesrw}.
+    Tomlt provides a type-safe, bidirectional codec system for TOML files,
+    inspired by {{:https://erratique.ch/software/jsont}Jsont}'s approach
+    to JSON codecs.
 
     {2 Quick Start}
 
-    Parse a TOML string:
-    {[
-      let config = Tomlt.of_string {|
-        [server]
+    Define a codec for your OCaml types:
+    {v
+    type config = { host : string; port : int; debug : bool }
+
+    let config_codec =
+      Tomlt.(Table.(
+        obj (fun host port debug -> { host; port; debug })
+        |> mem "host" string ~enc:(fun c -> c.host)
+        |> mem "port" int ~enc:(fun c -> c.port)
+        |> mem "debug" bool ~enc:(fun c -> c.debug) ~dec_absent:false
+        |> finish
+      ))
+
+    let () =
+      match Tomlt.decode_string config_codec {|
         host = "localhost"
         port = 8080
-      |} in
-      match config with
-      | Ok t ->
-          let host = Tomlt.(t.%{"server"; "host"} |> to_string) in
-          let port = Tomlt.(t.%{"server"; "port"} |> to_int) in
-          Printf.printf "Server: %s:%Ld\n" host port
-      | Error e -> prerr_endline (Tomlt.Error.to_string e)
-    ]}
+      |} with
+      | Ok config -> Printf.printf "Host: %s\n" config.host
+      | Error e -> prerr_endline (Tomlt.Toml.Error.to_string e)
+    v}
 
-    Create and encode TOML:
-    {[
-      let config = Tomlt.(table [
-        "title", string "My App";
-        "database", table [
-          "host", string "localhost";
-          "ports", array [int 5432L; int 5433L]
-        ]
-      ]) in
-      print_endline (Tomlt.to_string config)
-    ]}
+    {2 Codec Pattern}
+
+    Each codec ['a t] defines:
+    - A decoder: [Toml.t -> ('a, error) result]
+    - An encoder: ['a -> Toml.t]
+
+    Codecs compose through combinators to build complex types from
+    simple primitives.
 
     {2 Module Overview}
 
-    - {!section:types} - TOML value representation
-    - {!section:construct} - Value constructors
-    - {!section:access} - Value accessors and type conversion
-    - {!section:navigate} - Table navigation
-    - {!section:decode} - Parsing from strings and readers
-    - {!section:encode} - Encoding to strings and writers
-    - {!module:Error} - Structured error types *)
+    - {!section:datetime} - Structured datetime types
+    - {!section:codec} - Core codec type and combinators
+    - {!section:base} - Primitive type codecs
+    - {!section:combinators} - Codec transformers
+    - {!section:arrays} - Array codec builders
+    - {!section:tables} - Table/object codec builders
+    - {!section:codec_ops} - Encoding and decoding operations *)
 
-open Bytesrw
+(** {1:datetime Structured Datetime Types}
 
-(** {1:types TOML Value Types} *)
+    TOML 1.1 supports four datetime formats. These modules provide
+    structured representations for parsing and formatting. *)
 
-(** The type of TOML values.
+(** Timezone offsets for TOML offset datetimes.
 
-    TOML supports the following value types:
-    - Strings (UTF-8 encoded)
-    - Integers (64-bit signed)
-    - Floats (IEEE 754 double precision)
-    - Booleans
-    - Offset date-times (RFC 3339 with timezone)
-    - Local date-times (no timezone)
-    - Local dates
-    - Local times
-    - Arrays (heterogeneous in TOML 1.1)
-    - Tables (string-keyed maps) *)
-type t =
-  | String of string
-  | Int of int64
-  | Float of float
-  | Bool of bool
-  | Datetime of string        (** Offset datetime, e.g. [1979-05-27T07:32:00Z] *)
-  | Datetime_local of string  (** Local datetime, e.g. [1979-05-27T07:32:00] *)
-  | Date_local of string      (** Local date, e.g. [1979-05-27] *)
-  | Time_local of string      (** Local time, e.g. [07:32:00] *)
-  | Array of t list
-  | Table of (string * t) list
-(** A TOML value. Tables preserve key insertion order. *)
+    Per RFC 3339, timezones are expressed as [Z] (UTC) or as
+    [+HH:MM] / [-HH:MM] offsets from UTC. *)
+module Tz : sig
+  (** Timezone offset representation. *)
+  type t =
+    | UTC                                    (** UTC timezone, written as [Z] *)
+    | Offset of { hours : int; minutes : int } (** Fixed offset from UTC *)
 
-(** {1:construct Value Constructors}
+  val utc : t
+  (** [utc] is the UTC timezone. *)
 
-    These functions create TOML values. Use them to build TOML documents
-    programmatically. *)
+  val offset : hours:int -> minutes:int -> t
+  (** [offset ~hours ~minutes] creates a fixed UTC offset.
+      Hours may be negative for western timezones. *)
 
-val string : string -> t
-(** [string s] creates a string value. *)
+  val equal : t -> t -> bool
+  (** [equal a b] is structural equality. *)
 
-val int : int64 -> t
-(** [int i] creates an integer value. *)
+  val compare : t -> t -> int
+  (** [compare a b] is a total ordering. *)
 
-val int_of_int : int -> t
-(** [int_of_int i] creates an integer value from an [int]. *)
+  val to_string : t -> string
+  (** [to_string tz] formats as ["Z"] or ["+HH:MM"]/["-HH:MM"]. *)
 
-val float : float -> t
-(** [float f] creates a float value. *)
+  val pp : Format.formatter -> t -> unit
+  (** [pp fmt tz] pretty-prints the timezone. *)
 
-val bool : bool -> t
-(** [bool b] creates a boolean value. *)
+  val of_string : string -> (t, string) result
+  (** [of_string s] parses ["Z"], ["+HH:MM"], or ["-HH:MM"]. *)
+end
 
-val array : t list -> t
-(** [array vs] creates an array value from a list of values.
-    TOML 1.1 allows heterogeneous arrays. *)
+(** Local dates (no timezone information).
 
-val table : (string * t) list -> t
-(** [table pairs] creates a table value from key-value pairs.
-    Keys should be unique; later bindings shadow earlier ones during lookup. *)
+    Represents a calendar date like [1979-05-27]. *)
+module Date : sig
+  type t = { year : int; month : int; day : int }
+  (** A calendar date with year (4 digits), month (1-12), and day (1-31). *)
 
-val datetime : string -> t
-(** [datetime s] creates an offset datetime value.
-    The string should be in RFC 3339 format with timezone,
-    e.g. ["1979-05-27T07:32:00Z"] or ["1979-05-27T07:32:00-07:00"]. *)
+  val make : year:int -> month:int -> day:int -> t
+  (** [make ~year ~month ~day] creates a date value. *)
 
-val datetime_local : string -> t
-(** [datetime_local s] creates a local datetime value (no timezone).
-    E.g. ["1979-05-27T07:32:00"]. *)
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+  val to_string : t -> string
+  (** [to_string d] formats as ["YYYY-MM-DD"]. *)
 
-val date_local : string -> t
-(** [date_local s] creates a local date value.
-    E.g. ["1979-05-27"]. *)
+  val pp : Format.formatter -> t -> unit
+  val of_string : string -> (t, string) result
+  (** [of_string s] parses ["YYYY-MM-DD"] format. *)
+end
 
-val time_local : string -> t
-(** [time_local s] creates a local time value.
-    E.g. ["07:32:00"] or ["07:32:00.999"]. *)
+(** Local times (no date or timezone).
 
-(** {1:access Value Accessors}
+    Represents a time of day like [07:32:00] or [07:32:00.999999]. *)
+module Time : sig
+  type t = {
+    hour : int;     (** Hour (0-23) *)
+    minute : int;   (** Minute (0-59) *)
+    second : int;   (** Second (0-59, 60 for leap seconds) *)
+    frac : float;   (** Fractional seconds [0.0, 1.0) *)
+  }
 
-    These functions extract OCaml values from TOML values.
-    They raise [Invalid_argument] if the value is not of the expected type. *)
+  val make : hour:int -> minute:int -> second:int -> ?frac:float -> unit -> t
+  (** [make ~hour ~minute ~second ?frac ()] creates a time value.
+      [frac] defaults to [0.0]. *)
 
-val to_string : t -> string
-(** [to_string t] returns the string if [t] is a [String].
-    @raise Invalid_argument if [t] is not a string. *)
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+  val to_string : t -> string
+  (** [to_string t] formats as ["HH:MM:SS"] or ["HH:MM:SS.fff"]. *)
 
-val to_string_opt : t -> string option
-(** [to_string_opt t] returns [Some s] if [t] is [String s], [None] otherwise. *)
+  val pp : Format.formatter -> t -> unit
+  val of_string : string -> (t, string) result
+end
 
-val to_int : t -> int64
-(** [to_int t] returns the integer if [t] is an [Int].
-    @raise Invalid_argument if [t] is not an integer. *)
+(** Offset datetimes (date + time + timezone).
 
-val to_int_opt : t -> int64 option
-(** [to_int_opt t] returns [Some i] if [t] is [Int i], [None] otherwise. *)
+    The complete datetime format per RFC 3339, like
+    [1979-05-27T07:32:00Z] or [1979-05-27T07:32:00-07:00]. *)
+module Datetime : sig
+  type t = { date : Date.t; time : Time.t; tz : Tz.t }
 
-val to_float : t -> float
-(** [to_float t] returns the float if [t] is a [Float].
-    @raise Invalid_argument if [t] is not a float. *)
+  val make : date:Date.t -> time:Time.t -> tz:Tz.t -> t
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+  val to_string : t -> string
+  val pp : Format.formatter -> t -> unit
+  val of_string : string -> (t, string) result
+end
 
-val to_float_opt : t -> float option
-(** [to_float_opt t] returns [Some f] if [t] is [Float f], [None] otherwise. *)
+(** Local datetimes (date + time, no timezone).
 
-val to_bool : t -> bool
-(** [to_bool t] returns the boolean if [t] is a [Bool].
-    @raise Invalid_argument if [t] is not a boolean. *)
+    Like [1979-05-27T07:32:00] - a datetime with no timezone
+    information, representing "wall clock" time. *)
+module Datetime_local : sig
+  type t = { date : Date.t; time : Time.t }
 
-val to_bool_opt : t -> bool option
-(** [to_bool_opt t] returns [Some b] if [t] is [Bool b], [None] otherwise. *)
+  val make : date:Date.t -> time:Time.t -> t
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+  val to_string : t -> string
+  val pp : Format.formatter -> t -> unit
+  val of_string : string -> (t, string) result
+end
 
-val to_array : t -> t list
-(** [to_array t] returns the list if [t] is an [Array].
-    @raise Invalid_argument if [t] is not an array. *)
+(** {1:codec Codec Types} *)
 
-val to_array_opt : t -> t list option
-(** [to_array_opt t] returns [Some vs] if [t] is [Array vs], [None] otherwise. *)
+(** Errors that can occur during codec operations. *)
+type codec_error =
+  | Type_mismatch of { expected : string; got : string }
+      (** TOML value was not the expected type *)
+  | Missing_member of string
+      (** Required table member was not present *)
+  | Unknown_member of string
+      (** Unknown member found (when using [error_unknown]) *)
+  | Value_error of string
+      (** Value failed validation or parsing *)
+  | Int_overflow of int64
+      (** Integer value exceeds OCaml [int] range *)
+  | Parse_error of string
+      (** Parsing failed *)
 
-val to_table : t -> (string * t) list
-(** [to_table t] returns the association list if [t] is a [Table].
-    @raise Invalid_argument if [t] is not a table. *)
+val codec_error_to_string : codec_error -> string
+(** [codec_error_to_string e] returns a human-readable error message. *)
 
-val to_table_opt : t -> (string * t) list option
-(** [to_table_opt t] returns [Some pairs] if [t] is [Table pairs], [None] otherwise. *)
+(** The type of TOML codecs.
 
-val to_datetime : t -> string
-(** [to_datetime t] returns the datetime string for any datetime type.
-    @raise Invalid_argument if [t] is not a datetime variant. *)
+    A value of type ['a t] can decode TOML values to type ['a]
+    and encode values of type ['a] to TOML. *)
+type 'a t
 
-val to_datetime_opt : t -> string option
-(** [to_datetime_opt t] returns [Some s] if [t] is any datetime variant. *)
+val kind : 'a t -> string
+(** [kind c] returns the kind description of codec [c]. *)
 
-(** {2 Type Predicates} *)
+val doc : 'a t -> string
+(** [doc c] returns the documentation string of codec [c]. *)
 
-val is_string : t -> bool
-(** [is_string t] is [true] iff [t] is a [String]. *)
+val with_doc : ?kind:string -> ?doc:string -> 'a t -> 'a t
+(** [with_doc ?kind ?doc c] returns a codec with updated metadata. *)
 
-val is_int : t -> bool
-(** [is_int t] is [true] iff [t] is an [Int]. *)
+(** {1:base Base Type Codecs}
 
-val is_float : t -> bool
-(** [is_float t] is [true] iff [t] is a [Float]. *)
+    Primitive codecs for TOML's basic value types. *)
 
-val is_bool : t -> bool
-(** [is_bool t] is [true] iff [t] is a [Bool]. *)
+val bool : bool t
+(** Codec for TOML booleans. *)
 
-val is_array : t -> bool
-(** [is_array t] is [true] iff [t] is an [Array]. *)
+val int : int t
+(** Codec for TOML integers to OCaml [int].
+    @raise Int_overflow if the value exceeds platform [int] range. *)
 
-val is_table : t -> bool
-(** [is_table t] is [true] iff [t] is a [Table]. *)
+val int32 : int32 t
+(** Codec for TOML integers to [int32]. *)
 
-val is_datetime : t -> bool
-(** [is_datetime t] is [true] iff [t] is any datetime variant. *)
+val int64 : int64 t
+(** Codec for TOML integers to [int64]. *)
 
-(** {1:navigate Table Navigation}
+val float : float t
+(** Codec for TOML floats. Handles [inf], [-inf], and [nan]. *)
 
-    Functions for navigating and querying TOML tables. *)
+val number : float t
+(** Codec that accepts both TOML integers and floats as [float].
+    Integers are converted to floats during decoding. *)
 
-val find : string -> t -> t
-(** [find key t] returns the value associated with [key] in table [t].
-    @raise Invalid_argument if [t] is not a table.
-    @raise Not_found if [key] is not in the table. *)
+val string : string t
+(** Codec for TOML strings (UTF-8 encoded). *)
 
-val find_opt : string -> t -> t option
-(** [find_opt key t] returns [Some v] if [key] maps to [v] in table [t],
-    or [None] if [key] is not bound or [t] is not a table. *)
+val datetime : Datetime.t t
+(** Codec for offset datetimes like [1979-05-27T07:32:00Z]. *)
 
-val mem : string -> t -> bool
-(** [mem key t] is [true] if [key] is bound in table [t], [false] otherwise.
-    Returns [false] if [t] is not a table. *)
+val datetime_local : Datetime_local.t t
+(** Codec for local datetimes like [1979-05-27T07:32:00]. *)
 
-val keys : t -> string list
-(** [keys t] returns all keys in table [t].
-    @raise Invalid_argument if [t] is not a table. *)
+val date_local : Date.t t
+(** Codec for local dates like [1979-05-27]. *)
 
-val get : string list -> t -> t
-(** [get path t] navigates through nested tables following [path].
-    For example, [get ["server"; "port"] t] returns [t.server.port].
-    @raise Invalid_argument if any intermediate value is not a table.
-    @raise Not_found if any key in [path] is not found. *)
+val time_local : Time.t t
+(** Codec for local times like [07:32:00]. *)
 
-val get_opt : string list -> t -> t option
-(** [get_opt path t] is like [get] but returns [None] on any error. *)
+val datetime_string : string t
+(** Codec for any datetime type as a raw string.
+    Decodes any datetime variant; encodes as offset datetime. *)
 
-val ( .%{} ) : t -> string list -> t
-(** [t.%{path}] is [get path t].
+(** {1:combinators Codec Combinators} *)
 
-    Example: [config.%{["database"; "port"]}]
+val map :
+  ?kind:string -> ?doc:string ->
+  ?dec:('a -> 'b) -> ?enc:('b -> 'a) ->
+  'a t -> 'b t
+(** [map ?dec ?enc c] transforms codec [c] through functions.
+    [dec] transforms decoded values; [enc] transforms values before encoding. *)
 
-    @raise Invalid_argument if any intermediate value is not a table.
-    @raise Not_found if any key in the path is not found. *)
+val const : ?kind:string -> ?doc:string -> 'a -> 'a t
+(** [const v] is a codec that always decodes to [v] and encodes as empty. *)
 
-val ( .%{}<- ) : t -> string list -> t -> t
-(** [t.%{path} <- v] returns a new table with value [v] at [path].
-    Creates intermediate tables as needed.
+val enum : ?cmp:('a -> 'a -> int) -> ?kind:string -> ?doc:string ->
+  (string * 'a) list -> 'a t
+(** [enum assoc] creates a codec for string enumerations.
+    @param cmp Comparison function for finding values during encoding.
+    @param assoc List of [(string, value)] pairs. *)
 
-    Example: [config.%{["server"; "host"]} <- string "localhost"]
+val option : ?kind:string -> ?doc:string -> 'a t -> 'a option t
+(** [option c] wraps codec [c] to decode [Some v] or encode [None] as omitted. *)
 
-    @raise Invalid_argument if [t] is not a table or if an intermediate
-    value exists but is not a table. *)
+val result : ok:'a t -> error:'b t -> ('a, 'b) result t
+(** [result ~ok ~error] tries [ok] first, then [error]. *)
 
-(** {1:decode Decoding (Parsing)}
+val rec' : 'a t Lazy.t -> 'a t
+(** [rec' lazy_c] creates a recursive codec.
+    Use for self-referential types:
+    {v
+    let rec tree = lazy Tomlt.(
+      Table.(obj (fun v children -> Node (v, children))
+        |> mem "value" int ~enc:(function Node (v, _) -> v)
+        |> mem "children" (list (rec' tree)) ~enc:(function Node (_, cs) -> cs)
+        |> finish))
+    v} *)
 
-    Parse TOML from various sources. *)
+(** {1:arrays Array Codecs}
 
-val of_string : string -> (t, Tomlt_error.t) result
-(** [of_string s] parses [s] as a TOML document. *)
+    Build codecs for TOML arrays. *)
 
-val of_reader : ?file:string -> Bytes.Reader.t -> (t, Tomlt_error.t) result
-(** [of_reader r] parses a TOML document from reader [r].
+module Array : sig
+  type 'a codec = 'a t
+
+  (** Encoder specification for arrays. *)
+  type ('array, 'elt) enc = {
+    fold : 'acc. ('acc -> 'elt -> 'acc) -> 'acc -> 'array -> 'acc
+  }
+
+  (** Array codec builder. *)
+  type ('array, 'elt, 'builder) map
+
+  val map :
+    ?kind:string -> ?doc:string ->
+    ?dec_empty:(unit -> 'builder) ->
+    ?dec_add:('elt -> 'builder -> 'builder) ->
+    ?dec_finish:('builder -> 'array) ->
+    ?enc:('array, 'elt) enc ->
+    'elt codec -> ('array, 'elt, 'builder) map
+  (** [map elt] creates an array codec builder for elements of type ['elt]. *)
+
+  val list : ?kind:string -> ?doc:string -> 'a codec -> ('a list, 'a, 'a list) map
+  (** [list c] builds lists from arrays of elements decoded by [c]. *)
+
+  val array : ?kind:string -> ?doc:string -> 'a codec -> ('a array, 'a, 'a list) map
+  (** [array c] builds arrays from arrays of elements decoded by [c]. *)
+
+  val finish : ('array, 'elt, 'builder) map -> 'array codec
+  (** [finish m] completes the array codec. *)
+end
+
+val list : ?kind:string -> ?doc:string -> 'a t -> 'a list t
+(** [list c] is a codec for TOML arrays as OCaml lists. *)
+
+val array : ?kind:string -> ?doc:string -> 'a t -> 'a array t
+(** [array c] is a codec for TOML arrays as OCaml arrays. *)
+
+(** {1:tables Table Codecs}
+
+    Build codecs for TOML tables (objects). The applicative-style
+    builder pattern allows defining bidirectional codecs declaratively.
+
+    {2 Basic Usage}
+
+    {v
+    type person = { name : string; age : int }
+
+    let person_codec = Tomlt.Table.(
+      obj (fun name age -> { name; age })
+      |> mem "name" Tomlt.string ~enc:(fun p -> p.name)
+      |> mem "age" Tomlt.int ~enc:(fun p -> p.age)
+      |> finish
+    )
+    v} *)
+
+module Table : sig
+  type 'a codec = 'a t
+
+  (** {2 Member Specifications} *)
+
+  module Mem : sig
+    type 'a codec = 'a t
+    type ('o, 'a) t
+    (** A member specification for type ['a] within object type ['o]. *)
+
+    val v :
+      ?doc:string ->
+      ?dec_absent:'a ->
+      ?enc:('o -> 'a) ->
+      ?enc_omit:('a -> bool) ->
+      string -> 'a codec -> ('o, 'a) t
+    (** [v name codec] creates a member specification.
+        @param doc Documentation for this member.
+        @param dec_absent Default value if member is absent (makes it optional).
+        @param enc Encoder function from object to member value.
+        @param enc_omit Predicate to omit member during encoding. *)
+
+    val opt :
+      ?doc:string ->
+      ?enc:('o -> 'a option) ->
+      string -> 'a codec -> ('o, 'a option) t
+    (** [opt name codec] creates an optional member that decodes to [None]
+        when absent and is omitted when encoding [None]. *)
+  end
+
+  (** {2 Table Builder} *)
+
+  type ('o, 'dec) map
+  (** Builder state for a table codec producing ['o], currently decoding ['dec]. *)
+
+  val obj : ?kind:string -> ?doc:string -> 'dec -> ('o, 'dec) map
+  (** [obj f] starts building a table codec with decoder function [f].
+
+      The function [f] receives each member's decoded value as arguments
+      and returns the final decoded object. Build incrementally with [mem]:
+      {v
+      obj (fun a b c -> { a; b; c })
+      |> mem "a" codec_a ~enc:...
+      |> mem "b" codec_b ~enc:...
+      |> mem "c" codec_c ~enc:...
+      |> finish
+      v} *)
+
+  val obj' : ?kind:string -> ?doc:string -> (unit -> 'dec) -> ('o, 'dec) map
+  (** [obj' f] is like [obj] but [f] is a thunk for side-effecting decoders. *)
+
+  val mem :
+    ?doc:string ->
+    ?dec_absent:'a ->
+    ?enc:('o -> 'a) ->
+    ?enc_omit:('a -> bool) ->
+    string -> 'a codec -> ('o, 'a -> 'dec) map -> ('o, 'dec) map
+  (** [mem name codec m] adds a member to the table builder.
+
+      @param name The TOML key name.
+      @param codec The codec for the member's value.
+      @param doc Documentation string.
+      @param dec_absent Default value if absent (makes member optional).
+      @param enc Extractor function for encoding.
+      @param enc_omit Predicate; if [true], omit member during encoding. *)
+
+  val opt_mem :
+    ?doc:string ->
+    ?enc:('o -> 'a option) ->
+    string -> 'a codec -> ('o, 'a option -> 'dec) map -> ('o, 'dec) map
+  (** [opt_mem name codec m] adds an optional member.
+      Absent members decode as [None]; [None] values are omitted on encode. *)
+
+  (** {2 Unknown Member Handling} *)
+
+  val skip_unknown : ('o, 'dec) map -> ('o, 'dec) map
+  (** [skip_unknown m] ignores unknown members (the default). *)
+
+  val error_unknown : ('o, 'dec) map -> ('o, 'dec) map
+  (** [error_unknown m] raises an error on unknown members. *)
+
+  (** Collection of unknown members. *)
+  module Mems : sig
+    type 'a codec = 'a t
+
+    type ('mems, 'a) enc = {
+      fold : 'acc. ('acc -> string -> 'a -> 'acc) -> 'acc -> 'mems -> 'acc
+    }
+
+    type ('mems, 'a, 'builder) map
+
+    val map :
+      ?kind:string -> ?doc:string ->
+      ?dec_empty:(unit -> 'builder) ->
+      ?dec_add:(string -> 'a -> 'builder -> 'builder) ->
+      ?dec_finish:('builder -> 'mems) ->
+      ?enc:('mems, 'a) enc ->
+      'a codec -> ('mems, 'a, 'builder) map
+
+    val string_map : ?kind:string -> ?doc:string ->
+      'a codec -> ('a Map.Make(String).t, 'a, (string * 'a) list) map
+    (** [string_map codec] collects unknown members into a [StringMap]. *)
+
+    val assoc : ?kind:string -> ?doc:string ->
+      'a codec -> ((string * 'a) list, 'a, (string * 'a) list) map
+    (** [assoc codec] collects unknown members into an association list. *)
+  end
+
+  val keep_unknown :
+    ?enc:('o -> 'mems) ->
+    ('mems, 'a, 'builder) Mems.map ->
+    ('o, 'mems -> 'dec) map -> ('o, 'dec) map
+  (** [keep_unknown mems m] collects unknown members.
+
+      Unknown members are decoded using [mems] and passed to the decoder.
+      If [enc] is provided, those members are included during encoding. *)
+
+  val finish : ('o, 'o) map -> 'o codec
+  (** [finish m] completes the table codec.
+      @raise Invalid_argument if member names are duplicated. *)
+
+  val inline : ('o, 'o) map -> 'o codec
+  (** [inline m] is like [finish] but marks the table for inline encoding. *)
+end
+
+val array_of_tables : ?kind:string -> ?doc:string -> 'a t -> 'a list t
+(** [array_of_tables c] decodes a TOML array of tables.
+    This corresponds to TOML's [[[ ]]] syntax. *)
+
+(** {1 Generic Value Codecs} *)
+
+val value : Toml.t t
+(** [value] passes TOML values through unchanged. *)
+
+val value_mems : (string * Toml.t) list t
+(** [value_mems] decodes a table as raw key-value pairs. *)
+
+val any :
+  ?kind:string -> ?doc:string ->
+  ?dec_string:'a t -> ?dec_int:'a t -> ?dec_float:'a t -> ?dec_bool:'a t ->
+  ?dec_datetime:'a t -> ?dec_array:'a t -> ?dec_table:'a t ->
+  ?enc:('a -> 'a t) ->
+  unit -> 'a t
+(** [any ()] creates a codec that handles any TOML type.
+    Provide decoders for each type you want to support.
+    The [enc] function should return the appropriate codec for encoding. *)
+
+(** {1:codec_ops Encoding and Decoding} *)
+
+val decode : 'a t -> Toml.t -> ('a, Toml.Error.t) result
+(** [decode c v] decodes TOML value [v] using codec [c]. *)
+
+val decode_exn : 'a t -> Toml.t -> 'a
+(** [decode_exn c v] is like [decode] but raises on error.
+    @raise Toml.Error.Error on decode failure. *)
+
+val encode : 'a t -> 'a -> Toml.t
+(** [encode c v] encodes OCaml value [v] to TOML using codec [c]. *)
+
+val decode_string : 'a t -> string -> ('a, Toml.Error.t) result
+(** [decode_string c s] parses TOML string [s] and decodes with [c]. *)
+
+val decode_string_exn : 'a t -> string -> 'a
+(** [decode_string_exn c s] is like [decode_string] but raises on error. *)
+
+val encode_string : 'a t -> 'a -> string
+(** [encode_string c v] encodes [v] to a TOML-formatted string. *)
+
+val decode_reader : ?file:string -> 'a t -> Bytesrw.Bytes.Reader.t ->
+  ('a, Toml.Error.t) result
+(** [decode_reader c r] parses TOML from reader [r] and decodes with [c].
     @param file Optional filename for error messages. *)
 
-val parse : string -> t
-(** [parse s] parses [s] as a TOML document.
-    @raise Error.Error on parse errors. *)
+val encode_writer : 'a t -> 'a -> Bytesrw.Bytes.Writer.t -> unit
+(** [encode_writer c v w] encodes [v] and writes TOML to writer [w]. *)
 
-val parse_reader : ?file:string -> Bytes.Reader.t -> t
-(** [parse_reader r] parses a TOML document from reader [r].
-    @param file Optional filename for error messages.
-    @raise Error.Error on parse errors. *)
+(** {1 Re-exported Modules} *)
 
-(** {1:encode Encoding}
+module Toml = Toml
+(** The raw TOML value module. Use for low-level TOML manipulation. *)
 
-    Encode TOML values to various outputs. *)
-
-val to_toml_string : t -> string
-(** [to_toml_string t] encodes [t] as a TOML document string.
-    @raise Invalid_argument if [t] is not a [Table]. *)
-
-val to_buffer : Buffer.t -> t -> unit
-(** [to_buffer buf t] writes [t] as TOML to buffer [buf].
-    @raise Invalid_argument if [t] is not a [Table]. *)
-
-val to_writer : Bytes.Writer.t -> t -> unit
-(** [to_writer w t] writes [t] as TOML to writer [w].
-    Useful for streaming output without building the full string in memory.
-    @raise Invalid_argument if [t] is not a [Table]. *)
-
-(** {1:pp Pretty Printing} *)
-
-val pp : Format.formatter -> t -> unit
-(** [pp fmt t] pretty-prints [t] in TOML format. *)
-
-val pp_value : Format.formatter -> t -> unit
-(** [pp_value fmt t] pretty-prints a single TOML value (not a full document).
-    Useful for debugging. Tables are printed as inline tables. *)
-
-val equal : t -> t -> bool
-(** [equal a b] is structural equality on TOML values.
-    NaN floats are considered equal to each other. *)
-
-val compare : t -> t -> int
-(** [compare a b] is a total ordering on TOML values. *)
-
-(** {1:errors Error Handling} *)
-
-module Error = Tomlt_error
-(** Structured error types for TOML parsing and encoding.
-
-    See {!Tomlt_error} for detailed documentation. *)
-
-(** {1:internal Internal}
-
-    These functions are primarily for testing and interoperability.
-    They may change between versions. *)
-
-module Internal : sig
-  val to_tagged_json : t -> string
-  (** Convert TOML value to tagged JSON format used by toml-test. *)
-
-  val of_tagged_json : string -> t
-  (** Parse tagged JSON format into TOML value. *)
-
-  val encode_from_tagged_json : string -> (string, string) result
-  (** Convert tagged JSON to TOML string. For toml-test encoder. *)
-end
+module Error = Toml.Error
+(** Error types from the TOML parser. *)

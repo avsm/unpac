@@ -3,7 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-module Error = Tomlt.Error
+module Error = Tomlt.Toml.Error
 
 type Eio.Exn.err += E of Error.t
 
@@ -23,7 +23,7 @@ let wrap_error f =
     raise (err e)
 
 let parse ?file input =
-  try Tomlt.parse input
+  try Tomlt.Toml.parse input
   with Error.Error e ->
     let bt = Printexc.get_raw_backtrace () in
     let eio_exn = err e in
@@ -43,5 +43,5 @@ let of_path ~fs path =
   |> parse ~file
 
 let to_flow flow value =
-  let output = Tomlt.to_toml_string value in
+  let output = Tomlt.Toml.to_toml_string value in
   Eio.Flow.copy_string output flow
