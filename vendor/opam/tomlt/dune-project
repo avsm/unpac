@@ -16,7 +16,8 @@
  (depends
   (ocaml (>= 4.14.0))
   (bytesrw (>= 0.1.0))
-  (uutf (>= 1.0.0))))
+  (uutf (>= 1.0.0))
+  (alcotest :with-test)))
 
 (package
  (name tomlt-eio)

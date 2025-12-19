@@ -1,0 +1,897 @@
+(* Comprehensive test suite for tomlt - TOML 1.1 codec *)
+
+open Tomlt
+
+(* Helper to parse and extract value *)
+let parse s =
+  match of_string s with
+  | Ok v -> v
+  | Error e -> Alcotest.fail (Error.to_string e)
+
+let parse_error s =
+  match of_string s with
+  | Ok _ -> Alcotest.fail "Expected parse error"
+  | Error _ -> ()
+
+(* Custom testable for t *)
+let rec pp_t fmt = function
+  | String s -> Format.fprintf fmt "String %S" s
+  | Int i -> Format.fprintf fmt "Int %Ld" i
+  | Float f -> Format.fprintf fmt "Float %f" f
+  | Bool b -> Format.fprintf fmt "Bool %b" b
+  | Datetime s -> Format.fprintf fmt "Datetime %S" s
+  | Datetime_local s -> Format.fprintf fmt "Datetime_local %S" s
+  | Date_local s -> Format.fprintf fmt "Date_local %S" s
+  | Time_local s -> Format.fprintf fmt "Time_local %S" s
+  | Array items ->
+      Format.fprintf fmt "Array [%a]"
+        (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ") pp_t)
+        items
+  | Table pairs ->
+      Format.fprintf fmt "Table [%a]"
+        (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ")
+           (fun fmt (k, v) -> Format.fprintf fmt "(%S, %a)" k pp_t v))
+        pairs
+
+let rec equal_t a b =
+  match a, b with
+  | String s1, String s2 -> String.equal s1 s2
+  | Int i1, Int i2 -> Int64.equal i1 i2
+  | Float f1, Float f2 ->
+      Float.equal f1 f2 || (Float.is_nan f1 && Float.is_nan f2)
+  | Bool b1, Bool b2 -> Bool.equal b1 b2
+  | Datetime s1, Datetime s2 -> String.equal s1 s2
+  | Datetime_local s1, Datetime_local s2 -> String.equal s1 s2
+  | Date_local s1, Date_local s2 -> String.equal s1 s2
+  | Time_local s1, Time_local s2 -> String.equal s1 s2
+  | Array a1, Array a2 ->
+      List.length a1 = List.length a2 &&
+      List.for_all2 equal_t a1 a2
+  | Table p1, Table p2 ->
+      List.length p1 = List.length p2 &&
+      List.for_all2 (fun (k1, v1) (k2, v2) ->
+        String.equal k1 k2 && equal_t v1 v2
+      ) (List.sort Stdlib.compare p1) (List.sort Stdlib.compare p2)
+  | _ -> false
+
+let value_testable = Alcotest.testable pp_t equal_t
+
+(* Helper to get a key from a table *)
+let get key = function
+  | Table pairs -> List.assoc key pairs
+  | _ -> Alcotest.fail "Expected table"
+
+(* ============================================
+   Comments
+   ============================================ *)
+
+let test_comment_full_line () =
+  let t = parse "# This is a comment\nkey = \"value\"" in
+  Alcotest.(check value_testable) "full line comment" (String "value") (get "key" t)
+
+let test_comment_inline () =
+  let t = parse "key = \"value\" # inline comment" in
+  Alcotest.(check value_testable) "inline comment" (String "value") (get "key" t)
+
+let test_comment_hash_in_string () =
+  let t = parse "key = \"# not a comment\"" in
+  Alcotest.(check value_testable) "hash in string" (String "# not a comment") (get "key" t)
+
+let test_comment_empty () =
+  let t = parse "#\nkey = 1" in
+  Alcotest.(check value_testable) "empty comment" (Int 1L) (get "key" t)
+
+let comment_tests = [
+  "full line comment", `Quick, test_comment_full_line;
+  "inline comment", `Quick, test_comment_inline;
+  "hash in string", `Quick, test_comment_hash_in_string;
+  "empty comment", `Quick, test_comment_empty;
+]
+
+(* ============================================
+   Keys - Bare, Quoted, Dotted
+   ============================================ *)
+
+let test_bare_key () =
+  let t = parse "key = \"value\"" in
+  Alcotest.(check value_testable) "simple bare key" (String "value") (get "key" t)
+
+let test_bare_key_underscore () =
+  let t = parse "bare_key = \"value\"" in
+  Alcotest.(check value_testable) "bare key with underscore" (String "value") (get "bare_key" t)
+
+let test_bare_key_dash () =
+  let t = parse "bare-key = \"value\"" in
+  Alcotest.(check value_testable) "bare key with dash" (String "value") (get "bare-key" t)
+
+let test_bare_key_numeric () =
+  let t = parse "1234 = \"value\"" in
+  Alcotest.(check value_testable) "numeric bare key" (String "value") (get "1234" t)
+
+let test_quoted_key_basic () =
+  let t = parse "\"127.0.0.1\" = \"value\"" in
+  Alcotest.(check value_testable) "quoted key with dots" (String "value") (get "127.0.0.1" t)
+
+let test_quoted_key_spaces () =
+  let t = parse "\"character encoding\" = \"value\"" in
+  Alcotest.(check value_testable) "quoted key with spaces" (String "value") (get "character encoding" t)
+
+let test_quoted_key_literal () =
+  let t = parse "'key' = \"value\"" in
+  Alcotest.(check value_testable) "literal quoted key" (String "value") (get "key" t)
+
+let test_empty_quoted_key () =
+  let t = parse "\"\" = \"blank\"" in
+  Alcotest.(check value_testable) "empty quoted key" (String "blank") (get "" t)
+
+let test_dotted_key () =
+  let t = parse "physical.color = \"orange\"" in
+  match get "physical" t with
+  | Table pairs ->
+      Alcotest.(check value_testable) "dotted key" (String "orange") (List.assoc "color" pairs)
+  | _ -> Alcotest.fail "Expected nested table"
+
+let test_dotted_key_quoted () =
+  let t = parse "site.\"google.com\" = true" in
+  match get "site" t with
+  | Table pairs ->
+      Alcotest.(check value_testable) "dotted key with quoted part" (Bool true) (List.assoc "google.com" pairs)
+  | _ -> Alcotest.fail "Expected nested table"
+
+let test_dotted_key_whitespace () =
+  let t = parse "fruit . color = \"yellow\"" in
+  match get "fruit" t with
+  | Table pairs ->
+      Alcotest.(check value_testable) "dotted key with whitespace" (String "yellow") (List.assoc "color" pairs)
+  | _ -> Alcotest.fail "Expected nested table"
+
+let test_duplicate_key_error () =
+  parse_error "name = \"Tom\"\nname = \"Pradyun\""
+
+let test_bare_quoted_equivalent () =
+  parse_error "spelling = \"favorite\"\n\"spelling\" = \"favourite\""
+
+let key_tests = [
+  "bare key", `Quick, test_bare_key;
+  "bare key underscore", `Quick, test_bare_key_underscore;
+  "bare key dash", `Quick, test_bare_key_dash;
+  "bare key numeric", `Quick, test_bare_key_numeric;
+  "quoted key basic", `Quick, test_quoted_key_basic;
+  "quoted key spaces", `Quick, test_quoted_key_spaces;
+  "quoted key literal", `Quick, test_quoted_key_literal;
+  "empty quoted key", `Quick, test_empty_quoted_key;
+  "dotted key", `Quick, test_dotted_key;
+  "dotted key quoted", `Quick, test_dotted_key_quoted;
+  "dotted key whitespace", `Quick, test_dotted_key_whitespace;
+  "duplicate key error", `Quick, test_duplicate_key_error;
+  "bare quoted equivalent", `Quick, test_bare_quoted_equivalent;
+]
+
+(* ============================================
+   Strings - Basic, Literal, Multiline
+   ============================================ *)
+
+let test_basic_string () =
+  let t = parse {|str = "hello world"|} in
+  Alcotest.(check value_testable) "basic string" (String "hello world") (get "str" t)
+
+let test_basic_string_escapes () =
+  let t = parse {|str = "tab\there"|} in
+  Alcotest.(check value_testable) "tab escape" (String "tab\there") (get "str" t)
+
+let test_basic_string_newline () =
+  let t = parse {|str = "line1\nline2"|} in
+  Alcotest.(check value_testable) "newline escape" (String "line1\nline2") (get "str" t)
+
+let test_basic_string_backslash () =
+  let t = parse {|str = "back\\slash"|} in
+  Alcotest.(check value_testable) "backslash escape" (String "back\\slash") (get "str" t)
+
+let test_basic_string_quote () =
+  let t = parse {|str = "say \"hello\""|} in
+  Alcotest.(check value_testable) "quote escape" (String "say \"hello\"") (get "str" t)
+
+let test_basic_string_unicode_u () =
+  let t = parse {|str = "\u0041"|} in
+  Alcotest.(check value_testable) "unicode \\u escape" (String "A") (get "str" t)
+
+let test_basic_string_unicode_U () =
+  let t = parse {|str = "\U0001F600"|} in
+  (* U+1F600 is the grinning face emoji *)
+  Alcotest.(check value_testable) "unicode \\U escape" (String "\xF0\x9F\x98\x80") (get "str" t)
+
+let test_basic_string_hex_escape () =
+  let t = parse {|str = "\xE9"|} in
+  (* U+00E9 is e-acute *)
+  Alcotest.(check value_testable) "hex escape" (String "\xC3\xA9") (get "str" t)
+
+let test_basic_string_escape_e () =
+  let t = parse {|str = "\e"|} in
+  Alcotest.(check value_testable) "escape \\e" (String "\x1B") (get "str" t)
+
+let test_literal_string () =
+  let t = parse {|str = 'C:\Users\nodejs\templates'|} in
+  Alcotest.(check value_testable) "literal string" (String {|C:\Users\nodejs\templates|}) (get "str" t)
+
+let test_literal_string_no_escape () =
+  let t = parse {|str = '<\i\c*\s*>'|} in
+  Alcotest.(check value_testable) "literal no escape" (String {|<\i\c*\s*>|}) (get "str" t)
+
+let test_multiline_basic () =
+  let t = parse {|str = """
+Roses are red
+Violets are blue"""|} in
+  Alcotest.(check value_testable) "multiline basic" (String "Roses are red\nViolets are blue") (get "str" t)
+
+let test_multiline_basic_trim () =
+  let t = parse {|str = """\
+       The quick brown \
+       fox jumps over \
+       the lazy dog.\
+       """|} in
+  Alcotest.(check value_testable) "multiline trim" (String "The quick brown fox jumps over the lazy dog.") (get "str" t)
+
+let test_multiline_basic_quotes () =
+  let t = parse {|str = """Here are two quotation marks: "". Simple."""|} in
+  Alcotest.(check value_testable) "multiline with quotes" (String {|Here are two quotation marks: "". Simple.|}) (get "str" t)
+
+let test_multiline_literal () =
+  let t = parse {|str = '''
+The first newline is
+trimmed in literal strings.
+   All other whitespace
+   is preserved.
+'''|} in
+  let expected = "The first newline is\ntrimmed in literal strings.\n   All other whitespace\n   is preserved.\n" in
+  Alcotest.(check value_testable) "multiline literal" (String expected) (get "str" t)
+
+let test_multiline_literal_no_escape () =
+  let t = parse {|str = '''I [dw]on't need \d{2} apples'''|} in
+  Alcotest.(check value_testable) "multiline literal no escape" (String {|I [dw]on't need \d{2} apples|}) (get "str" t)
+
+let string_tests = [
+  "basic string", `Quick, test_basic_string;
+  "basic string escapes", `Quick, test_basic_string_escapes;
+  "basic string newline", `Quick, test_basic_string_newline;
+  "basic string backslash", `Quick, test_basic_string_backslash;
+  "basic string quote", `Quick, test_basic_string_quote;
+  "basic string unicode u", `Quick, test_basic_string_unicode_u;
+  "basic string unicode U", `Quick, test_basic_string_unicode_U;
+  "basic string hex escape", `Quick, test_basic_string_hex_escape;
+  "basic string escape e", `Quick, test_basic_string_escape_e;
+  "literal string", `Quick, test_literal_string;
+  "literal string no escape", `Quick, test_literal_string_no_escape;
+  "multiline basic", `Quick, test_multiline_basic;
+  "multiline basic trim", `Quick, test_multiline_basic_trim;
+  "multiline basic quotes", `Quick, test_multiline_basic_quotes;
+  "multiline literal", `Quick, test_multiline_literal;
+  "multiline literal no escape", `Quick, test_multiline_literal_no_escape;
+]
+
+(* ============================================
+   Integers - Decimal, Hex, Octal, Binary
+   ============================================ *)
+
+let test_integer_positive () =
+  let t = parse "int = +99" in
+  Alcotest.(check value_testable) "positive integer" (Int 99L) (get "int" t)
+
+let test_integer_plain () =
+  let t = parse "int = 42" in
+  Alcotest.(check value_testable) "plain integer" (Int 42L) (get "int" t)
+
+let test_integer_zero () =
+  let t = parse "int = 0" in
+  Alcotest.(check value_testable) "zero" (Int 0L) (get "int" t)
+
+let test_integer_negative () =
+  let t = parse "int = -17" in
+  Alcotest.(check value_testable) "negative integer" (Int (-17L)) (get "int" t)
+
+let test_integer_underscore () =
+  let t = parse "int = 1_000" in
+  Alcotest.(check value_testable) "underscore separator" (Int 1000L) (get "int" t)
+
+let test_integer_underscore_multi () =
+  let t = parse "int = 5_349_221" in
+  Alcotest.(check value_testable) "multiple underscores" (Int 5349221L) (get "int" t)
+
+let test_integer_hex () =
+  let t = parse "int = 0xDEADBEEF" in
+  Alcotest.(check value_testable) "hexadecimal" (Int 0xDEADBEEFL) (get "int" t)
+
+let test_integer_hex_lower () =
+  let t = parse "int = 0xdeadbeef" in
+  Alcotest.(check value_testable) "hex lowercase" (Int 0xdeadbeefL) (get "int" t)
+
+let test_integer_hex_underscore () =
+  let t = parse "int = 0xdead_beef" in
+  Alcotest.(check value_testable) "hex with underscore" (Int 0xdeadbeefL) (get "int" t)
+
+let test_integer_octal () =
+  let t = parse "int = 0o755" in
+  Alcotest.(check value_testable) "octal" (Int 0o755L) (get "int" t)
+
+let test_integer_binary () =
+  let t = parse "int = 0b11010110" in
+  Alcotest.(check value_testable) "binary" (Int 0b11010110L) (get "int" t)
+
+let test_integer_leading_zero_error () =
+  parse_error "int = 007"
+
+let test_integer_large () =
+  let t = parse "int = 9223372036854775807" in
+  Alcotest.(check value_testable) "max int64" (Int Int64.max_int) (get "int" t)
+
+let test_integer_negative_large () =
+  let t = parse "int = -9223372036854775808" in
+  Alcotest.(check value_testable) "min int64" (Int Int64.min_int) (get "int" t)
+
+let integer_tests = [
+  "positive integer", `Quick, test_integer_positive;
+  "plain integer", `Quick, test_integer_plain;
+  "zero", `Quick, test_integer_zero;
+  "negative integer", `Quick, test_integer_negative;
+  "underscore separator", `Quick, test_integer_underscore;
+  "multiple underscores", `Quick, test_integer_underscore_multi;
+  "hexadecimal", `Quick, test_integer_hex;
+  "hex lowercase", `Quick, test_integer_hex_lower;
+  "hex with underscore", `Quick, test_integer_hex_underscore;
+  "octal", `Quick, test_integer_octal;
+  "binary", `Quick, test_integer_binary;
+  "leading zero error", `Quick, test_integer_leading_zero_error;
+  "max int64", `Quick, test_integer_large;
+  "min int64", `Quick, test_integer_negative_large;
+]
+
+(* ============================================
+   Floats - Fractional, Exponent, Special
+   ============================================ *)
+
+let test_float_positive () =
+  let t = parse "flt = +1.0" in
+  Alcotest.(check value_testable) "positive float" (Float 1.0) (get "flt" t)
+
+let test_float_fractional () =
+  let t = parse "flt = 3.1415" in
+  Alcotest.(check value_testable) "fractional" (Float 3.1415) (get "flt" t)
+
+let test_float_negative () =
+  let t = parse "flt = -0.01" in
+  Alcotest.(check value_testable) "negative float" (Float (-0.01)) (get "flt" t)
+
+let test_float_exponent () =
+  let t = parse "flt = 5e+22" in
+  Alcotest.(check value_testable) "exponent" (Float 5e+22) (get "flt" t)
+
+let test_float_exponent_no_sign () =
+  let t = parse "flt = 1e06" in
+  Alcotest.(check value_testable) "exponent no sign" (Float 1e06) (get "flt" t)
+
+let test_float_exponent_negative () =
+  let t = parse "flt = -2E-2" in
+  Alcotest.(check value_testable) "negative exponent" (Float (-2E-2)) (get "flt" t)
+
+let test_float_both () =
+  let t = parse "flt = 6.626e-34" in
+  Alcotest.(check value_testable) "fractional and exponent" (Float 6.626e-34) (get "flt" t)
+
+let test_float_underscore () =
+  let t = parse "flt = 224_617.445_991_228" in
+  Alcotest.(check value_testable) "underscore in float" (Float 224617.445991228) (get "flt" t)
+
+let test_float_inf () =
+  let t = parse "flt = inf" in
+  Alcotest.(check value_testable) "infinity" (Float Float.infinity) (get "flt" t)
+
+let test_float_pos_inf () =
+  let t = parse "flt = +inf" in
+  Alcotest.(check value_testable) "positive infinity" (Float Float.infinity) (get "flt" t)
+
+let test_float_neg_inf () =
+  let t = parse "flt = -inf" in
+  Alcotest.(check value_testable) "negative infinity" (Float Float.neg_infinity) (get "flt" t)
+
+let test_float_nan () =
+  let t = parse "flt = nan" in
+  match get "flt" t with
+  | Float f when Float.is_nan f -> ()
+  | _ -> Alcotest.fail "Expected NaN"
+
+let test_float_pos_nan () =
+  let t = parse "flt = +nan" in
+  match get "flt" t with
+  | Float f when Float.is_nan f -> ()
+  | _ -> Alcotest.fail "Expected NaN"
+
+let test_float_neg_nan () =
+  let t = parse "flt = -nan" in
+  match get "flt" t with
+  | Float f when Float.is_nan f -> ()
+  | _ -> Alcotest.fail "Expected NaN"
+
+let test_float_no_leading_digit () =
+  parse_error "flt = .7"
+
+let test_float_no_trailing_digit () =
+  parse_error "flt = 7."
+
+let float_tests = [
+  "positive float", `Quick, test_float_positive;
+  "fractional", `Quick, test_float_fractional;
+  "negative float", `Quick, test_float_negative;
+  "exponent", `Quick, test_float_exponent;
+  "exponent no sign", `Quick, test_float_exponent_no_sign;
+  "negative exponent", `Quick, test_float_exponent_negative;
+  "fractional and exponent", `Quick, test_float_both;
+  "underscore in float", `Quick, test_float_underscore;
+  "infinity", `Quick, test_float_inf;
+  "positive infinity", `Quick, test_float_pos_inf;
+  "negative infinity", `Quick, test_float_neg_inf;
+  "nan", `Quick, test_float_nan;
+  "positive nan", `Quick, test_float_pos_nan;
+  "negative nan", `Quick, test_float_neg_nan;
+  "no leading digit", `Quick, test_float_no_leading_digit;
+  "no trailing digit", `Quick, test_float_no_trailing_digit;
+]
+
+(* ============================================
+   Booleans
+   ============================================ *)
+
+let test_bool_true () =
+  let t = parse "bool = true" in
+  Alcotest.(check value_testable) "true" (Bool true) (get "bool" t)
+
+let test_bool_false () =
+  let t = parse "bool = false" in
+  Alcotest.(check value_testable) "false" (Bool false) (get "bool" t)
+
+let test_bool_case_sensitive () =
+  parse_error "bool = True"
+
+let boolean_tests = [
+  "true", `Quick, test_bool_true;
+  "false", `Quick, test_bool_false;
+  "case sensitive", `Quick, test_bool_case_sensitive;
+]
+
+(* ============================================
+   Date-Times
+   ============================================ *)
+
+let test_datetime_offset () =
+  let t = parse "dt = 1979-05-27T07:32:00Z" in
+  Alcotest.(check value_testable) "offset datetime UTC" (Datetime "1979-05-27T07:32:00Z") (get "dt" t)
+
+let test_datetime_offset_negative () =
+  let t = parse "dt = 1979-05-27T00:32:00-07:00" in
+  Alcotest.(check value_testable) "offset datetime negative" (Datetime "1979-05-27T00:32:00-07:00") (get "dt" t)
+
+let test_datetime_offset_frac () =
+  let t = parse "dt = 1979-05-27T00:32:00.5-07:00" in
+  Alcotest.(check value_testable) "offset datetime fractional" (Datetime "1979-05-27T00:32:00.5-07:00") (get "dt" t)
+
+let test_datetime_space_separator () =
+  let t = parse "dt = 1979-05-27 07:32:00Z" in
+  Alcotest.(check value_testable) "space separator" (Datetime "1979-05-27T07:32:00Z") (get "dt" t)
+
+let test_datetime_local () =
+  let t = parse "dt = 1979-05-27T07:32:00" in
+  Alcotest.(check value_testable) "local datetime" (Datetime_local "1979-05-27T07:32:00") (get "dt" t)
+
+let test_datetime_local_frac () =
+  let t = parse "dt = 1979-05-27T07:32:00.5" in
+  Alcotest.(check value_testable) "local datetime fractional" (Datetime_local "1979-05-27T07:32:00.5") (get "dt" t)
+
+let test_date_local () =
+  let t = parse "dt = 1979-05-27" in
+  Alcotest.(check value_testable) "local date" (Date_local "1979-05-27") (get "dt" t)
+
+let test_time_local () =
+  let t = parse "dt = 07:32:00" in
+  Alcotest.(check value_testable) "local time" (Time_local "07:32:00") (get "dt" t)
+
+let test_time_local_frac () =
+  let t = parse "dt = 00:32:00.999999" in
+  Alcotest.(check value_testable) "local time fractional" (Time_local "00:32:00.999999") (get "dt" t)
+
+let datetime_tests = [
+  "offset datetime UTC", `Quick, test_datetime_offset;
+  "offset datetime negative", `Quick, test_datetime_offset_negative;
+  "offset datetime fractional", `Quick, test_datetime_offset_frac;
+  "space separator", `Quick, test_datetime_space_separator;
+  "local datetime", `Quick, test_datetime_local;
+  "local datetime fractional", `Quick, test_datetime_local_frac;
+  "local date", `Quick, test_date_local;
+  "local time", `Quick, test_time_local;
+  "local time fractional", `Quick, test_time_local_frac;
+]
+
+(* ============================================
+   Arrays
+   ============================================ *)
+
+let test_array_integers () =
+  let t = parse "arr = [1, 2, 3]" in
+  Alcotest.(check value_testable) "integer array"
+    (Array [Int 1L; Int 2L; Int 3L])
+    (get "arr" t)
+
+let test_array_strings () =
+  let t = parse {|arr = ["red", "yellow", "green"]|} in
+  Alcotest.(check value_testable) "string array"
+    (Array [String "red"; String "yellow"; String "green"])
+    (get "arr" t)
+
+let test_array_nested () =
+  let t = parse "arr = [[1, 2], [3, 4, 5]]" in
+  Alcotest.(check value_testable) "nested array"
+    (Array [
+      Array [Int 1L; Int 2L];
+      Array [Int 3L; Int 4L; Int 5L]
+    ])
+    (get "arr" t)
+
+let test_array_mixed () =
+  let t = parse "arr = [0.1, 0.2, 1, 2]" in
+  Alcotest.(check value_testable) "mixed types"
+    (Array [Float 0.1; Float 0.2; Int 1L; Int 2L])
+    (get "arr" t)
+
+let test_array_empty () =
+  let t = parse "arr = []" in
+  Alcotest.(check value_testable) "empty array" (Array []) (get "arr" t)
+
+let test_array_multiline () =
+  let t = parse "arr = [\n  1,\n  2,\n  3\n]" in
+  Alcotest.(check value_testable) "multiline array"
+    (Array [Int 1L; Int 2L; Int 3L])
+    (get "arr" t)
+
+let test_array_trailing_comma () =
+  let t = parse "arr = [1, 2, 3,]" in
+  Alcotest.(check value_testable) "trailing comma"
+    (Array [Int 1L; Int 2L; Int 3L])
+    (get "arr" t)
+
+let test_array_with_inline_tables () =
+  let t = parse {|arr = [{x = 1}, {x = 2}]|} in
+  match get "arr" t with
+  | Array [Table [("x", Int 1L)]; Table [("x", Int 2L)]] -> ()
+  | _ -> Alcotest.fail "Expected array of inline tables"
+
+let array_tests = [
+  "integer array", `Quick, test_array_integers;
+  "string array", `Quick, test_array_strings;
+  "nested array", `Quick, test_array_nested;
+  "mixed types", `Quick, test_array_mixed;
+  "empty array", `Quick, test_array_empty;
+  "multiline array", `Quick, test_array_multiline;
+  "trailing comma", `Quick, test_array_trailing_comma;
+  "with inline tables", `Quick, test_array_with_inline_tables;
+]
+
+(* ============================================
+   Tables
+   ============================================ *)
+
+let test_table_basic () =
+  let t = parse "[table]\nkey = \"value\"" in
+  match get "table" t with
+  | Table pairs ->
+      Alcotest.(check value_testable) "basic table" (String "value") (List.assoc "key" pairs)
+  | _ -> Alcotest.fail "Expected table"
+
+let test_table_multiple () =
+  let t = parse "[table1]\nkey1 = 1\n\n[table2]\nkey2 = 2" in
+  let t1 = get "table1" t and t2 = get "table2" t in
+  (match t1 with
+   | Table pairs -> Alcotest.(check value_testable) "table1" (Int 1L) (List.assoc "key1" pairs)
+   | _ -> Alcotest.fail "Expected table1");
+  (match t2 with
+   | Table pairs -> Alcotest.(check value_testable) "table2" (Int 2L) (List.assoc "key2" pairs)
+   | _ -> Alcotest.fail "Expected table2")
+
+let test_table_dotted_header () =
+  let t = parse "[dog.\"tater.man\"]\ntype = \"pug\"" in
+  match get "dog" t with
+  | Table pairs ->
+      (match List.assoc "tater.man" pairs with
+       | Table inner ->
+           Alcotest.(check value_testable) "nested quoted" (String "pug") (List.assoc "type" inner)
+       | _ -> Alcotest.fail "Expected nested table")
+  | _ -> Alcotest.fail "Expected dog table"
+
+let test_table_implicit_parent () =
+  let t = parse "[x.y.z.w]\nkey = 1" in
+  (* x, x.y, x.y.z should all be implicitly created *)
+  match get "x" t with
+  | Table _ -> ()
+  | _ -> Alcotest.fail "Expected x table"
+
+let test_table_empty () =
+  let t = parse "[empty]\n[other]\nkey = 1" in
+  match get "empty" t with
+  | Table [] -> ()
+  | Table _ -> ()  (* May have implicit content *)
+  | _ -> Alcotest.fail "Expected empty table"
+
+let test_table_duplicate_error () =
+  parse_error "[fruit]\napple = 1\n\n[fruit]\norange = 2"
+
+let test_table_super_after () =
+  let t = parse "[x.y]\na = 1\n[x]\nb = 2" in
+  match get "x" t with
+  | Table pairs ->
+      Alcotest.(check value_testable) "super table b" (Int 2L) (List.assoc "b" pairs)
+  | _ -> Alcotest.fail "Expected x table"
+
+let table_tests = [
+  "basic table", `Quick, test_table_basic;
+  "multiple tables", `Quick, test_table_multiple;
+  "dotted header", `Quick, test_table_dotted_header;
+  "implicit parent", `Quick, test_table_implicit_parent;
+  "empty table", `Quick, test_table_empty;
+  "duplicate error", `Quick, test_table_duplicate_error;
+  "super after", `Quick, test_table_super_after;
+]
+
+(* ============================================
+   Inline Tables
+   ============================================ *)
+
+let test_inline_table_basic () =
+  let t = parse {|name = { first = "Tom", last = "Preston-Werner" }|} in
+  match get "name" t with
+  | Table pairs ->
+      Alcotest.(check value_testable) "first" (String "Tom") (List.assoc "first" pairs);
+      Alcotest.(check value_testable) "last" (String "Preston-Werner") (List.assoc "last" pairs)
+  | _ -> Alcotest.fail "Expected inline table"
+
+let test_inline_table_compact () =
+  let t = parse "point = {x=1, y=2}" in
+  match get "point" t with
+  | Table pairs ->
+      Alcotest.(check value_testable) "x" (Int 1L) (List.assoc "x" pairs);
+      Alcotest.(check value_testable) "y" (Int 2L) (List.assoc "y" pairs)
+  | _ -> Alcotest.fail "Expected inline table"
+
+let test_inline_table_dotted_key () =
+  let t = parse "animal = { type.name = \"pug\" }" in
+  match get "animal" t with
+  | Table pairs ->
+      (match List.assoc "type" pairs with
+       | Table inner ->
+           Alcotest.(check value_testable) "nested" (String "pug") (List.assoc "name" inner)
+       | _ -> Alcotest.fail "Expected type table")
+  | _ -> Alcotest.fail "Expected animal table"
+
+let test_inline_table_empty () =
+  let t = parse "empty = {}" in
+  Alcotest.(check value_testable) "empty inline table" (Table []) (get "empty" t)
+
+let test_inline_table_trailing_comma () =
+  let t = parse "x = {a = 1, b = 2,}" in
+  match get "x" t with
+  | Table pairs ->
+      Alcotest.(check value_testable) "a" (Int 1L) (List.assoc "a" pairs);
+      Alcotest.(check value_testable) "b" (Int 2L) (List.assoc "b" pairs)
+  | _ -> Alcotest.fail "Expected inline table"
+
+let test_inline_table_nested () =
+  let t = parse "x = { a = { b = 1 } }" in
+  match get "x" t with
+  | Table pairs ->
+      (match List.assoc "a" pairs with
+       | Table inner ->
+           Alcotest.(check value_testable) "nested" (Int 1L) (List.assoc "b" inner)
+       | _ -> Alcotest.fail "Expected nested table")
+  | _ -> Alcotest.fail "Expected x table"
+
+let inline_table_tests = [
+  "basic inline table", `Quick, test_inline_table_basic;
+  "compact", `Quick, test_inline_table_compact;
+  "dotted key", `Quick, test_inline_table_dotted_key;
+  "empty", `Quick, test_inline_table_empty;
+  "trailing comma", `Quick, test_inline_table_trailing_comma;
+  "nested", `Quick, test_inline_table_nested;
+]
+
+(* ============================================
+   Array of Tables
+   ============================================ *)
+
+let test_array_of_tables_basic () =
+  let t = parse "[[product]]\nname = \"Hammer\"\n\n[[product]]\nname = \"Nail\"" in
+  match get "product" t with
+  | Array [Table p1; Table p2] ->
+      Alcotest.(check value_testable) "first" (String "Hammer") (List.assoc "name" p1);
+      Alcotest.(check value_testable) "second" (String "Nail") (List.assoc "name" p2)
+  | _ -> Alcotest.fail "Expected array of tables"
+
+let test_array_of_tables_empty () =
+  let t = parse "[[product]]\nname = \"Hammer\"\n\n[[product]]\n\n[[product]]\nname = \"Nail\"" in
+  match get "product" t with
+  | Array [_; Table []; _] -> ()
+  | Array items when List.length items = 3 -> ()
+  | _ -> Alcotest.fail "Expected 3 elements"
+
+let test_array_of_tables_subtable () =
+  let t = parse "[[fruits]]\nname = \"apple\"\n\n[fruits.physical]\ncolor = \"red\"" in
+  match get "fruits" t with
+  | Array [Table pairs] ->
+      Alcotest.(check value_testable) "name" (String "apple") (List.assoc "name" pairs);
+      (match List.assoc "physical" pairs with
+       | Table inner ->
+           Alcotest.(check value_testable) "color" (String "red") (List.assoc "color" inner)
+       | _ -> Alcotest.fail "Expected physical table")
+  | _ -> Alcotest.fail "Expected array of tables"
+
+let test_array_of_tables_nested () =
+  let t = parse "[[fruits]]\nname = \"apple\"\n\n[[fruits.varieties]]\nname = \"red delicious\"\n\n[[fruits.varieties]]\nname = \"granny smith\"" in
+  match get "fruits" t with
+  | Array [Table pairs] ->
+      Alcotest.(check value_testable) "name" (String "apple") (List.assoc "name" pairs);
+      (match List.assoc "varieties" pairs with
+       | Array [Table v1; Table v2] ->
+           Alcotest.(check value_testable) "v1" (String "red delicious") (List.assoc "name" v1);
+           Alcotest.(check value_testable) "v2" (String "granny smith") (List.assoc "name" v2)
+       | _ -> Alcotest.fail "Expected varieties array")
+  | _ -> Alcotest.fail "Expected fruits array"
+
+let test_array_of_tables_static_error () =
+  parse_error "fruits = []\n\n[[fruits]]"
+
+let array_of_tables_tests = [
+  "basic", `Quick, test_array_of_tables_basic;
+  "empty element", `Quick, test_array_of_tables_empty;
+  "subtable", `Quick, test_array_of_tables_subtable;
+  "nested", `Quick, test_array_of_tables_nested;
+  "static array error", `Quick, test_array_of_tables_static_error;
+]
+
+(* ============================================
+   Encoding / Round-trip
+   ============================================ *)
+
+let test_encode_roundtrip_basic () =
+  let original = Table [
+    ("name", String "test");
+    ("count", Int 42L);
+    ("enabled", Bool true);
+  ] in
+  let encoded = to_toml_string original in
+  let decoded = parse encoded in
+  Alcotest.(check value_testable) "roundtrip basic" original decoded
+
+let test_encode_roundtrip_nested () =
+  let original = Table [
+    ("server", Table [
+      ("host", String "localhost");
+      ("port", Int 8080L);
+    ]);
+  ] in
+  let encoded = to_toml_string original in
+  let decoded = parse encoded in
+  Alcotest.(check value_testable) "roundtrip nested" original decoded
+
+let test_encode_roundtrip_array () =
+  let original = Table [
+    ("items", Array [Int 1L; Int 2L; Int 3L]);
+  ] in
+  let encoded = to_toml_string original in
+  let decoded = parse encoded in
+  Alcotest.(check value_testable) "roundtrip array" original decoded
+
+let test_encode_roundtrip_special_string () =
+  let original = Table [
+    ("str", String "line1\nline2\ttab");
+  ] in
+  let encoded = to_toml_string original in
+  let decoded = parse encoded in
+  Alcotest.(check value_testable) "roundtrip special string" original decoded
+
+let test_encode_roundtrip_float () =
+  let original = Table [
+    ("pi", Float 3.14159);
+    ("inf", Float Float.infinity);
+    ("neg_inf", Float Float.neg_infinity);
+  ] in
+  let encoded = to_toml_string original in
+  let decoded = parse encoded in
+  Alcotest.(check value_testable) "roundtrip float" original decoded
+
+let test_encode_roundtrip_datetime () =
+  let original = Table [
+    ("dt", Datetime "1979-05-27T07:32:00Z");
+    ("ld", Date_local "1979-05-27");
+    ("lt", Time_local "07:32:00");
+  ] in
+  let encoded = to_toml_string original in
+  let decoded = parse encoded in
+  Alcotest.(check value_testable) "roundtrip datetime" original decoded
+
+let encode_tests = [
+  "roundtrip basic", `Quick, test_encode_roundtrip_basic;
+  "roundtrip nested", `Quick, test_encode_roundtrip_nested;
+  "roundtrip array", `Quick, test_encode_roundtrip_array;
+  "roundtrip special string", `Quick, test_encode_roundtrip_special_string;
+  "roundtrip float", `Quick, test_encode_roundtrip_float;
+  "roundtrip datetime", `Quick, test_encode_roundtrip_datetime;
+]
+
+(* ============================================
+   Edge Cases and Error Handling
+   ============================================ *)
+
+let test_error_invalid_escape () =
+  parse_error {|str = "\q"|}
+
+let test_error_unterminated_string () =
+  parse_error {|str = "hello|}
+
+let test_error_unterminated_multiline () =
+  parse_error {|str = """hello|}
+
+let test_error_bare_key_only () =
+  parse_error "key"
+
+let test_error_missing_value () =
+  parse_error "key ="
+
+let test_error_invalid_integer () =
+  parse_error "int = 1__2"
+
+let test_error_invalid_float () =
+  parse_error "flt = 1.2.3"
+
+let test_error_redefine_as_table () =
+  parse_error "a = 1\n[a]\nb = 2"
+
+let test_error_inline_extend () =
+  parse_error "[product]\ntype = { name = \"Nail\" }\ntype.edible = false"
+
+let test_unicode_key () =
+  let t = parse {|"ʎǝʞ" = "value"|} in
+  Alcotest.(check value_testable) "unicode key" (String "value") (get "ʎǝʞ" t)
+
+let test_crlf_newlines () =
+  let t = parse "key1 = 1\r\nkey2 = 2" in
+  Alcotest.(check value_testable) "key1" (Int 1L) (get "key1" t);
+  Alcotest.(check value_testable) "key2" (Int 2L) (get "key2" t)
+
+let edge_case_tests = [
+  "invalid escape", `Quick, test_error_invalid_escape;
+  "unterminated string", `Quick, test_error_unterminated_string;
+  "unterminated multiline", `Quick, test_error_unterminated_multiline;
+  "bare key only", `Quick, test_error_bare_key_only;
+  "missing value", `Quick, test_error_missing_value;
+  "invalid integer", `Quick, test_error_invalid_integer;
+  "invalid float", `Quick, test_error_invalid_float;
+  "redefine as table", `Quick, test_error_redefine_as_table;
+  "inline extend", `Quick, test_error_inline_extend;
+  "unicode key", `Quick, test_unicode_key;
+  "crlf newlines", `Quick, test_crlf_newlines;
+]
+
+(* ============================================
+   Main
+   ============================================ *)
+
+let () =
+  Alcotest.run "tomlt" [
+    "comments", comment_tests;
+    "keys", key_tests;
+    "strings", string_tests;
+    "integers", integer_tests;
+    "floats", float_tests;
+    "booleans", boolean_tests;
+    "datetimes", datetime_tests;
+    "arrays", array_tests;
+    "tables", table_tests;
+    "inline_tables", inline_table_tests;
+    "array_of_tables", array_of_tables_tests;
+    "encoding", encode_tests;
+    "edge_cases", edge_case_tests;
+  ]

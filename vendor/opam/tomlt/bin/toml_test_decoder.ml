@@ -2,11 +2,11 @@
 
 let () =
   let input = In_channel.input_all In_channel.stdin in
-  match Tomlt.decode_string input with
+  match Tomlt.of_string input with
   | Ok toml ->
-      let json = Tomlt.toml_to_tagged_json toml in
+      let json = Tomlt.Internal.to_tagged_json toml in
       print_string json;
       print_newline ()
-  | Error msg ->
-      Printf.eprintf "Error: %s\n" msg;
+  | Error e ->
+      Printf.eprintf "Error: %s\n" (Tomlt.Error.to_string e);
       exit 1
