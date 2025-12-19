@@ -255,6 +255,25 @@ let run_invalid_test toml_file =
   | Error _ -> `Pass  (* Should fail *)
   | Ok _ -> `Fail "Should have failed but parsed successfully"
 
+(* Encoder test: JSON -> TOML -> JSON round-trip *)
+let run_encoder_test json_file =
+  let json_content = In_channel.with_open_bin json_file In_channel.input_all in
+  (* First, encode JSON to TOML *)
+  match Tomlt.encode_from_tagged_json json_content with
+  | Error msg -> `Fail (Printf.sprintf "Encode error: %s" msg)
+  | Ok toml_output ->
+      (* Then decode the TOML back to check round-trip *)
+      match Tomlt.decode_string toml_output with
+      | Error msg -> `Fail (Printf.sprintf "Round-trip decode error: %s\nTOML was:\n%s" msg toml_output)
+      | Ok decoded_toml ->
+          (* Compare the decoded result with original JSON *)
+          let actual_json = Tomlt.toml_to_tagged_json decoded_toml in
+          if json_equal actual_json json_content then
+            `Pass
+          else
+            `Fail (Printf.sprintf "Round-trip mismatch.\nOriginal JSON: %s\nEncoded TOML:\n%s\nDecoded JSON: %s"
+              (normalize_json json_content) toml_output (normalize_json actual_json))
+
 let read_file_list filename =
   let ic = open_in filename in
   let rec loop acc =
@@ -267,6 +286,8 @@ let read_file_list filename =
 let () =
   let valid_passed = ref 0 in
   let valid_failed = ref 0 in
+  let encoder_passed = ref 0 in
+  let encoder_failed = ref 0 in
   let invalid_passed = ref 0 in
   let invalid_failed = ref 0 in
   let failures = ref [] in
@@ -283,11 +304,18 @@ let () =
           if Filename.check_suffix file ".toml" then begin
             let json_file = (Filename.chop_suffix full_path ".toml") ^ ".json" in
             if Sys.file_exists json_file then begin
-              match run_valid_test full_path json_file with
+              (* Decoder test: TOML -> JSON *)
+              (match run_valid_test full_path json_file with
               | `Pass -> incr valid_passed
               | `Fail msg ->
                   incr valid_failed;
-                  failures := (file, msg) :: !failures
+                  failures := (file ^ " (decode)", msg) :: !failures);
+              (* Encoder test: JSON -> TOML -> JSON round-trip *)
+              (match run_encoder_test json_file with
+              | `Pass -> incr encoder_passed
+              | `Fail msg ->
+                  incr encoder_failed;
+                  failures := (file ^ " (encode)", msg) :: !failures)
             end
           end
         end else if String.length file >= 8 && String.sub file 0 8 = "invalid/" then begin
@@ -305,11 +333,12 @@ let () =
   ) files;
 
   Printf.printf "\n=== Test Results ===\n";
-  Printf.printf "Valid tests:   %d passed, %d failed\n" !valid_passed !valid_failed;
+  Printf.printf "Decoder tests: %d passed, %d failed\n" !valid_passed !valid_failed;
+  Printf.printf "Encoder tests: %d passed, %d failed\n" !encoder_passed !encoder_failed;
   Printf.printf "Invalid tests: %d passed, %d failed\n" !invalid_passed !invalid_failed;
   Printf.printf "Total: %d passed, %d failed\n"
-    (!valid_passed + !invalid_passed)
-    (!valid_failed + !invalid_failed);
+    (!valid_passed + !encoder_passed + !invalid_passed)
+    (!valid_failed + !encoder_failed + !invalid_failed);
 
   if !failures <> [] then begin
     Printf.printf "\n=== Failures (first 30) ===\n";
