@@ -472,6 +472,9 @@ Working version
   into a match in typetexp.
   (Samuel Vivien, review by Gabriel Scherer)
 
+- #13224: Clarify barriers and spin macros with delayed expansion.
+  (Antonin Décimo, review by David Allsopp and Gabriel Scherer)
+
 ### Build system:
 
 - #13705: Cache test results of custom Autoconf tests from aclocal.m4.
