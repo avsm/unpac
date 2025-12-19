@@ -13,6 +13,7 @@ depends: [
   "ocaml" {>= "4.14.0"}
   "bytesrw" {>= "0.1.0"}
   "uutf" {>= "1.0.0"}
+  "alcotest" {with-test}
   "odoc" {with-doc}
 ]
 build: [

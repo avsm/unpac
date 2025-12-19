@@ -238,10 +238,10 @@ let json_equal a b =
 
 let run_valid_test toml_file json_file =
   let toml_content = In_channel.with_open_bin toml_file In_channel.input_all in
-  match Tomlt.decode_string toml_content with
-  | Error msg -> `Fail (Printf.sprintf "Decode error: %s" msg)
+  match Tomlt.of_string toml_content with
+  | Error e -> `Fail (Printf.sprintf "Decode error: %s" (Tomlt.Error.to_string e))
   | Ok toml ->
-      let actual_json = Tomlt.toml_to_tagged_json toml in
+      let actual_json = Tomlt.Internal.to_tagged_json toml in
       let expected_json = In_channel.with_open_bin json_file In_channel.input_all in
       if json_equal actual_json expected_json then
         `Pass
@@ -251,7 +251,7 @@ let run_valid_test toml_file json_file =
 
 let run_invalid_test toml_file =
   let toml_content = In_channel.with_open_bin toml_file In_channel.input_all in
-  match Tomlt.decode_string toml_content with
+  match Tomlt.of_string toml_content with
   | Error _ -> `Pass  (* Should fail *)
   | Ok _ -> `Fail "Should have failed but parsed successfully"
 
@@ -259,15 +259,15 @@ let run_invalid_test toml_file =
 let run_encoder_test json_file =
   let json_content = In_channel.with_open_bin json_file In_channel.input_all in
   (* First, encode JSON to TOML *)
-  match Tomlt.encode_from_tagged_json json_content with
+  match Tomlt.Internal.encode_from_tagged_json json_content with
   | Error msg -> `Fail (Printf.sprintf "Encode error: %s" msg)
   | Ok toml_output ->
       (* Then decode the TOML back to check round-trip *)
-      match Tomlt.decode_string toml_output with
-      | Error msg -> `Fail (Printf.sprintf "Round-trip decode error: %s\nTOML was:\n%s" msg toml_output)
+      match Tomlt.of_string toml_output with
+      | Error e -> `Fail (Printf.sprintf "Round-trip decode error: %s\nTOML was:\n%s" (Tomlt.Error.to_string e) toml_output)
       | Ok decoded_toml ->
           (* Compare the decoded result with original JSON *)
-          let actual_json = Tomlt.toml_to_tagged_json decoded_toml in
+          let actual_json = Tomlt.Internal.to_tagged_json decoded_toml in
           if json_equal actual_json json_content then
             `Pass
           else

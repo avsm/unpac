@@ -5,77 +5,319 @@
 
 (** TOML 1.1 codec.
 
-    This module provides TOML 1.1 parsing and encoding with Bytesrw streaming
-    support.
+    Tomlt provides TOML 1.1 parsing and encoding with efficient streaming
+    support via {{:https://erratique.ch/software/bytesrw}Bytesrw}.
 
-    {b Example:}
+    {2 Quick Start}
+
+    Parse a TOML string:
     {[
-      let contents = Bytesrw.Bytes.Reader.of_string toml_input in
-      match Tomlt.decode contents with
-      | Ok toml -> (* use toml *)
-      | Error msg -> (* handle error *)
-    ]} *)
+      let config = Tomlt.of_string {|
+        [server]
+        host = "localhost"
+        port = 8080
+      |} in
+      match config with
+      | Ok t ->
+          let host = Tomlt.(t.%{"server"; "host"} |> to_string) in
+          let port = Tomlt.(t.%{"server"; "port"} |> to_int) in
+          Printf.printf "Server: %s:%Ld\n" host port
+      | Error e -> prerr_endline (Tomlt.Error.to_string e)
+    ]}
+
+    Create and encode TOML:
+    {[
+      let config = Tomlt.(table [
+        "title", string "My App";
+        "database", table [
+          "host", string "localhost";
+          "ports", array [int 5432L; int 5433L]
+        ]
+      ]) in
+      print_endline (Tomlt.to_string config)
+    ]}
+
+    {2 Module Overview}
+
+    - {!section:types} - TOML value representation
+    - {!section:construct} - Value constructors
+    - {!section:access} - Value accessors and type conversion
+    - {!section:navigate} - Table navigation
+    - {!section:decode} - Parsing from strings and readers
+    - {!section:encode} - Encoding to strings and writers
+    - {!module:Error} - Structured error types *)
 
 open Bytesrw
 
 (** {1:types TOML Value Types} *)
 
-type toml_value =
-  | Toml_string of string
-  | Toml_int of int64
-  | Toml_float of float
-  | Toml_bool of bool
-  | Toml_datetime of string  (** Offset datetime (RFC 3339 with timezone) *)
-  | Toml_datetime_local of string  (** Local datetime (no timezone) *)
-  | Toml_date_local of string  (** Local date only *)
-  | Toml_time_local of string  (** Local time only *)
-  | Toml_array of toml_value list
-  | Toml_table of (string * toml_value) list
-(** The type for TOML values. *)
+(** The type of TOML values.
 
-(** {1:decode Decode} *)
+    TOML supports the following value types:
+    - Strings (UTF-8 encoded)
+    - Integers (64-bit signed)
+    - Floats (IEEE 754 double precision)
+    - Booleans
+    - Offset date-times (RFC 3339 with timezone)
+    - Local date-times (no timezone)
+    - Local dates
+    - Local times
+    - Arrays (heterogeneous in TOML 1.1)
+    - Tables (string-keyed maps) *)
+type t =
+  | String of string
+  | Int of int64
+  | Float of float
+  | Bool of bool
+  | Datetime of string        (** Offset datetime, e.g. [1979-05-27T07:32:00Z] *)
+  | Datetime_local of string  (** Local datetime, e.g. [1979-05-27T07:32:00] *)
+  | Date_local of string      (** Local date, e.g. [1979-05-27] *)
+  | Time_local of string      (** Local time, e.g. [07:32:00] *)
+  | Array of t list
+  | Table of (string * t) list
+(** A TOML value. Tables preserve key insertion order. *)
 
-val decode : ?file:string -> Bytes.Reader.t -> (toml_value, string) result
-(** [decode r] decodes a TOML document from reader [r].
-    - [file] is the file path for error messages. Defaults to ["-"]. *)
+(** {1:construct Value Constructors}
 
-val decode_string : string -> (toml_value, string) result
-(** [decode_string s] decodes a TOML document from string [s]. *)
+    These functions create TOML values. Use them to build TOML documents
+    programmatically. *)
 
-val decode_to_tagged_json : ?file:string -> Bytes.Reader.t -> (string, string) result
-(** [decode_to_tagged_json r] decodes TOML and outputs tagged JSON
-    in the format used by toml-test. *)
+val string : string -> t
+(** [string s] creates a string value. *)
 
-(** {1:encode Encode} *)
+val int : int64 -> t
+(** [int i] creates an integer value. *)
 
-val encode_toml : toml_value -> string
-(** [encode_toml v] encodes TOML value [v] to a TOML string. *)
+val int_of_int : int -> t
+(** [int_of_int i] creates an integer value from an [int]. *)
 
-val encode_toml_to_buffer : Buffer.t -> toml_value -> unit
-(** [encode_toml_to_buffer buf v] encodes TOML value [v] directly to buffer [buf].
-    This avoids allocating an intermediate string. *)
+val float : float -> t
+(** [float f] creates a float value. *)
 
-val encode_to_writer : Bytes.Writer.t -> toml_value -> unit
-(** [encode_to_writer w v] encodes TOML value [v] directly to writer [w].
-    Useful for streaming output to files or network without building the
-    full string in memory first. *)
+val bool : bool -> t
+(** [bool b] creates a boolean value. *)
 
-val encode_from_tagged_json : string -> (string, string) result
-(** [encode_from_tagged_json json] converts tagged JSON to TOML. *)
+val array : t list -> t
+(** [array vs] creates an array value from a list of values.
+    TOML 1.1 allows heterogeneous arrays. *)
 
-(** {1:helpers Helpers} *)
+val table : (string * t) list -> t
+(** [table pairs] creates a table value from key-value pairs.
+    Keys should be unique; later bindings shadow earlier ones during lookup. *)
 
-val toml_to_tagged_json : toml_value -> string
-(** [toml_to_tagged_json v] converts a TOML value to tagged JSON format
-    used by toml-test. *)
+val datetime : string -> t
+(** [datetime s] creates an offset datetime value.
+    The string should be in RFC 3339 format with timezone,
+    e.g. ["1979-05-27T07:32:00Z"] or ["1979-05-27T07:32:00-07:00"]. *)
 
-val decode_tagged_json_string : string -> toml_value
-(** [decode_tagged_json_string s] parses tagged JSON into TOML values. *)
+val datetime_local : string -> t
+(** [datetime_local s] creates a local datetime value (no timezone).
+    E.g. ["1979-05-27T07:32:00"]. *)
 
-val parse_toml : string -> toml_value
-(** [parse_toml s] parses a TOML string. Raises [Error.Error] on failure. *)
+val date_local : string -> t
+(** [date_local s] creates a local date value.
+    E.g. ["1979-05-27"]. *)
+
+val time_local : string -> t
+(** [time_local s] creates a local time value.
+    E.g. ["07:32:00"] or ["07:32:00.999"]. *)
+
+(** {1:access Value Accessors}
+
+    These functions extract OCaml values from TOML values.
+    They raise [Invalid_argument] if the value is not of the expected type. *)
+
+val to_string : t -> string
+(** [to_string t] returns the string if [t] is a [String].
+    @raise Invalid_argument if [t] is not a string. *)
+
+val to_string_opt : t -> string option
+(** [to_string_opt t] returns [Some s] if [t] is [String s], [None] otherwise. *)
+
+val to_int : t -> int64
+(** [to_int t] returns the integer if [t] is an [Int].
+    @raise Invalid_argument if [t] is not an integer. *)
+
+val to_int_opt : t -> int64 option
+(** [to_int_opt t] returns [Some i] if [t] is [Int i], [None] otherwise. *)
+
+val to_float : t -> float
+(** [to_float t] returns the float if [t] is a [Float].
+    @raise Invalid_argument if [t] is not a float. *)
+
+val to_float_opt : t -> float option
+(** [to_float_opt t] returns [Some f] if [t] is [Float f], [None] otherwise. *)
+
+val to_bool : t -> bool
+(** [to_bool t] returns the boolean if [t] is a [Bool].
+    @raise Invalid_argument if [t] is not a boolean. *)
+
+val to_bool_opt : t -> bool option
+(** [to_bool_opt t] returns [Some b] if [t] is [Bool b], [None] otherwise. *)
+
+val to_array : t -> t list
+(** [to_array t] returns the list if [t] is an [Array].
+    @raise Invalid_argument if [t] is not an array. *)
+
+val to_array_opt : t -> t list option
+(** [to_array_opt t] returns [Some vs] if [t] is [Array vs], [None] otherwise. *)
+
+val to_table : t -> (string * t) list
+(** [to_table t] returns the association list if [t] is a [Table].
+    @raise Invalid_argument if [t] is not a table. *)
+
+val to_table_opt : t -> (string * t) list option
+(** [to_table_opt t] returns [Some pairs] if [t] is [Table pairs], [None] otherwise. *)
+
+val to_datetime : t -> string
+(** [to_datetime t] returns the datetime string for any datetime type.
+    @raise Invalid_argument if [t] is not a datetime variant. *)
+
+val to_datetime_opt : t -> string option
+(** [to_datetime_opt t] returns [Some s] if [t] is any datetime variant. *)
+
+(** {2 Type Predicates} *)
+
+val is_string : t -> bool
+(** [is_string t] is [true] iff [t] is a [String]. *)
+
+val is_int : t -> bool
+(** [is_int t] is [true] iff [t] is an [Int]. *)
+
+val is_float : t -> bool
+(** [is_float t] is [true] iff [t] is a [Float]. *)
+
+val is_bool : t -> bool
+(** [is_bool t] is [true] iff [t] is a [Bool]. *)
+
+val is_array : t -> bool
+(** [is_array t] is [true] iff [t] is an [Array]. *)
+
+val is_table : t -> bool
+(** [is_table t] is [true] iff [t] is a [Table]. *)
+
+val is_datetime : t -> bool
+(** [is_datetime t] is [true] iff [t] is any datetime variant. *)
+
+(** {1:navigate Table Navigation}
+
+    Functions for navigating and querying TOML tables. *)
+
+val find : string -> t -> t
+(** [find key t] returns the value associated with [key] in table [t].
+    @raise Invalid_argument if [t] is not a table.
+    @raise Not_found if [key] is not in the table. *)
+
+val find_opt : string -> t -> t option
+(** [find_opt key t] returns [Some v] if [key] maps to [v] in table [t],
+    or [None] if [key] is not bound or [t] is not a table. *)
+
+val mem : string -> t -> bool
+(** [mem key t] is [true] if [key] is bound in table [t], [false] otherwise.
+    Returns [false] if [t] is not a table. *)
+
+val keys : t -> string list
+(** [keys t] returns all keys in table [t].
+    @raise Invalid_argument if [t] is not a table. *)
+
+val get : string list -> t -> t
+(** [get path t] navigates through nested tables following [path].
+    For example, [get ["server"; "port"] t] returns [t.server.port].
+    @raise Invalid_argument if any intermediate value is not a table.
+    @raise Not_found if any key in [path] is not found. *)
+
+val get_opt : string list -> t -> t option
+(** [get_opt path t] is like [get] but returns [None] on any error. *)
+
+val ( .%{} ) : t -> string list -> t
+(** [t.%{path}] is [get path t].
+
+    Example: [config.%{["database"; "port"]}]
+
+    @raise Invalid_argument if any intermediate value is not a table.
+    @raise Not_found if any key in the path is not found. *)
+
+val ( .%{}<- ) : t -> string list -> t -> t
+(** [t.%{path} <- v] returns a new table with value [v] at [path].
+    Creates intermediate tables as needed.
+
+    Example: [config.%{["server"; "host"]} <- string "localhost"]
+
+    @raise Invalid_argument if [t] is not a table or if an intermediate
+    value exists but is not a table. *)
+
+(** {1:decode Decoding (Parsing)}
+
+    Parse TOML from various sources. *)
+
+val of_string : string -> (t, Tomlt_error.t) result
+(** [of_string s] parses [s] as a TOML document. *)
+
+val of_reader : ?file:string -> Bytes.Reader.t -> (t, Tomlt_error.t) result
+(** [of_reader r] parses a TOML document from reader [r].
+    @param file Optional filename for error messages. *)
+
+val parse : string -> t
+(** [parse s] parses [s] as a TOML document.
+    @raise Error.Error on parse errors. *)
+
+val parse_reader : ?file:string -> Bytes.Reader.t -> t
+(** [parse_reader r] parses a TOML document from reader [r].
+    @param file Optional filename for error messages.
+    @raise Error.Error on parse errors. *)
+
+(** {1:encode Encoding}
+
+    Encode TOML values to various outputs. *)
+
+val to_toml_string : t -> string
+(** [to_toml_string t] encodes [t] as a TOML document string.
+    @raise Invalid_argument if [t] is not a [Table]. *)
+
+val to_buffer : Buffer.t -> t -> unit
+(** [to_buffer buf t] writes [t] as TOML to buffer [buf].
+    @raise Invalid_argument if [t] is not a [Table]. *)
+
+val to_writer : Bytes.Writer.t -> t -> unit
+(** [to_writer w t] writes [t] as TOML to writer [w].
+    Useful for streaming output without building the full string in memory.
+    @raise Invalid_argument if [t] is not a [Table]. *)
+
+(** {1:pp Pretty Printing} *)
+
+val pp : Format.formatter -> t -> unit
+(** [pp fmt t] pretty-prints [t] in TOML format. *)
+
+val pp_value : Format.formatter -> t -> unit
+(** [pp_value fmt t] pretty-prints a single TOML value (not a full document).
+    Useful for debugging. Tables are printed as inline tables. *)
+
+val equal : t -> t -> bool
+(** [equal a b] is structural equality on TOML values.
+    NaN floats are considered equal to each other. *)
+
+val compare : t -> t -> int
+(** [compare a b] is a total ordering on TOML values. *)
 
 (** {1:errors Error Handling} *)
 
 module Error = Tomlt_error
-(** Error types for TOML parsing and encoding. *)
+(** Structured error types for TOML parsing and encoding.
+
+    See {!Tomlt_error} for detailed documentation. *)
+
+(** {1:internal Internal}
+
+    These functions are primarily for testing and interoperability.
+    They may change between versions. *)
+
+module Internal : sig
+  val to_tagged_json : t -> string
+  (** Convert TOML value to tagged JSON format used by toml-test. *)
+
+  val of_tagged_json : string -> t
+  (** Parse tagged JSON format into TOML value. *)
+
+  val encode_from_tagged_json : string -> (string, string) result
+  (** Convert tagged JSON to TOML string. For toml-test encoder. *)
+end

@@ -2,7 +2,7 @@
 
 let () =
   let input = In_channel.input_all In_channel.stdin in
-  match Tomlt.encode_from_tagged_json input with
+  match Tomlt.Internal.encode_from_tagged_json input with
   | Ok toml ->
       print_string toml
   | Error msg ->

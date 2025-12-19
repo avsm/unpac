@@ -7,19 +7,19 @@ open Bytesrw
 
 (* TOML value representation *)
 
-type toml_value =
-  | Toml_string of string
-  | Toml_int of int64
-  | Toml_float of float
-  | Toml_bool of bool
-  | Toml_datetime of string  (* Offset datetime *)
-  | Toml_datetime_local of string  (* Local datetime *)
-  | Toml_date_local of string  (* Local date *)
-  | Toml_time_local of string  (* Local time *)
-  | Toml_array of toml_value list
-  | Toml_table of (string * toml_value) list
+type t =
+  | String of string
+  | Int of int64
+  | Float of float
+  | Bool of bool
+  | Datetime of string  (* Offset datetime *)
+  | Datetime_local of string  (* Local datetime *)
+  | Date_local of string  (* Local date *)
+  | Time_local of string  (* Local time *)
+  | Array of t list
+  | Table of (string * t) list
 
-(* Lexer *)
+(* Lexer - works directly on bytes buffer filled from Bytes.Reader *)
 
 type token =
   | Tok_lbracket
@@ -44,31 +44,50 @@ type token =
   | Tok_time_local of string
 
 type lexer = {
-  mutable input : string;
+  input : bytes;           (* Buffer containing input data *)
+  input_len : int;         (* Length of valid data in input *)
   mutable pos : int;
   mutable line : int;
   mutable col : int;
   file : string;
 }
 
-let make_lexer ?(file = "-") input =
-  { input; pos = 0; line = 1; col = 1; file }
+(* Create lexer from string (copies to bytes) *)
+let make_lexer ?(file = "-") s =
+  let input = Bytes.of_string s in
+  { input; input_len = Bytes.length input; pos = 0; line = 1; col = 1; file }
 
-let is_eof l = l.pos >= String.length l.input
+(* Create lexer directly from Bytes.Reader - reads all data into buffer *)
+let make_lexer_from_reader ?(file = "-") r =
+  (* Read all slices into a buffer *)
+  let buf = Buffer.create 4096 in
+  let rec read_all () =
+    let slice = Bytes.Reader.read r in
+    if Bytes.Slice.is_eod slice then ()
+    else begin
+      Bytes.Slice.add_to_buffer buf slice;
+      read_all ()
+    end
+  in
+  read_all ();
+  let input = Buffer.to_bytes buf in
+  { input; input_len = Bytes.length input; pos = 0; line = 1; col = 1; file }
 
-let peek l = if is_eof l then None else Some l.input.[l.pos]
+let is_eof l = l.pos >= l.input_len
+
+let peek l = if is_eof l then None else Some (Bytes.get l.input l.pos)
 
 let peek2 l =
-  if l.pos + 1 >= String.length l.input then None
-  else Some l.input.[l.pos + 1]
+  if l.pos + 1 >= l.input_len then None
+  else Some (Bytes.get l.input (l.pos + 1))
 
 let peek_n l n =
-  if l.pos + n - 1 >= String.length l.input then None
-  else Some (String.sub l.input l.pos n)
+  if l.pos + n - 1 >= l.input_len then None
+  else Some (Bytes.sub_string l.input l.pos n)
 
 let advance l =
   if not (is_eof l) then begin
-    if l.input.[l.pos] = '\n' then begin
+    if Bytes.get l.input l.pos = '\n' then begin
       l.line <- l.line + 1;
       l.col <- 1
     end else
@@ -80,9 +99,17 @@ let advance_n l n =
   for _ = 1 to n do advance l done
 
 let skip_whitespace l =
-  while not (is_eof l) && (l.input.[l.pos] = ' ' || l.input.[l.pos] = '\t') do
+  while not (is_eof l) && (Bytes.get l.input l.pos = ' ' || Bytes.get l.input l.pos = '\t') do
     advance l
   done
+
+(* Helper functions for bytes access *)
+let[@inline] get_char l pos = Bytes.unsafe_get l.input pos
+let[@inline] get_current l = Bytes.unsafe_get l.input l.pos
+let sub_string l pos len = Bytes.sub_string l.input pos len
+
+(* Helper to create error location from lexer state *)
+let lexer_loc l = Tomlt_error.loc ~file:l.file ~line:l.line ~column:l.col ()
 
 (* Get expected byte length of UTF-8 char from first byte *)
 let utf8_byte_length_from_first_byte c =
@@ -94,54 +121,54 @@ let utf8_byte_length_from_first_byte c =
   else if code < 0xF8 then 4
   else 0  (* Invalid: 5+ byte sequence *)
 
-(* Validate UTF-8 at position using uutf, returns byte length *)
-let validate_utf8_at_pos input pos line =
-  if pos >= String.length input then
-    failwith "Unexpected end of input";
-  let byte_len = utf8_byte_length_from_first_byte input.[pos] in
+(* Validate UTF-8 at position in lexer's bytes buffer, returns byte length *)
+let validate_utf8_at_pos_bytes l =
+  if l.pos >= l.input_len then
+    Tomlt_error.raise_lexer ~location:(lexer_loc l) Unexpected_eof;
+  let byte_len = utf8_byte_length_from_first_byte (Bytes.unsafe_get l.input l.pos) in
   if byte_len = 0 then
-    failwith (Printf.sprintf "Invalid UTF-8 sequence at line %d" line);
-  if pos + byte_len > String.length input then
-    failwith (Printf.sprintf "Incomplete UTF-8 sequence at line %d" line);
+    Tomlt_error.raise_lexer ~location:(lexer_loc l) Invalid_utf8;
+  if l.pos + byte_len > l.input_len then
+    Tomlt_error.raise_lexer ~location:(lexer_loc l) Incomplete_utf8;
   (* Validate using uutf - it checks overlong encodings, surrogates, etc. *)
-  let sub = String.sub input pos byte_len in
+  let sub = Bytes.sub_string l.input l.pos byte_len in
   let valid = ref false in
   Uutf.String.fold_utf_8 (fun () _ -> function
     | `Uchar _ -> valid := true
     | `Malformed _ -> ()
   ) () sub;
   if not !valid then
-    failwith (Printf.sprintf "Invalid UTF-8 sequence at line %d" line);
+    Tomlt_error.raise_lexer ~location:(lexer_loc l) Invalid_utf8;
   byte_len
 
 (* UTF-8 validation - validates and advances over a single UTF-8 character *)
 let validate_utf8_char l =
-  let byte_len = validate_utf8_at_pos l.input l.pos l.line in
+  let byte_len = validate_utf8_at_pos_bytes l in
   for _ = 1 to byte_len do advance l done
 
 let skip_comment l =
-  if not (is_eof l) && l.input.[l.pos] = '#' then begin
+  if not (is_eof l) && get_current l = '#' then begin
     (* Validate comment characters *)
     advance l;
     let continue = ref true in
-    while !continue && not (is_eof l) && l.input.[l.pos] <> '\n' do
-      let c = l.input.[l.pos] in
+    while !continue && not (is_eof l) && get_current l <> '\n' do
+      let c = get_current l in
       let code = Char.code c in
       (* CR is only valid if followed by LF (CRLF at end of comment) *)
       if c = '\r' then begin
         (* Check if this CR is followed by LF - if so, it ends the comment *)
-        if l.pos + 1 < String.length l.input && l.input.[l.pos + 1] = '\n' then
+        if l.pos + 1 < l.input_len && get_char l (l.pos + 1) = '\n' then
           (* This is CRLF - stop the loop, let the main lexer handle it *)
           continue := false
         else
-          failwith (Printf.sprintf "Bare carriage return not allowed in comment at line %d" l.line)
+          Tomlt_error.raise_lexer ~location:(lexer_loc l) Bare_carriage_return
       end else if code >= 0x80 then begin
         (* Multi-byte UTF-8 character - validate it *)
         validate_utf8_char l
       end else begin
         (* ASCII control characters other than tab are not allowed in comments *)
         if code < 0x09 || (code > 0x09 && code < 0x20) || code = 0x7F then
-          failwith (Printf.sprintf "Control character U+%04X not allowed in comment at line %d" code l.line);
+          Tomlt_error.raise_lexer ~location:(lexer_loc l) (Control_character code);
         advance l
       end
     done
@@ -150,7 +177,7 @@ let skip_comment l =
 let skip_ws_and_comments l =
   let rec loop () =
     skip_whitespace l;
-    if not (is_eof l) && l.input.[l.pos] = '#' then begin
+    if not (is_eof l) && get_current l = '#' then begin
       skip_comment l;
       loop ()
     end
@@ -170,22 +197,33 @@ let hex_value c =
   if c >= '0' && c <= '9' then Char.code c - Char.code '0'
   else if c >= 'a' && c <= 'f' then Char.code c - Char.code 'a' + 10
   else if c >= 'A' && c <= 'F' then Char.code c - Char.code 'A' + 10
-  else failwith "Invalid hex digit"
+  else Tomlt_error.raise_number Invalid_hex_digit
 
-(* Parse Unicode escape and convert to UTF-8 using uutf *)
-let unicode_to_utf8 codepoint =
+(* Convert Unicode codepoint to UTF-8 using uutf *)
+let codepoint_to_utf8 codepoint =
   if codepoint < 0 || codepoint > 0x10FFFF then
     failwith (Printf.sprintf "Invalid Unicode codepoint: U+%X" codepoint);
   if codepoint >= 0xD800 && codepoint <= 0xDFFF then
-    failwith (Printf.sprintf "Surrogate codepoint not allowed: U+%X" codepoint);
+    failwith (Printf.sprintf "Surrogate codepoint not allowed: U+%04X" codepoint);
+  let buf = Buffer.create 4 in
+  Uutf.Buffer.add_utf_8 buf (Uchar.of_int codepoint);
+  Buffer.contents buf
+
+(* Parse Unicode escape with error location from lexer *)
+let unicode_to_utf8 l codepoint =
+  if codepoint < 0 || codepoint > 0x10FFFF then
+    Tomlt_error.raise_lexer ~location:(lexer_loc l) (Invalid_unicode_codepoint codepoint);
+  if codepoint >= 0xD800 && codepoint <= 0xDFFF then
+    Tomlt_error.raise_lexer ~location:(lexer_loc l) (Surrogate_codepoint codepoint);
   let buf = Buffer.create 4 in
   Uutf.Buffer.add_utf_8 buf (Uchar.of_int codepoint);
   Buffer.contents buf
 
 let parse_escape l =
   advance l; (* skip backslash *)
-  if is_eof l then failwith "Unexpected end of input in escape sequence";
-  let c = l.input.[l.pos] in
+  if is_eof l then
+    Tomlt_error.raise_lexer ~location:(lexer_loc l) Unexpected_eof;
+  let c = get_current l in
   advance l;
   match c with
   | 'b' -> "\b"
@@ -198,55 +236,56 @@ let parse_escape l =
   | '\\' -> "\\"
   | 'x' ->
       (* \xHH - 2 hex digits *)
-      if l.pos + 1 >= String.length l.input then
-        failwith "Incomplete \\x escape sequence";
-      let c1 = l.input.[l.pos] in
-      let c2 = l.input.[l.pos + 1] in
+      if l.pos + 1 >= l.input_len then
+        Tomlt_error.raise_lexer ~location:(lexer_loc l) (Incomplete_escape "\\x");
+      let c1 = get_char l l.pos in
+      let c2 = get_char l (l.pos + 1) in
       if not (is_hex_digit c1 && is_hex_digit c2) then
-        failwith "Invalid \\x escape sequence";
+        Tomlt_error.raise_lexer ~location:(lexer_loc l) (Invalid_unicode_escape "\\x");
       let cp = (hex_value c1 * 16) + hex_value c2 in
       advance l; advance l;
-      unicode_to_utf8 cp
+      unicode_to_utf8 l cp
   | 'u' ->
       (* \uHHHH - 4 hex digits *)
-      if l.pos + 3 >= String.length l.input then
-        failwith "Incomplete \\u escape sequence";
-      let s = String.sub l.input l.pos 4 in
+      if l.pos + 3 >= l.input_len then
+        Tomlt_error.raise_lexer ~location:(lexer_loc l) (Incomplete_escape "\\u");
+      let s = sub_string l l.pos 4 in
       for i = 0 to 3 do
         if not (is_hex_digit s.[i]) then
-          failwith "Invalid \\u escape sequence"
+          Tomlt_error.raise_lexer ~location:(lexer_loc l) (Invalid_unicode_escape "\\u")
       done;
       let cp = int_of_string ("0x" ^ s) in
       advance_n l 4;
-      unicode_to_utf8 cp
+      unicode_to_utf8 l cp
   | 'U' ->
       (* \UHHHHHHHH - 8 hex digits *)
-      if l.pos + 7 >= String.length l.input then
-        failwith "Incomplete \\U escape sequence";
-      let s = String.sub l.input l.pos 8 in
+      if l.pos + 7 >= l.input_len then
+        Tomlt_error.raise_lexer ~location:(lexer_loc l) (Incomplete_escape "\\U");
+      let s = sub_string l l.pos 8 in
       for i = 0 to 7 do
         if not (is_hex_digit s.[i]) then
-          failwith "Invalid \\U escape sequence"
+          Tomlt_error.raise_lexer ~location:(lexer_loc l) (Invalid_unicode_escape "\\U")
       done;
       let cp = int_of_string ("0x" ^ s) in
       advance_n l 8;
-      unicode_to_utf8 cp
-  | _ -> failwith (Printf.sprintf "Invalid escape sequence: \\%c" c)
+      unicode_to_utf8 l cp
+  | _ ->
+      Tomlt_error.raise_lexer ~location:(lexer_loc l) (Invalid_escape c)
 
 let validate_string_char l c is_multiline =
   let code = Char.code c in
   (* Control characters other than tab (and LF/CR for multiline) are not allowed *)
   if code < 0x09 then
-    failwith (Printf.sprintf "Control character U+%04X not allowed in string at line %d" code l.line);
+    Tomlt_error.raise_lexer ~location:(lexer_loc l) (Control_character code);
   if code > 0x09 && code < 0x20 && not (is_multiline && (code = 0x0A || code = 0x0D)) then
-    failwith (Printf.sprintf "Control character U+%04X not allowed in string at line %d" code l.line);
+    Tomlt_error.raise_lexer ~location:(lexer_loc l) (Control_character code);
   if code = 0x7F then
-    failwith (Printf.sprintf "Control character U+007F not allowed in string at line %d" l.line)
+    Tomlt_error.raise_lexer ~location:(lexer_loc l) (Control_character code)
 
 (* Validate UTF-8 in string context and add bytes to buffer *)
 let validate_and_add_utf8_to_buffer l buf =
-  let byte_len = validate_utf8_at_pos l.input l.pos l.line in
-  Buffer.add_substring buf l.input l.pos byte_len;
+  let byte_len = validate_utf8_at_pos_bytes l in
+  Buffer.add_string buf (sub_string l l.pos byte_len);
   for _ = 1 to byte_len do advance l done
 
 let parse_basic_string l =
@@ -270,13 +309,13 @@ let parse_basic_string l =
   let rec loop () =
     if is_eof l then
       failwith "Unterminated string";
-    let c = l.input.[l.pos] in
+    let c = get_current l in
     if multiline then begin
       if c = '"' then begin
         (* Count consecutive quotes *)
         let quote_count = ref 0 in
         let p = ref l.pos in
-        while !p < String.length l.input && l.input.[!p] = '"' do
+        while !p < l.input_len && get_char l !p = '"' do
           incr quote_count;
           incr p
         done;
@@ -415,13 +454,13 @@ let parse_literal_string l =
   let rec loop () =
     if is_eof l then
       failwith "Unterminated literal string";
-    let c = l.input.[l.pos] in
+    let c = get_current l in
     if multiline then begin
       if c = '\'' then begin
         (* Count consecutive quotes *)
         let quote_count = ref 0 in
         let p = ref l.pos in
-        while !p < String.length l.input && l.input.[!p] = '\'' do
+        while !p < l.input_len && get_char l !p = '\'' do
           incr quote_count;
           incr p
         done;
@@ -502,11 +541,11 @@ let parse_number l =
   match peek_n l 3 with
   | Some "inf" ->
       advance_n l 3;
-      let s = String.sub l.input start (l.pos - start) in
+      let s = sub_string l start (l.pos - start) in
       Tok_float ((if neg then Float.neg_infinity else Float.infinity), s)
   | Some "nan" ->
       advance_n l 3;
-      let s = String.sub l.input start (l.pos - start) in
+      let s = sub_string l start (l.pos - start) in
       Tok_float (Float.nan, s)
   | _ ->
       (* Check for hex, octal, or binary *)
@@ -530,9 +569,9 @@ let parse_number l =
                 if first then failwith "Expected hex digit after 0x"
           in
           read_hex true;
-          let s = String.sub l.input num_start (l.pos - num_start) in
+          let s = sub_string l num_start (l.pos - num_start) in
           let s = String.concat "" (String.split_on_char '_' s) in
-          let orig = String.sub l.input start (l.pos - start) in
+          let orig = sub_string l start (l.pos - start) in
           Tok_integer (Int64.of_string ("0x" ^ s), orig)
       | Some '0', Some 'o' when not neg ->
           advance l; advance l;
@@ -553,9 +592,9 @@ let parse_number l =
                 if first then failwith "Expected octal digit after 0o"
           in
           read_oct true;
-          let s = String.sub l.input num_start (l.pos - num_start) in
+          let s = sub_string l num_start (l.pos - num_start) in
           let s = String.concat "" (String.split_on_char '_' s) in
-          let orig = String.sub l.input start (l.pos - start) in
+          let orig = sub_string l start (l.pos - start) in
           Tok_integer (Int64.of_string ("0o" ^ s), orig)
       | Some '0', Some 'b' when not neg ->
           advance l; advance l;
@@ -576,9 +615,9 @@ let parse_number l =
                 if first then failwith "Expected binary digit after 0b"
           in
           read_bin true;
-          let s = String.sub l.input num_start (l.pos - num_start) in
+          let s = sub_string l num_start (l.pos - num_start) in
           let s = String.concat "" (String.split_on_char '_' s) in
-          let orig = String.sub l.input start (l.pos - start) in
+          let orig = sub_string l start (l.pos - start) in
           Tok_integer (Int64.of_string ("0b" ^ s), orig)
       | _ ->
           (* Regular decimal number *)
@@ -630,7 +669,7 @@ let parse_number l =
               | _ -> ());
               read_int true
           | _ -> ());
-          let s = String.sub l.input start (l.pos - start) in
+          let s = sub_string l start (l.pos - start) in
           let s' = String.concat "" (String.split_on_char '_' s) in
           if !is_float then
             Tok_float (float_of_string s', s)
@@ -642,39 +681,39 @@ let looks_like_datetime l =
   (* YYYY-MM-DD or HH:MM - need to ensure it's not a bare key that starts with numbers *)
   let check_datetime () =
     let pos = l.pos in
-    let len = String.length l.input in
+    let len = l.input_len in
     (* Check for YYYY-MM-DD pattern - must have exactly this structure *)
     if pos + 10 <= len then begin
-      let c0 = l.input.[pos] in
-      let c1 = l.input.[pos + 1] in
-      let c2 = l.input.[pos + 2] in
-      let c3 = l.input.[pos + 3] in
-      let c4 = l.input.[pos + 4] in
-      let c5 = l.input.[pos + 5] in
-      let c6 = l.input.[pos + 6] in
-      let c7 = l.input.[pos + 7] in
-      let c8 = l.input.[pos + 8] in
-      let c9 = l.input.[pos + 9] in
+      let c0 = get_char l pos in
+      let c1 = get_char l (pos + 1) in
+      let c2 = get_char l (pos + 2) in
+      let c3 = get_char l (pos + 3) in
+      let c4 = get_char l (pos + 4) in
+      let c5 = get_char l (pos + 5) in
+      let c6 = get_char l (pos + 6) in
+      let c7 = get_char l (pos + 7) in
+      let c8 = get_char l (pos + 8) in
+      let c9 = get_char l (pos + 9) in
       (* Must match YYYY-MM-DD pattern AND not be followed by bare key chars (except T or space for time) *)
       if is_digit c0 && is_digit c1 && is_digit c2 && is_digit c3 && c4 = '-' &&
          is_digit c5 && is_digit c6 && c7 = '-' && is_digit c8 && is_digit c9 then begin
         (* Check what follows - if it's a bare key char other than T/t/space, it's not a date *)
         if pos + 10 < len then begin
-          let next = l.input.[pos + 10] in
+          let next = get_char l (pos + 10) in
           if next = 'T' || next = 't' then
             `Date  (* Datetime continues with time part *)
           else if next = ' ' || next = '\t' then begin
             (* Check if followed by = (key context) or time part *)
             let rec skip_ws p =
               if p >= len then p
-              else match l.input.[p] with
+              else match get_char l p with
                 | ' ' | '\t' -> skip_ws (p + 1)
                 | _ -> p
             in
             let after_ws = skip_ws (pos + 11) in
-            if after_ws < len && l.input.[after_ws] = '=' then
+            if after_ws < len && get_char l after_ws = '=' then
               `Other  (* It's a key followed by = *)
-            else if after_ws < len && is_digit l.input.[after_ws] then
+            else if after_ws < len && is_digit (get_char l after_ws) then
               `Date  (* Could be "2001-02-03 12:34:56" format *)
             else
               `Date
@@ -693,11 +732,11 @@ let looks_like_datetime l =
       else
         `Other
     end else if pos + 5 <= len then begin
-      let c0 = l.input.[pos] in
-      let c1 = l.input.[pos + 1] in
-      let c2 = l.input.[pos + 2] in
-      let c3 = l.input.[pos + 3] in
-      let c4 = l.input.[pos + 4] in
+      let c0 = get_char l pos in
+      let c1 = get_char l (pos + 1) in
+      let c2 = get_char l (pos + 2) in
+      let c3 = get_char l (pos + 3) in
+      let c4 = get_char l (pos + 4) in
       if is_digit c0 && is_digit c1 && c2 = ':' && is_digit c3 && is_digit c4 then
         `Time
       else
@@ -920,7 +959,7 @@ let next_token l =
   skip_ws_and_comments l;
   if is_eof l then Tok_eof
   else begin
-    let c = l.input.[l.pos] in
+    let c = get_current l in
     match c with
     | '[' -> advance l; Tok_lbracket
     | ']' -> advance l; Tok_rbracket
@@ -953,15 +992,15 @@ let next_token l =
             (* A key like -01 should be followed by whitespace then =, not by . or e (number syntax) *)
             let is_key_context =
               let rec scan_ahead p =
-                if p >= String.length l.input then false
+                if p >= l.input_len then false
                 else
-                  let c = l.input.[p] in
+                  let c = get_char l p in
                   if is_digit c || c = '_' then scan_ahead (p + 1)
                   else if c = ' ' || c = '\t' then
                     (* Skip whitespace and check for = *)
                     let rec skip_ws pp =
-                      if pp >= String.length l.input then false
-                      else match l.input.[pp] with
+                      if pp >= l.input_len then false
+                      else match get_char l pp with
                         | ' ' | '\t' -> skip_ws (pp + 1)
                         | '=' -> true
                         | _ -> false
@@ -970,8 +1009,8 @@ let next_token l =
                   else if c = '=' then true
                   else if c = '.' then
                     (* Check if . is followed by digit (number) vs letter/underscore (dotted key) *)
-                    if p + 1 < String.length l.input then
-                      let next = l.input.[p + 1] in
+                    if p + 1 < l.input_len then
+                      let next = get_char l (p + 1) in
                       if is_digit next then false  (* It's a decimal number like -3.14 *)
                       else if is_bare_key_char next then true  (* Dotted key *)
                       else false
@@ -986,49 +1025,49 @@ let next_token l =
             in
             if is_key_context then begin
               (* Treat as bare key *)
-              while not (is_eof l) && is_bare_key_char l.input.[l.pos] do
+              while not (is_eof l) && is_bare_key_char (get_current l) do
                 advance l
               done;
-              Tok_bare_key (String.sub l.input start (l.pos - start))
+              Tok_bare_key (sub_string l start (l.pos - start))
             end else
               parse_number l
         | Some 'i' ->
             (* Check for inf *)
-            if l.pos + 3 < String.length l.input &&
-               l.input.[l.pos + 1] = 'i' && l.input.[l.pos + 2] = 'n' && l.input.[l.pos + 3] = 'f' then begin
+            if l.pos + 3 < l.input_len &&
+               get_char l (l.pos + 1) = 'i' && get_char l (l.pos + 2) = 'n' && get_char l (l.pos + 3) = 'f' then begin
               advance_n l 4;
-              let s = String.sub l.input start (l.pos - start) in
+              let s = sub_string l start (l.pos - start) in
               if sign = '-' then Tok_float (Float.neg_infinity, s)
               else Tok_float (Float.infinity, s)
             end else if sign = '-' then begin
               (* Could be bare key like -inf-key *)
-              while not (is_eof l) && is_bare_key_char l.input.[l.pos] do
+              while not (is_eof l) && is_bare_key_char (get_current l) do
                 advance l
               done;
-              Tok_bare_key (String.sub l.input start (l.pos - start))
+              Tok_bare_key (sub_string l start (l.pos - start))
             end else
               failwith (Printf.sprintf "Unexpected character after %c" sign)
         | Some 'n' ->
             (* Check for nan *)
-            if l.pos + 3 < String.length l.input &&
-               l.input.[l.pos + 1] = 'n' && l.input.[l.pos + 2] = 'a' && l.input.[l.pos + 3] = 'n' then begin
+            if l.pos + 3 < l.input_len &&
+               get_char l (l.pos + 1) = 'n' && get_char l (l.pos + 2) = 'a' && get_char l (l.pos + 3) = 'n' then begin
               advance_n l 4;
-              let s = String.sub l.input start (l.pos - start) in
+              let s = sub_string l start (l.pos - start) in
               Tok_float (Float.nan, s)  (* Sign on NaN doesn't change the value *)
             end else if sign = '-' then begin
               (* Could be bare key like -name *)
-              while not (is_eof l) && is_bare_key_char l.input.[l.pos] do
+              while not (is_eof l) && is_bare_key_char (get_current l) do
                 advance l
               done;
-              Tok_bare_key (String.sub l.input start (l.pos - start))
+              Tok_bare_key (sub_string l start (l.pos - start))
             end else
               failwith (Printf.sprintf "Unexpected character after %c" sign)
         | _ when sign = '-' ->
             (* Bare key starting with - like -key or --- *)
-            while not (is_eof l) && is_bare_key_char l.input.[l.pos] do
+            while not (is_eof l) && is_bare_key_char (get_current l) do
               advance l
             done;
-            Tok_bare_key (String.sub l.input start (l.pos - start))
+            Tok_bare_key (sub_string l start (l.pos - start))
         | _ -> failwith (Printf.sprintf "Unexpected character after %c" sign))
     | c when is_digit c ->
         (* Could be number, datetime, or bare key starting with digits *)
@@ -1039,8 +1078,8 @@ let next_token l =
             (* Check for hex/octal/binary prefix first - these are always numbers *)
             let start = l.pos in
             let is_prefixed_number =
-              start + 1 < String.length l.input && l.input.[start] = '0' &&
-              (let c1 = l.input.[start + 1] in
+              start + 1 < l.input_len && get_char l start = '0' &&
+              (let c1 = get_char l (start + 1) in
                c1 = 'x' || c1 = 'X' || c1 = 'o' || c1 = 'O' || c1 = 'b' || c1 = 'B')
             in
             if is_prefixed_number then
@@ -1050,24 +1089,24 @@ let next_token l =
                  - Contains letters (like "123abc")
                  - Has leading zeros (like "0123") which would be invalid as a number *)
               let has_leading_zero =
-                l.input.[start] = '0' && start + 1 < String.length l.input &&
-                let c1 = l.input.[start + 1] in
+                get_char l start = '0' && start + 1 < l.input_len &&
+                let c1 = get_char l (start + 1) in
                 is_digit c1
               in
               (* Scan to see if this is a bare key or a number
                  - If it looks like scientific notation (digits + e/E + optional sign + digits), it's a number
                  - If it contains letters OR dashes between digits, it's a bare key *)
               let rec scan_for_bare_key pos has_dash_between_digits =
-                if pos >= String.length l.input then has_dash_between_digits
+                if pos >= l.input_len then has_dash_between_digits
                 else
-                  let c = l.input.[pos] in
+                  let c = get_char l pos in
                   if is_digit c || c = '_' then scan_for_bare_key (pos + 1) has_dash_between_digits
                   else if c = '.' then scan_for_bare_key (pos + 1) has_dash_between_digits
                   else if c = '-' then
                     (* Dash in key - check what follows *)
                     let next_pos = pos + 1 in
-                    if next_pos < String.length l.input then
-                      let next = l.input.[next_pos] in
+                    if next_pos < l.input_len then
+                      let next = get_char l next_pos in
                       if is_digit next then
                         scan_for_bare_key (next_pos) true  (* Dash between digits - bare key *)
                       else if is_bare_key_char next then
@@ -1079,13 +1118,13 @@ let next_token l =
                   else if c = 'e' || c = 'E' then
                     (* Check if this looks like scientific notation *)
                     let next_pos = pos + 1 in
-                    if next_pos >= String.length l.input then true  (* Just 'e' at end, bare key *)
+                    if next_pos >= l.input_len then true  (* Just 'e' at end, bare key *)
                     else
-                      let next = l.input.[next_pos] in
+                      let next = get_char l next_pos in
                       if next = '+' || next = '-' then
                         (* Has exponent sign - check if followed by digit *)
                         let after_sign = next_pos + 1 in
-                        if after_sign < String.length l.input && is_digit l.input.[after_sign] then
+                        if after_sign < l.input_len && is_digit (get_char l after_sign) then
                           has_dash_between_digits  (* Scientific notation, but might have dash earlier *)
                         else
                           true  (* e.g., "3e-abc" - bare key *)
@@ -1100,10 +1139,10 @@ let next_token l =
               in
               if has_leading_zero || scan_for_bare_key start false then begin
                 (* It's a bare key *)
-                while not (is_eof l) && is_bare_key_char l.input.[l.pos] do
+                while not (is_eof l) && is_bare_key_char (get_current l) do
                   advance l
                 done;
-                Tok_bare_key (String.sub l.input start (l.pos - start))
+                Tok_bare_key (sub_string l start (l.pos - start))
               end else
                 (* It's a number - use parse_number *)
                 parse_number l
@@ -1112,16 +1151,16 @@ let next_token l =
         (* These could be keywords (true, false, inf, nan) or bare keys
            Always read as bare key and let parser interpret *)
         let start = l.pos in
-        while not (is_eof l) && is_bare_key_char l.input.[l.pos] do
+        while not (is_eof l) && is_bare_key_char (get_current l) do
           advance l
         done;
-        Tok_bare_key (String.sub l.input start (l.pos - start))
+        Tok_bare_key (sub_string l start (l.pos - start))
     | c when is_bare_key_char c ->
         let start = l.pos in
-        while not (is_eof l) && is_bare_key_char l.input.[l.pos] do
+        while not (is_eof l) && is_bare_key_char (get_current l) do
           advance l
         done;
-        Tok_bare_key (String.sub l.input start (l.pos - start))
+        Tok_bare_key (sub_string l start (l.pos - start))
     | c ->
         let code = Char.code c in
         if code < 0x20 || code = 0x7F then
@@ -1155,7 +1194,7 @@ let consume_token p =
 
 (* Check if next raw character (without skipping whitespace) matches *)
 let next_raw_char_is p c =
-  p.lexer.pos < String.length p.lexer.input && p.lexer.input.[p.lexer.pos] = c
+  p.lexer.pos < p.lexer.input_len && get_char p.lexer p.lexer.pos = c
 
 let expect_token p expected =
   let tok = consume_token p in
@@ -1223,26 +1262,26 @@ let parse_dotted_key p =
 
 let rec parse_value p =
   match peek_token p with
-  | Tok_basic_string s -> ignore (consume_token p); Toml_string s
-  | Tok_literal_string s -> ignore (consume_token p); Toml_string s
-  | Tok_ml_basic_string s -> ignore (consume_token p); Toml_string s
-  | Tok_ml_literal_string s -> ignore (consume_token p); Toml_string s
-  | Tok_integer (i, _) -> ignore (consume_token p); Toml_int i
-  | Tok_float (f, _) -> ignore (consume_token p); Toml_float f
-  | Tok_datetime s -> ignore (consume_token p); Toml_datetime s
-  | Tok_datetime_local s -> ignore (consume_token p); Toml_datetime_local s
-  | Tok_date_local s -> ignore (consume_token p); Toml_date_local s
-  | Tok_time_local s -> ignore (consume_token p); Toml_time_local s
+  | Tok_basic_string s -> ignore (consume_token p); String s
+  | Tok_literal_string s -> ignore (consume_token p); String s
+  | Tok_ml_basic_string s -> ignore (consume_token p); String s
+  | Tok_ml_literal_string s -> ignore (consume_token p); String s
+  | Tok_integer (i, _) -> ignore (consume_token p); Int i
+  | Tok_float (f, _) -> ignore (consume_token p); Float f
+  | Tok_datetime s -> ignore (consume_token p); Datetime s
+  | Tok_datetime_local s -> ignore (consume_token p); Datetime_local s
+  | Tok_date_local s -> ignore (consume_token p); Date_local s
+  | Tok_time_local s -> ignore (consume_token p); Time_local s
   | Tok_lbracket -> parse_array p
   | Tok_lbrace -> parse_inline_table p
   | Tok_bare_key s ->
       (* Interpret bare keys as boolean, float keywords, or numbers in value context *)
       ignore (consume_token p);
       (match s with
-      | "true" -> Toml_bool true
-      | "false" -> Toml_bool false
-      | "inf" -> Toml_float Float.infinity
-      | "nan" -> Toml_float Float.nan
+      | "true" -> Bool true
+      | "false" -> Bool false
+      | "inf" -> Float Float.infinity
+      | "nan" -> Float Float.nan
       | _ ->
           (* Validate underscore placement in the original string *)
           let validate_underscores str =
@@ -1286,9 +1325,9 @@ let rec parse_value p =
                   if String.contains s_no_underscore '.' ||
                      String.contains s_no_underscore 'e' ||
                      String.contains s_no_underscore 'E' then
-                    Toml_float (float_of_string s_no_underscore)
+                    Float (float_of_string s_no_underscore)
                   else
-                    Toml_int (Int64.of_string s_no_underscore)
+                    Int (Int64.of_string s_no_underscore)
                 with _ ->
                   failwith (Printf.sprintf "Unexpected bare key '%s' as value" s)
             end else
@@ -1304,7 +1343,7 @@ and parse_array p =
     match peek_token p with
     | Tok_rbracket ->
         ignore (consume_token p);
-        Toml_array (List.rev acc)
+        Array (List.rev acc)
     | _ ->
         let v = parse_value p in
         skip_newlines p;
@@ -1315,7 +1354,7 @@ and parse_array p =
             loop (v :: acc)
         | Tok_rbracket ->
             ignore (consume_token p);
-            Toml_array (List.rev (v :: acc))
+            Array (List.rev (v :: acc))
         | _ -> failwith "Expected ',' or ']' in array"
   in
   loop []
@@ -1329,7 +1368,7 @@ and parse_inline_table p =
     match peek_token p with
     | Tok_rbrace ->
         ignore (consume_token p);
-        Toml_table (List.rev acc)
+        Table (List.rev acc)
     | _ ->
         let keys = parse_dotted_key p in
         skip_ws p;
@@ -1361,7 +1400,7 @@ and parse_inline_table p =
             loop acc
         | Tok_rbrace ->
             ignore (consume_token p);
-            Toml_table (List.rev acc)
+            Table (List.rev acc)
         | _ -> failwith "Expected ',' or '}' in inline table"
   in
   loop []
@@ -1375,12 +1414,12 @@ and build_nested_table keys value =
   | [] -> failwith "Empty key"
   | [k] -> (k, value)
   | k :: rest ->
-      (k, Toml_table [build_nested_table rest value])
+      (k, Table [build_nested_table rest value])
 
 (* Merge two TOML values - used for combining dotted keys in inline tables *)
 and merge_toml_values v1 v2 =
   match v1, v2 with
-  | Toml_table entries1, Toml_table entries2 ->
+  | Table entries1, Table entries2 ->
       (* Merge the entries *)
       let merged = List.fold_left (fun acc (k, v) ->
         match List.assoc_opt k acc with
@@ -1391,7 +1430,7 @@ and merge_toml_values v1 v2 =
         | None ->
             (k, v) :: acc
       ) entries1 entries2 in
-      Toml_table (List.rev merged)
+      Table (List.rev merged)
   | _, _ ->
       (* Can't merge non-table values with same key *)
       failwith "Conflicting keys in inline table"
@@ -1448,7 +1487,7 @@ let validate_time_string s =
 
 (* Table management for the parser *)
 type table_state = {
-  mutable values : (string * toml_value) list;
+  mutable values : (string * t) list;
   subtables : (string, table_state) Hashtbl.t;
   mutable is_array : bool;
   mutable is_inline : bool;
@@ -1550,20 +1589,19 @@ let rec table_state_to_toml state =
   let subtable_values = Hashtbl.fold (fun k sub acc ->
     let v =
       if sub.is_array then
-        Toml_array (List.map table_state_to_toml (get_array_elements sub))
+        Array (List.map table_state_to_toml (get_array_elements sub))
       else
         table_state_to_toml sub
     in
     (k, v) :: acc
   ) state.subtables [] in
-  Toml_table (List.rev state.values @ subtable_values)
+  Table (List.rev state.values @ subtable_values)
 
 and get_array_elements state =
   List.rev state.array_elements
 
 (* Main parser function *)
-let parse_toml input =
-  let lexer = make_lexer input in
+let parse_toml_from_lexer lexer =
   let parser = make_parser lexer in
   let root = create_table_state () in
   let current_table = ref root in
@@ -1786,14 +1824,24 @@ let parse_toml input =
   parse_document ();
   table_state_to_toml root
 
+(* Parse TOML from string - creates lexer internally *)
+let parse_toml input =
+  let lexer = make_lexer input in
+  parse_toml_from_lexer lexer
+
+(* Parse TOML directly from Bytes.Reader - no intermediate string *)
+let parse_toml_from_reader ?file r =
+  let lexer = make_lexer_from_reader ?file r in
+  parse_toml_from_lexer lexer
+
 (* Convert TOML to tagged JSON for toml-test compatibility *)
 let rec toml_to_tagged_json value =
   match value with
-  | Toml_string s ->
+  | String s ->
       Printf.sprintf "{\"type\":\"string\",\"value\":%s}" (json_encode_string s)
-  | Toml_int i ->
+  | Int i ->
       Printf.sprintf "{\"type\":\"integer\",\"value\":\"%Ld\"}" i
-  | Toml_float f ->
+  | Float f ->
       let value_str =
         (* Normalize exponent format - lowercase e, keep + for positive exponents *)
         let format_exp s =
@@ -1909,24 +1957,24 @@ let rec toml_to_tagged_json value =
               try_precision 1
       in
       Printf.sprintf "{\"type\":\"float\",\"value\":\"%s\"}" value_str
-  | Toml_bool b ->
+  | Bool b ->
       Printf.sprintf "{\"type\":\"bool\",\"value\":\"%s\"}" (if b then "true" else "false")
-  | Toml_datetime s ->
+  | Datetime s ->
       validate_datetime_string s;
       Printf.sprintf "{\"type\":\"datetime\",\"value\":\"%s\"}" s
-  | Toml_datetime_local s ->
+  | Datetime_local s ->
       validate_datetime_string s;
       Printf.sprintf "{\"type\":\"datetime-local\",\"value\":\"%s\"}" s
-  | Toml_date_local s ->
+  | Date_local s ->
       validate_date_string s;
       Printf.sprintf "{\"type\":\"date-local\",\"value\":\"%s\"}" s
-  | Toml_time_local s ->
+  | Time_local s ->
       validate_time_string s;
       Printf.sprintf "{\"type\":\"time-local\",\"value\":\"%s\"}" s
-  | Toml_array items ->
+  | Array items ->
       let json_items = List.map toml_to_tagged_json items in
       Printf.sprintf "[%s]" (String.concat "," json_items)
-  | Toml_table pairs ->
+  | Table pairs ->
       let json_pairs = List.map (fun (k, v) ->
         Printf.sprintf "%s:%s" (json_encode_string k) (toml_to_tagged_json v)
       ) pairs in
@@ -1950,15 +1998,6 @@ and json_encode_string s =
   ) s;
   Buffer.add_char buf '"';
   Buffer.contents buf
-
-(* Main decode function *)
-let decode_string input =
-  try
-    let toml = parse_toml input in
-    Ok toml
-  with
-  | Failure msg -> Error msg
-  | e -> Error (Printexc.to_string e)
 
 (* Tagged JSON to TOML for encoder *)
 let decode_tagged_json_string s =
@@ -2006,7 +2045,7 @@ let decode_tagged_json_string s =
             if !pos + 3 >= len then failwith "Invalid unicode escape";
             let hex = String.sub s !pos 4 in
             let cp = int_of_string ("0x" ^ hex) in
-            Buffer.add_string buf (unicode_to_utf8 cp);
+            Buffer.add_string buf (codepoint_to_utf8 cp);
             pos := !pos + 4
         | c -> failwith (Printf.sprintf "Invalid escape: \\%c" c)
       end else begin
@@ -2021,22 +2060,22 @@ let decode_tagged_json_string s =
   (* Convert a tagged JSON object to a TOML primitive if applicable *)
   let convert_tagged_value value =
     match value with
-    | Toml_table [("type", Toml_string typ); ("value", Toml_string v)]
-    | Toml_table [("value", Toml_string v); ("type", Toml_string typ)] ->
+    | Table [("type", String typ); ("value", String v)]
+    | Table [("value", String v); ("type", String typ)] ->
         (match typ with
-        | "string" -> Toml_string v
-        | "integer" -> Toml_int (Int64.of_string v)
+        | "string" -> String v
+        | "integer" -> Int (Int64.of_string v)
         | "float" ->
             (match v with
-            | "inf" -> Toml_float Float.infinity
-            | "-inf" -> Toml_float Float.neg_infinity
-            | "nan" -> Toml_float Float.nan
-            | _ -> Toml_float (float_of_string v))
-        | "bool" -> Toml_bool (v = "true")
-        | "datetime" -> Toml_datetime v
-        | "datetime-local" -> Toml_datetime_local v
-        | "date-local" -> Toml_date_local v
-        | "time-local" -> Toml_time_local v
+            | "inf" -> Float Float.infinity
+            | "-inf" -> Float Float.neg_infinity
+            | "nan" -> Float Float.nan
+            | _ -> Float (float_of_string v))
+        | "bool" -> Bool (v = "true")
+        | "datetime" -> Datetime v
+        | "datetime-local" -> Datetime_local v
+        | "date-local" -> Date_local v
+        | "time-local" -> Time_local v
         | _ -> failwith (Printf.sprintf "Unknown type: %s" typ))
     | _ -> value
   in
@@ -2046,7 +2085,7 @@ let decode_tagged_json_string s =
     match peek () with
     | Some '{' -> parse_object ()
     | Some '[' -> parse_array ()
-    | Some '"' -> Toml_string (parse_json_string ())
+    | Some '"' -> String (parse_json_string ())
     | _ -> failwith "Expected value"
 
   and parse_object () =
@@ -2054,7 +2093,7 @@ let decode_tagged_json_string s =
     skip_ws ();
     if peek () = Some '}' then begin
       incr pos;
-      Toml_table []
+      Table []
     end else begin
       let pairs = ref [] in
       let first = ref true in
@@ -2068,7 +2107,7 @@ let decode_tagged_json_string s =
         pairs := (key, convert_tagged_value value) :: !pairs
       done;
       expect '}';
-      Toml_table (List.rev !pairs)
+      Table (List.rev !pairs)
     end
 
   and parse_array () =
@@ -2076,7 +2115,7 @@ let decode_tagged_json_string s =
     skip_ws ();
     if peek () = Some ']' then begin
       incr pos;
-      Toml_array []
+      Array []
     end else begin
       let items = ref [] in
       let first = ref true in
@@ -2086,42 +2125,15 @@ let decode_tagged_json_string s =
         items := convert_tagged_value (parse_value ()) :: !items
       done;
       expect ']';
-      Toml_array (List.rev !items)
+      Array (List.rev !items)
     end
   in
 
   parse_value ()
 
-(* Encode TOML value to TOML string *)
-let rec encode_toml_value ?(inline=false) value =
-  match value with
-  | Toml_string s -> encode_toml_string s
-  | Toml_int i -> Int64.to_string i
-  | Toml_float f ->
-      if Float.is_nan f then "nan"
-      else if f = Float.infinity then "inf"
-      else if f = Float.neg_infinity then "-inf"
-      else
-        let s = Printf.sprintf "%.17g" f in
-        (* Ensure it looks like a float *)
-        if String.contains s '.' || String.contains s 'e' || String.contains s 'E' then s
-        else s ^ ".0"
-  | Toml_bool b -> if b then "true" else "false"
-  | Toml_datetime s -> s
-  | Toml_datetime_local s -> s
-  | Toml_date_local s -> s
-  | Toml_time_local s -> s
-  | Toml_array items ->
-      let encoded = List.map (encode_toml_value ~inline:true) items in
-      Printf.sprintf "[%s]" (String.concat ", " encoded)
-  | Toml_table pairs when inline ->
-      let encoded = List.map (fun (k, v) ->
-        Printf.sprintf "%s = %s" (encode_toml_key k) (encode_toml_value ~inline:true v)
-      ) pairs in
-      Printf.sprintf "{%s}" (String.concat ", " encoded)
-  | Toml_table _ -> failwith "Cannot encode table inline without inline flag"
+(* Streaming TOML encoder - writes directly to a Bytes.Writer *)
 
-and encode_toml_string s =
+let rec write_toml_string w s =
   (* Check if we need to escape *)
   let needs_escape = String.exists (fun c ->
     let code = Char.code c in
@@ -2129,57 +2141,107 @@ and encode_toml_string s =
     code < 0x20 || code = 0x7F
   ) s in
   if needs_escape then begin
-    let buf = Buffer.create (String.length s + 2) in
-    Buffer.add_char buf '"';
+    Bytes.Writer.write_string w "\"";
     String.iter (fun c ->
       match c with
-      | '"' -> Buffer.add_string buf "\\\""
-      | '\\' -> Buffer.add_string buf "\\\\"
-      | '\n' -> Buffer.add_string buf "\\n"
-      | '\r' -> Buffer.add_string buf "\\r"
-      | '\t' -> Buffer.add_string buf "\\t"
-      | '\b' -> Buffer.add_string buf "\\b"
-      | c when Char.code c = 0x0C -> Buffer.add_string buf "\\f"
+      | '"' -> Bytes.Writer.write_string w "\\\""
+      | '\\' -> Bytes.Writer.write_string w "\\\\"
+      | '\n' -> Bytes.Writer.write_string w "\\n"
+      | '\r' -> Bytes.Writer.write_string w "\\r"
+      | '\t' -> Bytes.Writer.write_string w "\\t"
+      | '\b' -> Bytes.Writer.write_string w "\\b"
+      | c when Char.code c = 0x0C -> Bytes.Writer.write_string w "\\f"
       | c when Char.code c < 0x20 || Char.code c = 0x7F ->
-          Buffer.add_string buf (Printf.sprintf "\\u%04X" (Char.code c))
-      | c -> Buffer.add_char buf c
+          Bytes.Writer.write_string w (Printf.sprintf "\\u%04X" (Char.code c))
+      | c ->
+          let b = Bytes.create 1 in
+          Bytes.set b 0 c;
+          Bytes.Writer.write_bytes w b
     ) s;
-    Buffer.add_char buf '"';
-    Buffer.contents buf
-  end else
-    Printf.sprintf "\"%s\"" s
+    Bytes.Writer.write_string w "\""
+  end else begin
+    Bytes.Writer.write_string w "\"";
+    Bytes.Writer.write_string w s;
+    Bytes.Writer.write_string w "\""
+  end
 
-and encode_toml_key k =
+and write_toml_key w k =
   (* Check if it can be a bare key *)
   let is_bare = String.length k > 0 && String.for_all is_bare_key_char k in
-  if is_bare then k else encode_toml_string k
+  if is_bare then Bytes.Writer.write_string w k
+  else write_toml_string w k
 
-(* Streaming TOML encoder - writes directly to a buffer *)
-let encode_toml_to_buffer buf value =
+and write_toml_value w ?(inline=false) value =
+  match value with
+  | String s -> write_toml_string w s
+  | Int i -> Bytes.Writer.write_string w (Int64.to_string i)
+  | Float f ->
+      if Float.is_nan f then Bytes.Writer.write_string w "nan"
+      else if f = Float.infinity then Bytes.Writer.write_string w "inf"
+      else if f = Float.neg_infinity then Bytes.Writer.write_string w "-inf"
+      else begin
+        let s = Printf.sprintf "%.17g" f in
+        (* Ensure it looks like a float *)
+        let s = if String.contains s '.' || String.contains s 'e' || String.contains s 'E'
+                then s else s ^ ".0" in
+        Bytes.Writer.write_string w s
+      end
+  | Bool b -> Bytes.Writer.write_string w (if b then "true" else "false")
+  | Datetime s -> Bytes.Writer.write_string w s
+  | Datetime_local s -> Bytes.Writer.write_string w s
+  | Date_local s -> Bytes.Writer.write_string w s
+  | Time_local s -> Bytes.Writer.write_string w s
+  | Array items ->
+      Bytes.Writer.write_string w "[";
+      List.iteri (fun i item ->
+        if i > 0 then Bytes.Writer.write_string w ", ";
+        write_toml_value w ~inline:true item
+      ) items;
+      Bytes.Writer.write_string w "]"
+  | Table pairs when inline ->
+      Bytes.Writer.write_string w "{";
+      List.iteri (fun i (k, v) ->
+        if i > 0 then Bytes.Writer.write_string w ", ";
+        write_toml_key w k;
+        Bytes.Writer.write_string w " = ";
+        write_toml_value w ~inline:true v
+      ) pairs;
+      Bytes.Writer.write_string w "}"
+  | Table _ -> failwith "Cannot encode table inline without inline flag"
+
+(* True streaming TOML encoder - writes directly to Bytes.Writer *)
+let encode_to_writer w value =
   let has_content = ref false in
+
+  let write_path path =
+    List.iteri (fun i k ->
+      if i > 0 then Bytes.Writer.write_string w ".";
+      write_toml_key w k
+    ) path
+  in
 
   let rec encode_at_path path value =
     match value with
-    | Toml_table pairs ->
+    | Table pairs ->
         (* Separate simple values from nested tables *)
         (* Only PURE table arrays (all items are tables) use [[array]] syntax.
            Mixed arrays (primitives + tables) must be encoded inline. *)
         let is_pure_table_array items =
-          items <> [] && List.for_all (function Toml_table _ -> true | _ -> false) items
+          items <> [] && List.for_all (function Table _ -> true | _ -> false) items
         in
         let simple, nested = List.partition (fun (_, v) ->
           match v with
-          | Toml_table _ -> false
-          | Toml_array items -> not (is_pure_table_array items)
+          | Table _ -> false
+          | Array items -> not (is_pure_table_array items)
           | _ -> true
         ) pairs in
 
         (* Emit simple values first *)
         List.iter (fun (k, v) ->
-          Buffer.add_string buf (encode_toml_key k);
-          Buffer.add_string buf " = ";
-          Buffer.add_string buf (encode_toml_value ~inline:true v);
-          Buffer.add_char buf '\n';
+          write_toml_key w k;
+          Bytes.Writer.write_string w " = ";
+          write_toml_value w ~inline:true v;
+          Bytes.Writer.write_string w "\n";
           has_content := true
         ) simple;
 
@@ -2187,31 +2249,31 @@ let encode_toml_to_buffer buf value =
         List.iter (fun (k, v) ->
           let new_path = path @ [k] in
           match v with
-          | Toml_table _ ->
-              if !has_content then Buffer.add_char buf '\n';
-              Buffer.add_char buf '[';
-              Buffer.add_string buf (String.concat "." (List.map encode_toml_key new_path));
-              Buffer.add_string buf "]\n";
+          | Table _ ->
+              if !has_content then Bytes.Writer.write_string w "\n";
+              Bytes.Writer.write_string w "[";
+              write_path new_path;
+              Bytes.Writer.write_string w "]\n";
               has_content := true;
               encode_at_path new_path v
-          | Toml_array items when items <> [] && List.for_all (function Toml_table _ -> true | _ -> false) items ->
+          | Array items when items <> [] && List.for_all (function Table _ -> true | _ -> false) items ->
               (* Pure table array - use [[array]] syntax *)
               List.iter (fun item ->
                 match item with
-                | Toml_table _ ->
-                    if !has_content then Buffer.add_char buf '\n';
-                    Buffer.add_string buf "[[";
-                    Buffer.add_string buf (String.concat "." (List.map encode_toml_key new_path));
-                    Buffer.add_string buf "]]\n";
+                | Table _ ->
+                    if !has_content then Bytes.Writer.write_string w "\n";
+                    Bytes.Writer.write_string w "[[";
+                    write_path new_path;
+                    Bytes.Writer.write_string w "]]\n";
                     has_content := true;
                     encode_at_path new_path item
                 | _ -> assert false  (* Impossible - we checked for_all above *)
               ) items
           | _ ->
-              Buffer.add_string buf (encode_toml_key k);
-              Buffer.add_string buf " = ";
-              Buffer.add_string buf (encode_toml_value ~inline:true v);
-              Buffer.add_char buf '\n';
+              write_toml_key w k;
+              Bytes.Writer.write_string w " = ";
+              write_toml_value w ~inline:true v;
+              Bytes.Writer.write_string w "\n";
               has_content := true
         ) nested
     | _ ->
@@ -2220,39 +2282,311 @@ let encode_toml_to_buffer buf value =
 
   encode_at_path [] value
 
-(* Full TOML encoder with proper table handling *)
-let encode_toml value =
+(* ============================================
+   Public Interface - Constructors
+   ============================================ *)
+
+let string s = String s
+let int i = Int i
+let int_of_int i = Int (Int64.of_int i)
+let float f = Float f
+let bool b = Bool b
+let array vs = Array vs
+let table pairs = Table pairs
+let datetime s = Datetime s
+let datetime_local s = Datetime_local s
+let date_local s = Date_local s
+let time_local s = Time_local s
+
+(* ============================================
+   Public Interface - Accessors
+   ============================================ *)
+
+let to_string = function
+  | String s -> s
+  | _ -> invalid_arg "Tomlt.to_string: not a string"
+
+let to_string_opt = function
+  | String s -> Some s
+  | _ -> None
+
+let to_int = function
+  | Int i -> i
+  | _ -> invalid_arg "Tomlt.to_int: not an integer"
+
+let to_int_opt = function
+  | Int i -> Some i
+  | _ -> None
+
+let to_float = function
+  | Float f -> f
+  | _ -> invalid_arg "Tomlt.to_float: not a float"
+
+let to_float_opt = function
+  | Float f -> Some f
+  | _ -> None
+
+let to_bool = function
+  | Bool b -> b
+  | _ -> invalid_arg "Tomlt.to_bool: not a boolean"
+
+let to_bool_opt = function
+  | Bool b -> Some b
+  | _ -> None
+
+let to_array = function
+  | Array vs -> vs
+  | _ -> invalid_arg "Tomlt.to_array: not an array"
+
+let to_array_opt = function
+  | Array vs -> Some vs
+  | _ -> None
+
+let to_table = function
+  | Table pairs -> pairs
+  | _ -> invalid_arg "Tomlt.to_table: not a table"
+
+let to_table_opt = function
+  | Table pairs -> Some pairs
+  | _ -> None
+
+let to_datetime = function
+  | Datetime s | Datetime_local s | Date_local s | Time_local s -> s
+  | _ -> invalid_arg "Tomlt.to_datetime: not a datetime"
+
+let to_datetime_opt = function
+  | Datetime s | Datetime_local s | Date_local s | Time_local s -> Some s
+  | _ -> None
+
+(* ============================================
+   Public Interface - Type Predicates
+   ============================================ *)
+
+let is_string = function String _ -> true | _ -> false
+let is_int = function Int _ -> true | _ -> false
+let is_float = function Float _ -> true | _ -> false
+let is_bool = function Bool _ -> true | _ -> false
+let is_array = function Array _ -> true | _ -> false
+let is_table = function Table _ -> true | _ -> false
+let is_datetime = function
+  | Datetime _ | Datetime_local _ | Date_local _ | Time_local _ -> true
+  | _ -> false
+
+(* ============================================
+   Public Interface - Table Navigation
+   ============================================ *)
+
+let find key = function
+  | Table pairs -> List.assoc key pairs
+  | _ -> invalid_arg "Tomlt.find: not a table"
+
+let find_opt key = function
+  | Table pairs -> List.assoc_opt key pairs
+  | _ -> None
+
+let mem key = function
+  | Table pairs -> List.mem_assoc key pairs
+  | _ -> false
+
+let keys = function
+  | Table pairs -> List.map fst pairs
+  | _ -> invalid_arg "Tomlt.keys: not a table"
+
+let rec get path t =
+  match path with
+  | [] -> t
+  | key :: rest ->
+      match t with
+      | Table pairs ->
+          (match List.assoc_opt key pairs with
+          | Some v -> get rest v
+          | None -> raise Not_found)
+      | _ -> invalid_arg "Tomlt.get: intermediate value is not a table"
+
+let get_opt path t =
+  try Some (get path t) with Not_found | Invalid_argument _ -> None
+
+let ( .%{} ) t path = get path t
+
+let rec set_at_path path v t =
+  match path with
+  | [] -> v
+  | [key] ->
+      (match t with
+      | Table pairs ->
+          let pairs' = List.filter (fun (k, _) -> k <> key) pairs in
+          Table ((key, v) :: pairs')
+      | _ -> invalid_arg "Tomlt.(.%{}<-): not a table")
+  | key :: rest ->
+      match t with
+      | Table pairs ->
+          let existing = List.assoc_opt key pairs in
+          let subtable = match existing with
+            | Some (Table _ as sub) -> sub
+            | Some _ -> invalid_arg "Tomlt.(.%{}<-): intermediate value is not a table"
+            | None -> Table []
+          in
+          let updated = set_at_path rest v subtable in
+          let pairs' = List.filter (fun (k, _) -> k <> key) pairs in
+          Table ((key, updated) :: pairs')
+      | _ -> invalid_arg "Tomlt.(.%{}<-): not a table"
+
+let ( .%{}<- ) t path v = set_at_path path v t
+
+(* ============================================
+   Public Interface - Encoding
+   ============================================ *)
+
+let to_buffer buf value =
+  let w = Bytes.Writer.of_buffer buf in
+  encode_to_writer w value
+
+let to_toml_string value =
   let buf = Buffer.create 256 in
-  encode_toml_to_buffer buf value;
+  to_buffer buf value;
   Buffer.contents buf
 
-(* Streaming encoder that writes directly to a Bytes.Writer *)
-let encode_to_writer w value =
-  let buf = Buffer.create 4096 in
-  encode_toml_to_buffer buf value;
-  Bytes.Writer.write_string w (Buffer.contents buf)
+let to_writer = encode_to_writer
 
-(* Bytesrw interface *)
+(* ============================================
+   Public Interface - Decoding
+   ============================================ *)
 
-let decode ?file:_ r =
-  let contents = Bytes.Reader.to_string r in
-  match decode_string contents with
-  | Ok toml -> Ok toml
-  | Error msg -> Error msg
-
-let decode_to_tagged_json ?file:_ r =
-  let contents = Bytes.Reader.to_string r in
-  match decode_string contents with
-  | Ok toml -> Ok (toml_to_tagged_json toml)
-  | Error msg -> Error msg
-
-let encode_from_tagged_json json_str =
+let of_string input =
   try
-    let toml = decode_tagged_json_string json_str in
-    Ok (encode_toml toml)
+    Ok (parse_toml input)
   with
-  | Failure msg -> Error msg
-  | e -> Error (Printexc.to_string e)
+  | Failure msg -> Error (Tomlt_error.make (Tomlt_error.Syntax (Tomlt_error.Expected msg)))
+  | Tomlt_error.Error e -> Error e
+  | e -> Error (Tomlt_error.make (Tomlt_error.Syntax (Tomlt_error.Expected (Printexc.to_string e))))
 
-(* Re-export the error module *)
+let of_reader ?file r =
+  try
+    Ok (parse_toml_from_reader ?file r)
+  with
+  | Failure msg -> Error (Tomlt_error.make (Tomlt_error.Syntax (Tomlt_error.Expected msg)))
+  | Tomlt_error.Error e -> Error e
+  | e -> Error (Tomlt_error.make (Tomlt_error.Syntax (Tomlt_error.Expected (Printexc.to_string e))))
+
+let parse = parse_toml
+
+let parse_reader ?file r = parse_toml_from_reader ?file r
+
+(* ============================================
+   Public Interface - Pretty Printing
+   ============================================ *)
+
+let rec pp_value fmt = function
+  | String s ->
+      Format.fprintf fmt "\"%s\"" (String.escaped s)
+  | Int i ->
+      Format.fprintf fmt "%Ld" i
+  | Float f ->
+      if Float.is_nan f then Format.fprintf fmt "nan"
+      else if f = Float.infinity then Format.fprintf fmt "inf"
+      else if f = Float.neg_infinity then Format.fprintf fmt "-inf"
+      else Format.fprintf fmt "%g" f
+  | Bool b ->
+      Format.fprintf fmt "%s" (if b then "true" else "false")
+  | Datetime s | Datetime_local s | Date_local s | Time_local s ->
+      Format.fprintf fmt "%s" s
+  | Array items ->
+      Format.fprintf fmt "[";
+      List.iteri (fun i item ->
+        if i > 0 then Format.fprintf fmt ", ";
+        pp_value fmt item
+      ) items;
+      Format.fprintf fmt "]"
+  | Table pairs ->
+      Format.fprintf fmt "{";
+      List.iteri (fun i (k, v) ->
+        if i > 0 then Format.fprintf fmt ", ";
+        Format.fprintf fmt "%s = " k;
+        pp_value fmt v
+      ) pairs;
+      Format.fprintf fmt "}"
+
+let pp fmt t =
+  Format.fprintf fmt "%s" (to_toml_string t)
+
+(* ============================================
+   Public Interface - Equality and Comparison
+   ============================================ *)
+
+let rec equal a b =
+  match a, b with
+  | String s1, String s2 -> String.equal s1 s2
+  | Int i1, Int i2 -> Int64.equal i1 i2
+  | Float f1, Float f2 ->
+      (* NaN = NaN for TOML equality *)
+      (Float.is_nan f1 && Float.is_nan f2) || Float.equal f1 f2
+  | Bool b1, Bool b2 -> Bool.equal b1 b2
+  | Datetime s1, Datetime s2 -> String.equal s1 s2
+  | Datetime_local s1, Datetime_local s2 -> String.equal s1 s2
+  | Date_local s1, Date_local s2 -> String.equal s1 s2
+  | Time_local s1, Time_local s2 -> String.equal s1 s2
+  | Array vs1, Array vs2 ->
+      List.length vs1 = List.length vs2 &&
+      List.for_all2 equal vs1 vs2
+  | Table ps1, Table ps2 ->
+      List.length ps1 = List.length ps2 &&
+      List.for_all2 (fun (k1, v1) (k2, v2) ->
+        String.equal k1 k2 && equal v1 v2
+      ) ps1 ps2
+  | _ -> false
+
+let type_order = function
+  | String _ -> 0
+  | Int _ -> 1
+  | Float _ -> 2
+  | Bool _ -> 3
+  | Datetime _ -> 4
+  | Datetime_local _ -> 5
+  | Date_local _ -> 6
+  | Time_local _ -> 7
+  | Array _ -> 8
+  | Table _ -> 9
+
+let rec compare a b =
+  let ta, tb = type_order a, type_order b in
+  if ta <> tb then Int.compare ta tb
+  else match a, b with
+  | String s1, String s2 -> String.compare s1 s2
+  | Int i1, Int i2 -> Int64.compare i1 i2
+  | Float f1, Float f2 -> Float.compare f1 f2
+  | Bool b1, Bool b2 -> Bool.compare b1 b2
+  | Datetime s1, Datetime s2 -> String.compare s1 s2
+  | Datetime_local s1, Datetime_local s2 -> String.compare s1 s2
+  | Date_local s1, Date_local s2 -> String.compare s1 s2
+  | Time_local s1, Time_local s2 -> String.compare s1 s2
+  | Array vs1, Array vs2 ->
+      List.compare compare vs1 vs2
+  | Table ps1, Table ps2 ->
+      List.compare (fun (k1, v1) (k2, v2) ->
+        let c = String.compare k1 k2 in
+        if c <> 0 then c else compare v1 v2
+      ) ps1 ps2
+  | _ -> 0  (* Impossible - handled by type_order check *)
+
+(* ============================================
+   Error Module
+   ============================================ *)
+
 module Error = Tomlt_error
+
+(* ============================================
+   Internal Module (for testing)
+   ============================================ *)
+
+module Internal = struct
+  let to_tagged_json = toml_to_tagged_json
+  let of_tagged_json = decode_tagged_json_string
+
+  let encode_from_tagged_json json_str =
+    try
+      let toml = decode_tagged_json_string json_str in
+      Ok (to_toml_string toml)
+    with
+    | Failure msg -> Error msg
+    | e -> Error (Printexc.to_string e)
+end

@@ -3,10 +3,10 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** Eio integration for TOML errors.
+(** Eio integration for TOML.
 
-    This module registers TOML errors with Eio's exception system,
-    allowing them to be used with {!Eio.Io} and providing context tracking.
+    This module provides Eio-native functions for parsing and encoding TOML,
+    with proper integration into Eio's exception system.
 
     {2 Example}
     {[
@@ -18,29 +18,33 @@
 
 (** {1 Eio Exception Integration} *)
 
-(** TOML errors as Eio errors *)
 type Eio.Exn.err += E of Tomlt.Error.t
+(** TOML errors as Eio errors. *)
 
-(** Create an [Eio.Io] exception from a TOML error *)
 val err : Tomlt.Error.t -> exn
+(** [err e] creates an [Eio.Io] exception from TOML error [e]. *)
 
-(** Wrap a function, converting [Tomlt_error.Error] to [Eio.Io] *)
 val wrap_error : (unit -> 'a) -> 'a
+(** [wrap_error f] runs [f] and converts [Tomlt.Error.Error] to [Eio.Io]. *)
 
 (** {1 Parsing with Eio} *)
 
-(** Parse TOML string with Eio error handling.
-    @param file optional filename for error context *)
-val parse_toml : ?file:string -> string -> Tomlt.toml_value
+val parse : ?file:string -> string -> Tomlt.t
+(** [parse s] parses TOML string [s] with Eio error handling.
+    @param file optional filename for error context.
+    @raise Eio.Io on parse errors. *)
 
-(** Read and parse TOML from an Eio flow.
-    @param file optional filename for error context *)
-val of_flow : ?file:string -> _ Eio.Flow.source -> Tomlt.toml_value
+val of_flow : ?file:string -> _ Eio.Flow.source -> Tomlt.t
+(** [of_flow flow] reads and parses TOML from an Eio flow.
+    @param file optional filename for error context.
+    @raise Eio.Io on read or parse errors. *)
 
-(** Read and parse TOML from an Eio path *)
-val of_path : fs:_ Eio.Path.t -> string -> Tomlt.toml_value
+val of_path : fs:_ Eio.Path.t -> string -> Tomlt.t
+(** [of_path ~fs path] reads and parses TOML from a file path.
+    @raise Eio.Io on file or parse errors. *)
 
 (** {1 Encoding with Eio} *)
 
-(** Write TOML to an Eio flow *)
-val to_flow : _ Eio.Flow.sink -> Tomlt.toml_value -> unit
+val to_flow : _ Eio.Flow.sink -> Tomlt.t -> unit
+(** [to_flow flow t] writes TOML value [t] to an Eio flow.
+    @raise Invalid_argument if [t] is not a table. *)
