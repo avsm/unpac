@@ -1,0 +1,5 @@
+(library
+ (name tomlt)
+ (public_name tomlt)
+ (modules tomlt tomlt_error)
+ (libraries bytesrw uutf))

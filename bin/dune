@@ -1,0 +1,15 @@
+(executable
+ (name toml_test_decoder)
+ (public_name toml-test-decoder)
+ (package tomlt)
+ (libraries tomlt))
+
+(executable
+ (name toml_test_encoder)
+ (public_name toml-test-encoder)
+ (package tomlt)
+ (libraries tomlt))
+
+(executable
+ (name run_tests)
+ (libraries tomlt))
