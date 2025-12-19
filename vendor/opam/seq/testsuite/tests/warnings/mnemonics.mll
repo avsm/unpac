@@ -6,7 +6,7 @@
 }
 
 let ws = [' ''\t']
-let eol = '\n'
+let eol = '\r'? '\n'
 let to_eol = [^'\n']* eol
 let constr = ['A'-'Z']['a'-'z''A'-'Z''0'-'9''_']*
 let int = ['0'-'9']+
@@ -38,7 +38,9 @@ let ocamlsrcdir = Sys.getenv "ocamlsrcdir"
 let ocamlrun = Sys.getenv "ocamlrun"
 
 let constructors =
-  let ic = open_in Filename.(concat ocamlsrcdir (concat "utils" "warnings.ml")) in
+  let ic =
+    open_in_bin Filename.(concat ocamlsrcdir (concat "utils" "warnings.ml"))
+  in
   Fun.protect ~finally:(fun () -> close_in_noerr ic)
     (fun () ->
        let lexbuf = Lexing.from_channel ic in
@@ -54,7 +56,7 @@ let mnemonics =
                   ocamlrun [concat ocamlsrcdir "ocamlc"; "-warn-help"])
   in
   assert (n = 0);
-  let ic = open_in stdout in
+  let ic = open_in_bin stdout in
   Fun.protect ~finally:(fun () -> close_in_noerr ic)
     (fun () ->
        let lexbuf = Lexing.from_channel ic in
@@ -75,9 +77,11 @@ let () =
       | true, false -> ()
       | false, true -> ()
       | false, false ->
-        Printf.printf "Could not find constructor corresponding to mnemonic %S (%d)\n%!" s n
+        Printf.printf
+          "Could not find constructor corresponding to mnemonic %S (%d)\n%!" s n
       | true, true ->
-        Printf.printf "Found constructor for deprecated warnings %S (%d)\n%!" s n
+        Printf.printf
+          "Found constructor for deprecated warnings %S (%d)\n%!" s n
     ) mnemonics
 
 let _ =
