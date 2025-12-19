@@ -27,3 +27,13 @@
   (ocaml (>= 5.0.0))
   (tomlt (= :version))
   (eio (>= 1.0))))
+
+(package
+ (name tomlt-jsont)
+ (synopsis "Jsont codecs for TOML tagged JSON format")
+ (description "Convert between TOML values and the toml-test tagged JSON format using Jsont codecs")
+ (depends
+  (ocaml (>= 4.14.0))
+  (tomlt (= :version))
+  (jsont (>= 0.2.0))
+  (jsont-bytesrw (>= 0.2.0))))

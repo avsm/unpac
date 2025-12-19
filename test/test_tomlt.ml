@@ -1,6 +1,6 @@
 (* Comprehensive test suite for tomlt - TOML 1.1 codec *)
 
-open Tomlt
+open Tomlt.Toml
 
 (* Helper to parse and extract value *)
 let parse s =
