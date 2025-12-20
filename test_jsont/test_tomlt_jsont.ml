@@ -149,7 +149,7 @@ let compatibility_tests = [
       host = "localhost"
       port = 8080
     |} in
-    match Toml.of_string toml_str with
+    match Tomlt_bytesrw.of_string toml_str with
     | Error _ -> Alcotest.fail "TOML parse failed"
     | Ok toml ->
         let json = Tomlt_jsont.encode toml in

@@ -3,7 +3,7 @@ open Tomlt
 (* Helper to encode TOML to string via writer *)
 let toml_to_string value =
   let buf = Buffer.create 256 in
-  Toml.to_writer (Bytesrw.Bytes.Writer.of_buffer buf) value;
+  Tomlt_bytesrw.to_writer (Bytesrw.Bytes.Writer.of_buffer buf) value;
   Buffer.contents buf
 
 type config = { name : string; timeout : int option }

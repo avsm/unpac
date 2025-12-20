@@ -16,13 +16,13 @@ module String_map = Map.Make(String)
    while arrays and objects are passed through with their contents recursively
    encoded. *)
 
-(* Encode TOML -> JSON (string representation) using Tomlt's existing encoder *)
+(* Encode TOML -> JSON (string representation) using Tomlt_bytesrw's encoder *)
 let encode (v : Toml.t) : string =
-  Toml.Tagged_json.encode v
+  Tomlt_bytesrw.Tagged_json.encode v
 
-(* Decode JSON (string) -> TOML using Tomlt's existing decoder *)
+(* Decode JSON (string) -> TOML using Tomlt_bytesrw's decoder *)
 let decode (s : string) : Toml.t =
-  Toml.Tagged_json.decode s
+  Tomlt_bytesrw.Tagged_json.decode s
 
 (* Convenience result-based decode *)
 let decode_result (s : string) : (Toml.t, string) result =

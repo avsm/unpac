@@ -3,7 +3,6 @@
   SPDX-License-Identifier: ISC
  ---------------------------------------------------------------------------*)
 
-module Toml = Tomlt.Toml
 module Bytes = Bytesrw.Bytes
 
 (* Time utilities *)
@@ -24,11 +23,11 @@ let today_date ?tz_offset_s () =
 (* Channel-based I/O *)
 let of_channel ?file ic =
   let r = Bytes.Reader.of_in_channel ic in
-  Toml.parse_reader ?file r
+  Tomlt_bytesrw.parse_reader ?file r
 
 let to_channel oc value =
   let w = Bytes.Writer.of_out_channel oc in
-  Toml.to_writer w value
+  Tomlt_bytesrw.to_writer w value
 
 (* File-based I/O *)
 let of_file path =

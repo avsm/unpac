@@ -23,7 +23,7 @@ let wrap_error f =
     raise (err e)
 
 let parse ?file input =
-  try Tomlt.Toml.parse input
+  try Tomlt_bytesrw.parse input
   with Error.Error e ->
     let bt = Printexc.get_raw_backtrace () in
     let eio_exn = err e in
@@ -44,13 +44,13 @@ let of_path ~fs path =
 
 let to_flow flow value =
   let buf = Buffer.create 256 in
-  Tomlt.Toml.to_writer (Bytesrw.Bytes.Writer.of_buffer buf) value;
+  Tomlt_bytesrw.to_writer (Bytesrw.Bytes.Writer.of_buffer buf) value;
   Eio.Flow.copy_string (Buffer.contents buf) flow
 
 let to_path ~fs path value =
   Eio.Path.save ~create:(`Or_truncate 0o644) (Eio.Path.(/) fs path)
     (let buf = Buffer.create 256 in
-     Tomlt.Toml.to_writer (Bytesrw.Bytes.Writer.of_buffer buf) value;
+     Tomlt_bytesrw.to_writer (Bytesrw.Bytes.Writer.of_buffer buf) value;
      Buffer.contents buf)
 
 (* Codec-based operations *)

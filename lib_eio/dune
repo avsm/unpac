@@ -2,4 +2,4 @@
  (name tomlt_eio)
  (public_name tomlt.eio)
  (optional)
- (libraries tomlt eio bytesrw ptime.clock.os))
+ (libraries tomlt tomlt.bytesrw eio bytesrw ptime.clock.os))

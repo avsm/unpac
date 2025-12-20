@@ -5,17 +5,17 @@ open Tomlt.Toml
 (* Helper to encode TOML to string via writer *)
 let to_toml_string value =
   let buf = Buffer.create 256 in
-  to_writer (Bytesrw.Bytes.Writer.of_buffer buf) value;
+  Tomlt_bytesrw.to_writer (Bytesrw.Bytes.Writer.of_buffer buf) value;
   Buffer.contents buf
 
 (* Helper to parse and extract value *)
-let parse s =
-  match of_string s with
+let parse_toml s =
+  match Tomlt_bytesrw.of_string s with
   | Ok v -> v
   | Error e -> Alcotest.fail (Error.to_string e)
 
 let parse_error s =
-  match of_string s with
+  match Tomlt_bytesrw.of_string s with
   | Ok _ -> Alcotest.fail "Expected parse error"
   | Error _ -> ()
 
@@ -72,19 +72,19 @@ let get key = function
    ============================================ *)
 
 let test_comment_full_line () =
-  let t = parse "# This is a comment\nkey = \"value\"" in
+  let t = parse_toml "# This is a comment\nkey = \"value\"" in
   Alcotest.(check value_testable) "full line comment" (String "value") (get "key" t)
 
 let test_comment_inline () =
-  let t = parse "key = \"value\" # inline comment" in
+  let t = parse_toml "key = \"value\" # inline comment" in
   Alcotest.(check value_testable) "inline comment" (String "value") (get "key" t)
 
 let test_comment_hash_in_string () =
-  let t = parse "key = \"# not a comment\"" in
+  let t = parse_toml "key = \"# not a comment\"" in
   Alcotest.(check value_testable) "hash in string" (String "# not a comment") (get "key" t)
 
 let test_comment_empty () =
-  let t = parse "#\nkey = 1" in
+  let t = parse_toml "#\nkey = 1" in
   Alcotest.(check value_testable) "empty comment" (Int 1L) (get "key" t)
 
 let comment_tests = [
@@ -99,53 +99,53 @@ let comment_tests = [
    ============================================ *)
 
 let test_bare_key () =
-  let t = parse "key = \"value\"" in
+  let t = parse_toml "key = \"value\"" in
   Alcotest.(check value_testable) "simple bare key" (String "value") (get "key" t)
 
 let test_bare_key_underscore () =
-  let t = parse "bare_key = \"value\"" in
+  let t = parse_toml "bare_key = \"value\"" in
   Alcotest.(check value_testable) "bare key with underscore" (String "value") (get "bare_key" t)
 
 let test_bare_key_dash () =
-  let t = parse "bare-key = \"value\"" in
+  let t = parse_toml "bare-key = \"value\"" in
   Alcotest.(check value_testable) "bare key with dash" (String "value") (get "bare-key" t)
 
 let test_bare_key_numeric () =
-  let t = parse "1234 = \"value\"" in
+  let t = parse_toml "1234 = \"value\"" in
   Alcotest.(check value_testable) "numeric bare key" (String "value") (get "1234" t)
 
 let test_quoted_key_basic () =
-  let t = parse "\"127.0.0.1\" = \"value\"" in
+  let t = parse_toml "\"127.0.0.1\" = \"value\"" in
   Alcotest.(check value_testable) "quoted key with dots" (String "value") (get "127.0.0.1" t)
 
 let test_quoted_key_spaces () =
-  let t = parse "\"character encoding\" = \"value\"" in
+  let t = parse_toml "\"character encoding\" = \"value\"" in
   Alcotest.(check value_testable) "quoted key with spaces" (String "value") (get "character encoding" t)
 
 let test_quoted_key_literal () =
-  let t = parse "'key' = \"value\"" in
+  let t = parse_toml "'key' = \"value\"" in
   Alcotest.(check value_testable) "literal quoted key" (String "value") (get "key" t)
 
 let test_empty_quoted_key () =
-  let t = parse "\"\" = \"blank\"" in
+  let t = parse_toml "\"\" = \"blank\"" in
   Alcotest.(check value_testable) "empty quoted key" (String "blank") (get "" t)
 
 let test_dotted_key () =
-  let t = parse "physical.color = \"orange\"" in
+  let t = parse_toml "physical.color = \"orange\"" in
   match get "physical" t with
   | Table pairs ->
       Alcotest.(check value_testable) "dotted key" (String "orange") (List.assoc "color" pairs)
   | _ -> Alcotest.fail "Expected nested table"
 
 let test_dotted_key_quoted () =
-  let t = parse "site.\"google.com\" = true" in
+  let t = parse_toml "site.\"google.com\" = true" in
   match get "site" t with
   | Table pairs ->
       Alcotest.(check value_testable) "dotted key with quoted part" (Bool true) (List.assoc "google.com" pairs)
   | _ -> Alcotest.fail "Expected nested table"
 
 let test_dotted_key_whitespace () =
-  let t = parse "fruit . color = \"yellow\"" in
+  let t = parse_toml "fruit . color = \"yellow\"" in
   match get "fruit" t with
   | Table pairs ->
       Alcotest.(check value_testable) "dotted key with whitespace" (String "yellow") (List.assoc "color" pairs)
@@ -178,59 +178,59 @@ let key_tests = [
    ============================================ *)
 
 let test_basic_string () =
-  let t = parse {|str = "hello world"|} in
+  let t = parse_toml {|str = "hello world"|} in
   Alcotest.(check value_testable) "basic string" (String "hello world") (get "str" t)
 
 let test_basic_string_escapes () =
-  let t = parse {|str = "tab\there"|} in
+  let t = parse_toml {|str = "tab\there"|} in
   Alcotest.(check value_testable) "tab escape" (String "tab\there") (get "str" t)
 
 let test_basic_string_newline () =
-  let t = parse {|str = "line1\nline2"|} in
+  let t = parse_toml {|str = "line1\nline2"|} in
   Alcotest.(check value_testable) "newline escape" (String "line1\nline2") (get "str" t)
 
 let test_basic_string_backslash () =
-  let t = parse {|str = "back\\slash"|} in
+  let t = parse_toml {|str = "back\\slash"|} in
   Alcotest.(check value_testable) "backslash escape" (String "back\\slash") (get "str" t)
 
 let test_basic_string_quote () =
-  let t = parse {|str = "say \"hello\""|} in
+  let t = parse_toml {|str = "say \"hello\""|} in
   Alcotest.(check value_testable) "quote escape" (String "say \"hello\"") (get "str" t)
 
 let test_basic_string_unicode_u () =
-  let t = parse {|str = "\u0041"|} in
+  let t = parse_toml {|str = "\u0041"|} in
   Alcotest.(check value_testable) "unicode \\u escape" (String "A") (get "str" t)
 
 let test_basic_string_unicode_U () =
-  let t = parse {|str = "\U0001F600"|} in
+  let t = parse_toml {|str = "\U0001F600"|} in
   (* U+1F600 is the grinning face emoji *)
   Alcotest.(check value_testable) "unicode \\U escape" (String "\xF0\x9F\x98\x80") (get "str" t)
 
 let test_basic_string_hex_escape () =
-  let t = parse {|str = "\xE9"|} in
+  let t = parse_toml {|str = "\xE9"|} in
   (* U+00E9 is e-acute *)
   Alcotest.(check value_testable) "hex escape" (String "\xC3\xA9") (get "str" t)
 
 let test_basic_string_escape_e () =
-  let t = parse {|str = "\e"|} in
+  let t = parse_toml {|str = "\e"|} in
   Alcotest.(check value_testable) "escape \\e" (String "\x1B") (get "str" t)
 
 let test_literal_string () =
-  let t = parse {|str = 'C:\Users\nodejs\templates'|} in
+  let t = parse_toml {|str = 'C:\Users\nodejs\templates'|} in
   Alcotest.(check value_testable) "literal string" (String {|C:\Users\nodejs\templates|}) (get "str" t)
 
 let test_literal_string_no_escape () =
-  let t = parse {|str = '<\i\c*\s*>'|} in
+  let t = parse_toml {|str = '<\i\c*\s*>'|} in
   Alcotest.(check value_testable) "literal no escape" (String {|<\i\c*\s*>|}) (get "str" t)
 
 let test_multiline_basic () =
-  let t = parse {|str = """
+  let t = parse_toml {|str = """
 Roses are red
 Violets are blue"""|} in
   Alcotest.(check value_testable) "multiline basic" (String "Roses are red\nViolets are blue") (get "str" t)
 
 let test_multiline_basic_trim () =
-  let t = parse {|str = """\
+  let t = parse_toml {|str = """\
        The quick brown \
        fox jumps over \
        the lazy dog.\
@@ -238,11 +238,11 @@ let test_multiline_basic_trim () =
   Alcotest.(check value_testable) "multiline trim" (String "The quick brown fox jumps over the lazy dog.") (get "str" t)
 
 let test_multiline_basic_quotes () =
-  let t = parse {|str = """Here are two quotation marks: "". Simple."""|} in
+  let t = parse_toml {|str = """Here are two quotation marks: "". Simple."""|} in
   Alcotest.(check value_testable) "multiline with quotes" (String {|Here are two quotation marks: "". Simple.|}) (get "str" t)
 
 let test_multiline_literal () =
-  let t = parse {|str = '''
+  let t = parse_toml {|str = '''
 The first newline is
 trimmed in literal strings.
    All other whitespace
@@ -252,7 +252,7 @@ trimmed in literal strings.
   Alcotest.(check value_testable) "multiline literal" (String expected) (get "str" t)
 
 let test_multiline_literal_no_escape () =
-  let t = parse {|str = '''I [dw]on't need \d{2} apples'''|} in
+  let t = parse_toml {|str = '''I [dw]on't need \d{2} apples'''|} in
   Alcotest.(check value_testable) "multiline literal no escape" (String {|I [dw]on't need \d{2} apples|}) (get "str" t)
 
 let string_tests = [
@@ -279,58 +279,58 @@ let string_tests = [
    ============================================ *)
 
 let test_integer_positive () =
-  let t = parse "int = +99" in
+  let t = parse_toml "int = +99" in
   Alcotest.(check value_testable) "positive integer" (Int 99L) (get "int" t)
 
 let test_integer_plain () =
-  let t = parse "int = 42" in
+  let t = parse_toml "int = 42" in
   Alcotest.(check value_testable) "plain integer" (Int 42L) (get "int" t)
 
 let test_integer_zero () =
-  let t = parse "int = 0" in
+  let t = parse_toml "int = 0" in
   Alcotest.(check value_testable) "zero" (Int 0L) (get "int" t)
 
 let test_integer_negative () =
-  let t = parse "int = -17" in
+  let t = parse_toml "int = -17" in
   Alcotest.(check value_testable) "negative integer" (Int (-17L)) (get "int" t)
 
 let test_integer_underscore () =
-  let t = parse "int = 1_000" in
+  let t = parse_toml "int = 1_000" in
   Alcotest.(check value_testable) "underscore separator" (Int 1000L) (get "int" t)
 
 let test_integer_underscore_multi () =
-  let t = parse "int = 5_349_221" in
+  let t = parse_toml "int = 5_349_221" in
   Alcotest.(check value_testable) "multiple underscores" (Int 5349221L) (get "int" t)
 
 let test_integer_hex () =
-  let t = parse "int = 0xDEADBEEF" in
+  let t = parse_toml "int = 0xDEADBEEF" in
   Alcotest.(check value_testable) "hexadecimal" (Int 0xDEADBEEFL) (get "int" t)
 
 let test_integer_hex_lower () =
-  let t = parse "int = 0xdeadbeef" in
+  let t = parse_toml "int = 0xdeadbeef" in
   Alcotest.(check value_testable) "hex lowercase" (Int 0xdeadbeefL) (get "int" t)
 
 let test_integer_hex_underscore () =
-  let t = parse "int = 0xdead_beef" in
+  let t = parse_toml "int = 0xdead_beef" in
   Alcotest.(check value_testable) "hex with underscore" (Int 0xdeadbeefL) (get "int" t)
 
 let test_integer_octal () =
-  let t = parse "int = 0o755" in
+  let t = parse_toml "int = 0o755" in
   Alcotest.(check value_testable) "octal" (Int 0o755L) (get "int" t)
 
 let test_integer_binary () =
-  let t = parse "int = 0b11010110" in
+  let t = parse_toml "int = 0b11010110" in
   Alcotest.(check value_testable) "binary" (Int 0b11010110L) (get "int" t)
 
 let test_integer_leading_zero_error () =
   parse_error "int = 007"
 
 let test_integer_large () =
-  let t = parse "int = 9223372036854775807" in
+  let t = parse_toml "int = 9223372036854775807" in
   Alcotest.(check value_testable) "max int64" (Int Int64.max_int) (get "int" t)
 
 let test_integer_negative_large () =
-  let t = parse "int = -9223372036854775808" in
+  let t = parse_toml "int = -9223372036854775808" in
   Alcotest.(check value_testable) "min int64" (Int Int64.min_int) (get "int" t)
 
 let integer_tests = [
@@ -355,63 +355,63 @@ let integer_tests = [
    ============================================ *)
 
 let test_float_positive () =
-  let t = parse "flt = +1.0" in
+  let t = parse_toml "flt = +1.0" in
   Alcotest.(check value_testable) "positive float" (Float 1.0) (get "flt" t)
 
 let test_float_fractional () =
-  let t = parse "flt = 3.1415" in
+  let t = parse_toml "flt = 3.1415" in
   Alcotest.(check value_testable) "fractional" (Float 3.1415) (get "flt" t)
 
 let test_float_negative () =
-  let t = parse "flt = -0.01" in
+  let t = parse_toml "flt = -0.01" in
   Alcotest.(check value_testable) "negative float" (Float (-0.01)) (get "flt" t)
 
 let test_float_exponent () =
-  let t = parse "flt = 5e+22" in
+  let t = parse_toml "flt = 5e+22" in
   Alcotest.(check value_testable) "exponent" (Float 5e+22) (get "flt" t)
 
 let test_float_exponent_no_sign () =
-  let t = parse "flt = 1e06" in
+  let t = parse_toml "flt = 1e06" in
   Alcotest.(check value_testable) "exponent no sign" (Float 1e06) (get "flt" t)
 
 let test_float_exponent_negative () =
-  let t = parse "flt = -2E-2" in
+  let t = parse_toml "flt = -2E-2" in
   Alcotest.(check value_testable) "negative exponent" (Float (-2E-2)) (get "flt" t)
 
 let test_float_both () =
-  let t = parse "flt = 6.626e-34" in
+  let t = parse_toml "flt = 6.626e-34" in
   Alcotest.(check value_testable) "fractional and exponent" (Float 6.626e-34) (get "flt" t)
 
 let test_float_underscore () =
-  let t = parse "flt = 224_617.445_991_228" in
+  let t = parse_toml "flt = 224_617.445_991_228" in
   Alcotest.(check value_testable) "underscore in float" (Float 224617.445991228) (get "flt" t)
 
 let test_float_inf () =
-  let t = parse "flt = inf" in
+  let t = parse_toml "flt = inf" in
   Alcotest.(check value_testable) "infinity" (Float Float.infinity) (get "flt" t)
 
 let test_float_pos_inf () =
-  let t = parse "flt = +inf" in
+  let t = parse_toml "flt = +inf" in
   Alcotest.(check value_testable) "positive infinity" (Float Float.infinity) (get "flt" t)
 
 let test_float_neg_inf () =
-  let t = parse "flt = -inf" in
+  let t = parse_toml "flt = -inf" in
   Alcotest.(check value_testable) "negative infinity" (Float Float.neg_infinity) (get "flt" t)
 
 let test_float_nan () =
-  let t = parse "flt = nan" in
+  let t = parse_toml "flt = nan" in
   match get "flt" t with
   | Float f when Float.is_nan f -> ()
   | _ -> Alcotest.fail "Expected NaN"
 
 let test_float_pos_nan () =
-  let t = parse "flt = +nan" in
+  let t = parse_toml "flt = +nan" in
   match get "flt" t with
   | Float f when Float.is_nan f -> ()
   | _ -> Alcotest.fail "Expected NaN"
 
 let test_float_neg_nan () =
-  let t = parse "flt = -nan" in
+  let t = parse_toml "flt = -nan" in
   match get "flt" t with
   | Float f when Float.is_nan f -> ()
   | _ -> Alcotest.fail "Expected NaN"
@@ -446,11 +446,11 @@ let float_tests = [
    ============================================ *)
 
 let test_bool_true () =
-  let t = parse "bool = true" in
+  let t = parse_toml "bool = true" in
   Alcotest.(check value_testable) "true" (Bool true) (get "bool" t)
 
 let test_bool_false () =
-  let t = parse "bool = false" in
+  let t = parse_toml "bool = false" in
   Alcotest.(check value_testable) "false" (Bool false) (get "bool" t)
 
 let test_bool_case_sensitive () =
@@ -467,39 +467,39 @@ let boolean_tests = [
    ============================================ *)
 
 let test_datetime_offset () =
-  let t = parse "dt = 1979-05-27T07:32:00Z" in
+  let t = parse_toml "dt = 1979-05-27T07:32:00Z" in
   Alcotest.(check value_testable) "offset datetime UTC" (Datetime "1979-05-27T07:32:00Z") (get "dt" t)
 
 let test_datetime_offset_negative () =
-  let t = parse "dt = 1979-05-27T00:32:00-07:00" in
+  let t = parse_toml "dt = 1979-05-27T00:32:00-07:00" in
   Alcotest.(check value_testable) "offset datetime negative" (Datetime "1979-05-27T00:32:00-07:00") (get "dt" t)
 
 let test_datetime_offset_frac () =
-  let t = parse "dt = 1979-05-27T00:32:00.5-07:00" in
+  let t = parse_toml "dt = 1979-05-27T00:32:00.5-07:00" in
   Alcotest.(check value_testable) "offset datetime fractional" (Datetime "1979-05-27T00:32:00.5-07:00") (get "dt" t)
 
 let test_datetime_space_separator () =
-  let t = parse "dt = 1979-05-27 07:32:00Z" in
+  let t = parse_toml "dt = 1979-05-27 07:32:00Z" in
   Alcotest.(check value_testable) "space separator" (Datetime "1979-05-27T07:32:00Z") (get "dt" t)
 
 let test_datetime_local () =
-  let t = parse "dt = 1979-05-27T07:32:00" in
+  let t = parse_toml "dt = 1979-05-27T07:32:00" in
   Alcotest.(check value_testable) "local datetime" (Datetime_local "1979-05-27T07:32:00") (get "dt" t)
 
 let test_datetime_local_frac () =
-  let t = parse "dt = 1979-05-27T07:32:00.5" in
+  let t = parse_toml "dt = 1979-05-27T07:32:00.5" in
   Alcotest.(check value_testable) "local datetime fractional" (Datetime_local "1979-05-27T07:32:00.5") (get "dt" t)
 
 let test_date_local () =
-  let t = parse "dt = 1979-05-27" in
+  let t = parse_toml "dt = 1979-05-27" in
   Alcotest.(check value_testable) "local date" (Date_local "1979-05-27") (get "dt" t)
 
 let test_time_local () =
-  let t = parse "dt = 07:32:00" in
+  let t = parse_toml "dt = 07:32:00" in
   Alcotest.(check value_testable) "local time" (Time_local "07:32:00") (get "dt" t)
 
 let test_time_local_frac () =
-  let t = parse "dt = 00:32:00.999999" in
+  let t = parse_toml "dt = 00:32:00.999999" in
   Alcotest.(check value_testable) "local time fractional" (Time_local "00:32:00.999999") (get "dt" t)
 
 let datetime_tests = [
@@ -519,19 +519,19 @@ let datetime_tests = [
    ============================================ *)
 
 let test_array_integers () =
-  let t = parse "arr = [1, 2, 3]" in
+  let t = parse_toml "arr = [1, 2, 3]" in
   Alcotest.(check value_testable) "integer array"
     (Array [Int 1L; Int 2L; Int 3L])
     (get "arr" t)
 
 let test_array_strings () =
-  let t = parse {|arr = ["red", "yellow", "green"]|} in
+  let t = parse_toml {|arr = ["red", "yellow", "green"]|} in
   Alcotest.(check value_testable) "string array"
     (Array [String "red"; String "yellow"; String "green"])
     (get "arr" t)
 
 let test_array_nested () =
-  let t = parse "arr = [[1, 2], [3, 4, 5]]" in
+  let t = parse_toml "arr = [[1, 2], [3, 4, 5]]" in
   Alcotest.(check value_testable) "nested array"
     (Array [
       Array [Int 1L; Int 2L];
@@ -540,29 +540,29 @@ let test_array_nested () =
     (get "arr" t)
 
 let test_array_mixed () =
-  let t = parse "arr = [0.1, 0.2, 1, 2]" in
+  let t = parse_toml "arr = [0.1, 0.2, 1, 2]" in
   Alcotest.(check value_testable) "mixed types"
     (Array [Float 0.1; Float 0.2; Int 1L; Int 2L])
     (get "arr" t)
 
 let test_array_empty () =
-  let t = parse "arr = []" in
+  let t = parse_toml "arr = []" in
   Alcotest.(check value_testable) "empty array" (Array []) (get "arr" t)
 
 let test_array_multiline () =
-  let t = parse "arr = [\n  1,\n  2,\n  3\n]" in
+  let t = parse_toml "arr = [\n  1,\n  2,\n  3\n]" in
   Alcotest.(check value_testable) "multiline array"
     (Array [Int 1L; Int 2L; Int 3L])
     (get "arr" t)
 
 let test_array_trailing_comma () =
-  let t = parse "arr = [1, 2, 3,]" in
+  let t = parse_toml "arr = [1, 2, 3,]" in
   Alcotest.(check value_testable) "trailing comma"
     (Array [Int 1L; Int 2L; Int 3L])
     (get "arr" t)
 
 let test_array_with_inline_tables () =
-  let t = parse {|arr = [{x = 1}, {x = 2}]|} in
+  let t = parse_toml {|arr = [{x = 1}, {x = 2}]|} in
   match get "arr" t with
   | Array [Table [("x", Int 1L)]; Table [("x", Int 2L)]] -> ()
   | _ -> Alcotest.fail "Expected array of inline tables"
@@ -583,14 +583,14 @@ let array_tests = [
    ============================================ *)
 
 let test_table_basic () =
-  let t = parse "[table]\nkey = \"value\"" in
+  let t = parse_toml "[table]\nkey = \"value\"" in
   match get "table" t with
   | Table pairs ->
       Alcotest.(check value_testable) "basic table" (String "value") (List.assoc "key" pairs)
   | _ -> Alcotest.fail "Expected table"
 
 let test_table_multiple () =
-  let t = parse "[table1]\nkey1 = 1\n\n[table2]\nkey2 = 2" in
+  let t = parse_toml "[table1]\nkey1 = 1\n\n[table2]\nkey2 = 2" in
   let t1 = get "table1" t and t2 = get "table2" t in
   (match t1 with
    | Table pairs -> Alcotest.(check value_testable) "table1" (Int 1L) (List.assoc "key1" pairs)
@@ -600,7 +600,7 @@ let test_table_multiple () =
    | _ -> Alcotest.fail "Expected table2")
 
 let test_table_dotted_header () =
-  let t = parse "[dog.\"tater.man\"]\ntype = \"pug\"" in
+  let t = parse_toml "[dog.\"tater.man\"]\ntype = \"pug\"" in
   match get "dog" t with
   | Table pairs ->
       (match List.assoc "tater.man" pairs with
@@ -610,14 +610,14 @@ let test_table_dotted_header () =
   | _ -> Alcotest.fail "Expected dog table"
 
 let test_table_implicit_parent () =
-  let t = parse "[x.y.z.w]\nkey = 1" in
+  let t = parse_toml "[x.y.z.w]\nkey = 1" in
   (* x, x.y, x.y.z should all be implicitly created *)
   match get "x" t with
   | Table _ -> ()
   | _ -> Alcotest.fail "Expected x table"
 
 let test_table_empty () =
-  let t = parse "[empty]\n[other]\nkey = 1" in
+  let t = parse_toml "[empty]\n[other]\nkey = 1" in
   match get "empty" t with
   | Table [] -> ()
   | Table _ -> ()  (* May have implicit content *)
@@ -627,7 +627,7 @@ let test_table_duplicate_error () =
   parse_error "[fruit]\napple = 1\n\n[fruit]\norange = 2"
 
 let test_table_super_after () =
-  let t = parse "[x.y]\na = 1\n[x]\nb = 2" in
+  let t = parse_toml "[x.y]\na = 1\n[x]\nb = 2" in
   match get "x" t with
   | Table pairs ->
       Alcotest.(check value_testable) "super table b" (Int 2L) (List.assoc "b" pairs)
@@ -648,7 +648,7 @@ let table_tests = [
    ============================================ *)
 
 let test_inline_table_basic () =
-  let t = parse {|name = { first = "Tom", last = "Preston-Werner" }|} in
+  let t = parse_toml {|name = { first = "Tom", last = "Preston-Werner" }|} in
   match get "name" t with
   | Table pairs ->
       Alcotest.(check value_testable) "first" (String "Tom") (List.assoc "first" pairs);
@@ -656,7 +656,7 @@ let test_inline_table_basic () =
   | _ -> Alcotest.fail "Expected inline table"
 
 let test_inline_table_compact () =
-  let t = parse "point = {x=1, y=2}" in
+  let t = parse_toml "point = {x=1, y=2}" in
   match get "point" t with
   | Table pairs ->
       Alcotest.(check value_testable) "x" (Int 1L) (List.assoc "x" pairs);
@@ -664,7 +664,7 @@ let test_inline_table_compact () =
   | _ -> Alcotest.fail "Expected inline table"
 
 let test_inline_table_dotted_key () =
-  let t = parse "animal = { type.name = \"pug\" }" in
+  let t = parse_toml "animal = { type.name = \"pug\" }" in
   match get "animal" t with
   | Table pairs ->
       (match List.assoc "type" pairs with
@@ -674,11 +674,11 @@ let test_inline_table_dotted_key () =
   | _ -> Alcotest.fail "Expected animal table"
 
 let test_inline_table_empty () =
-  let t = parse "empty = {}" in
+  let t = parse_toml "empty = {}" in
   Alcotest.(check value_testable) "empty inline table" (Table []) (get "empty" t)
 
 let test_inline_table_trailing_comma () =
-  let t = parse "x = {a = 1, b = 2,}" in
+  let t = parse_toml "x = {a = 1, b = 2,}" in
   match get "x" t with
   | Table pairs ->
       Alcotest.(check value_testable) "a" (Int 1L) (List.assoc "a" pairs);
@@ -686,7 +686,7 @@ let test_inline_table_trailing_comma () =
   | _ -> Alcotest.fail "Expected inline table"
 
 let test_inline_table_nested () =
-  let t = parse "x = { a = { b = 1 } }" in
+  let t = parse_toml "x = { a = { b = 1 } }" in
   match get "x" t with
   | Table pairs ->
       (match List.assoc "a" pairs with
@@ -709,7 +709,7 @@ let inline_table_tests = [
    ============================================ *)
 
 let test_array_of_tables_basic () =
-  let t = parse "[[product]]\nname = \"Hammer\"\n\n[[product]]\nname = \"Nail\"" in
+  let t = parse_toml "[[product]]\nname = \"Hammer\"\n\n[[product]]\nname = \"Nail\"" in
   match get "product" t with
   | Array [Table p1; Table p2] ->
       Alcotest.(check value_testable) "first" (String "Hammer") (List.assoc "name" p1);
@@ -717,14 +717,14 @@ let test_array_of_tables_basic () =
   | _ -> Alcotest.fail "Expected array of tables"
 
 let test_array_of_tables_empty () =
-  let t = parse "[[product]]\nname = \"Hammer\"\n\n[[product]]\n\n[[product]]\nname = \"Nail\"" in
+  let t = parse_toml "[[product]]\nname = \"Hammer\"\n\n[[product]]\n\n[[product]]\nname = \"Nail\"" in
   match get "product" t with
   | Array [_; Table []; _] -> ()
   | Array items when List.length items = 3 -> ()
   | _ -> Alcotest.fail "Expected 3 elements"
 
 let test_array_of_tables_subtable () =
-  let t = parse "[[fruits]]\nname = \"apple\"\n\n[fruits.physical]\ncolor = \"red\"" in
+  let t = parse_toml "[[fruits]]\nname = \"apple\"\n\n[fruits.physical]\ncolor = \"red\"" in
   match get "fruits" t with
   | Array [Table pairs] ->
       Alcotest.(check value_testable) "name" (String "apple") (List.assoc "name" pairs);
@@ -735,7 +735,7 @@ let test_array_of_tables_subtable () =
   | _ -> Alcotest.fail "Expected array of tables"
 
 let test_array_of_tables_nested () =
-  let t = parse "[[fruits]]\nname = \"apple\"\n\n[[fruits.varieties]]\nname = \"red delicious\"\n\n[[fruits.varieties]]\nname = \"granny smith\"" in
+  let t = parse_toml "[[fruits]]\nname = \"apple\"\n\n[[fruits.varieties]]\nname = \"red delicious\"\n\n[[fruits.varieties]]\nname = \"granny smith\"" in
   match get "fruits" t with
   | Array [Table pairs] ->
       Alcotest.(check value_testable) "name" (String "apple") (List.assoc "name" pairs);
@@ -768,7 +768,7 @@ let test_encode_roundtrip_basic () =
     ("enabled", Bool true);
   ] in
   let encoded = to_toml_string original in
-  let decoded = parse encoded in
+  let decoded = parse_toml encoded in
   Alcotest.(check value_testable) "roundtrip basic" original decoded
 
 let test_encode_roundtrip_nested () =
@@ -779,7 +779,7 @@ let test_encode_roundtrip_nested () =
     ]);
   ] in
   let encoded = to_toml_string original in
-  let decoded = parse encoded in
+  let decoded = parse_toml encoded in
   Alcotest.(check value_testable) "roundtrip nested" original decoded
 
 let test_encode_roundtrip_array () =
@@ -787,7 +787,7 @@ let test_encode_roundtrip_array () =
     ("items", Array [Int 1L; Int 2L; Int 3L]);
   ] in
   let encoded = to_toml_string original in
-  let decoded = parse encoded in
+  let decoded = parse_toml encoded in
   Alcotest.(check value_testable) "roundtrip array" original decoded
 
 let test_encode_roundtrip_special_string () =
@@ -795,7 +795,7 @@ let test_encode_roundtrip_special_string () =
     ("str", String "line1\nline2\ttab");
   ] in
   let encoded = to_toml_string original in
-  let decoded = parse encoded in
+  let decoded = parse_toml encoded in
   Alcotest.(check value_testable) "roundtrip special string" original decoded
 
 let test_encode_roundtrip_float () =
@@ -805,7 +805,7 @@ let test_encode_roundtrip_float () =
     ("neg_inf", Float Float.neg_infinity);
   ] in
   let encoded = to_toml_string original in
-  let decoded = parse encoded in
+  let decoded = parse_toml encoded in
   Alcotest.(check value_testable) "roundtrip float" original decoded
 
 let test_encode_roundtrip_datetime () =
@@ -815,7 +815,7 @@ let test_encode_roundtrip_datetime () =
     ("lt", Time_local "07:32:00");
   ] in
   let encoded = to_toml_string original in
-  let decoded = parse encoded in
+  let decoded = parse_toml encoded in
   Alcotest.(check value_testable) "roundtrip datetime" original decoded
 
 let encode_tests = [
@@ -859,11 +859,11 @@ let test_error_inline_extend () =
   parse_error "[product]\ntype = { name = \"Nail\" }\ntype.edible = false"
 
 let test_unicode_key () =
-  let t = parse {|"ʎǝʞ" = "value"|} in
+  let t = parse_toml {|"ʎǝʞ" = "value"|} in
   Alcotest.(check value_testable) "unicode key" (String "value") (get "ʎǝʞ" t)
 
 let test_crlf_newlines () =
-  let t = parse "key1 = 1\r\nkey2 = 2" in
+  let t = parse_toml "key1 = 1\r\nkey2 = 2" in
   Alcotest.(check value_testable) "key1" (Int 1L) (get "key1" t);
   Alcotest.(check value_testable) "key2" (Int 2L) (get "key2" t)
 
