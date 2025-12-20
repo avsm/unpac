@@ -2,4 +2,4 @@
  (name tomlt)
  (public_name tomlt)
  (modules tomlt toml toml_error)
- (libraries bytesrw uutf ptime))
+ (libraries ptime))

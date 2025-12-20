@@ -5,7 +5,7 @@ open Tomlt
 (* Helper to encode TOML to string via writer *)
 let toml_to_string value =
   let buf = Buffer.create 256 in
-  Toml.to_writer (Bytesrw.Bytes.Writer.of_buffer buf) value;
+  Tomlt_bytesrw.to_writer (Bytesrw.Bytes.Writer.of_buffer buf) value;
   Buffer.contents buf
 
 (* ============================================================================
@@ -14,7 +14,7 @@ let toml_to_string value =
 
 (* Decode a value from "value = X" TOML *)
 let check_decode_ok name codec input expected =
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   let actual = decode codec value in
   match actual with
@@ -26,7 +26,7 @@ let check_decode_ok name codec input expected =
 
 (* Check that decode fails *)
 let check_decode_error name codec input =
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   match decode codec value with
   | Error _ -> ()
@@ -34,7 +34,7 @@ let check_decode_error name codec input =
 
 (* Decode from a table (for table codecs) *)
 let check_decode_table_ok name codec input expected =
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   let actual = decode codec value in
   match actual with
@@ -46,7 +46,7 @@ let check_decode_table_ok name codec input expected =
 
 (* Check table decode error *)
 let check_decode_table_error name codec input =
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   match decode codec value with
   | Error _ -> ()
@@ -375,7 +375,7 @@ let test_float_special () =
   check_decode_ok "neg inf" float "value = -inf" Float.neg_infinity;
   check_decode_ok "pos inf" float "value = +inf" Float.infinity;
   (* nan requires special handling since nan <> nan *)
-  let toml = Toml.parse "value = nan" in
+  let toml = Tomlt_bytesrw.parse "value = nan" in
   let value = Toml.find "value" toml in
   match decode float value with
   | Ok f when Float.is_nan f -> ()
@@ -453,7 +453,7 @@ let test_ptime_codec () =
   let input = "value = 2024-06-15T14:30:00Z" in
   let expected = match Ptime.of_date_time ((2024, 6, 15), ((14, 30, 0), 0)) with
     | Some t -> t | None -> failwith "invalid test datetime" in
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   match decode (ptime ()) value with
   | Ok v -> Alcotest.(check ptime_testable) "ptime" expected v
@@ -465,7 +465,7 @@ let test_ptime_codec_offset () =
   (* UTC time should be 1979-05-27T07:32:00Z *)
   let expected = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
     | Some t -> t | None -> failwith "invalid test datetime" in
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   match decode (ptime ()) value with
   | Ok v -> Alcotest.(check ptime_testable) "ptime with offset" expected v
@@ -484,7 +484,7 @@ let test_ptime_codec_optional_seconds () =
   let input = "value = 1979-05-27T07:32Z" in
   let expected = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
     | Some t -> t | None -> failwith "invalid test datetime" in
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   match decode (ptime ()) value with
   | Ok v -> Alcotest.(check ptime_testable) "optional seconds" expected v
@@ -495,7 +495,7 @@ let test_ptime_opt_codec () =
   let input = "value = 1979-05-27T07:32:00Z" in
   let expected = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
     | Some t -> t | None -> failwith "invalid test datetime" in
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   match decode (ptime_opt ()) value with
   | Ok t -> Alcotest.(check ptime_testable) "ptime_opt" expected t
@@ -504,7 +504,7 @@ let test_ptime_opt_codec () =
 let test_ptime_opt_rejects_local () =
   (* ptime_opt should reject local datetime *)
   let input = "value = 1979-05-27T07:32:00" in
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   match decode (ptime_opt ()) value with
   | Ok _ -> Alcotest.fail "expected error for local datetime"
@@ -514,7 +514,7 @@ let test_ptime_span_codec () =
   let input = "value = 14:30:45" in
   let expected = match Ptime.Span.of_float_s (14.0 *. 3600.0 +. 30.0 *. 60.0 +. 45.0) with
     | Some s -> s | None -> failwith "invalid span" in
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   match decode ptime_span value with
   | Ok span -> Alcotest.(check ptime_span_testable) "span" expected span
@@ -530,7 +530,7 @@ let test_ptime_span_roundtrip () =
 
 let test_ptime_date_codec () =
   let input = "value = 1979-05-27" in
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   match decode ptime_date value with
   | Ok date -> Alcotest.(check ptime_date_testable) "date" (1979, 5, 27) date
@@ -548,7 +548,7 @@ let test_ptime_local_datetime () =
   let input = "value = 1979-05-27T07:32:00" in
   let expected = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
     | Some t -> t | None -> failwith "invalid test datetime" in
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   match decode (ptime ~tz_offset_s:0 ()) value with
   | Ok v -> Alcotest.(check ptime_testable) "local datetime" expected v
@@ -559,7 +559,7 @@ let test_ptime_date_as_ptime () =
   let input = "value = 1979-05-27" in
   let expected = match Ptime.of_date_time ((1979, 5, 27), ((0, 0, 0), 0)) with
     | Some t -> t | None -> failwith "invalid test datetime" in
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   match decode (ptime ~tz_offset_s:0 ()) value with
   | Ok v -> Alcotest.(check ptime_testable) "date as ptime" expected v
@@ -580,7 +580,7 @@ let ptime_full_testable =
 
 let test_ptime_full_offset () =
   let input = "value = 1979-05-27T07:32:00Z" in
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   match decode (ptime_full ()) value with
   | Ok (`Datetime (ptime, Some 0)) ->
@@ -592,7 +592,7 @@ let test_ptime_full_offset () =
 
 let test_ptime_full_local_datetime () =
   let input = "value = 1979-05-27T07:32:00" in
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   match decode (ptime_full ~tz_offset_s:0 ()) value with
   | Ok (`Datetime_local ptime) ->
@@ -604,7 +604,7 @@ let test_ptime_full_local_datetime () =
 
 let test_ptime_full_date () =
   let input = "value = 1979-05-27" in
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   match decode (ptime_full ()) value with
   | Ok (`Date (y, m, d)) ->
@@ -616,7 +616,7 @@ let test_ptime_full_date () =
 
 let test_ptime_full_time () =
   let input = "value = 07:32:00" in
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value = Toml.find "value" toml in
   match decode (ptime_full ()) value with
   | Ok (`Time (h, m, s, ns)) ->
@@ -1023,7 +1023,7 @@ let test_error_unknown () =
     name = "test"
     extra = 42
   |} in
-  let toml = Toml.parse input2 in
+  let toml = Tomlt_bytesrw.parse input2 in
   let value_toml = Toml.find "value" toml in
   try
     let _ = decode strict_config_codec value_toml in
@@ -1050,7 +1050,7 @@ let test_keep_unknown () =
     extra1 = 42
     extra2 = "hello"
   |} in
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let value_toml = Toml.find "value" toml in
   match decode extensible_config_codec value_toml with
   | Ok c ->
@@ -1164,7 +1164,7 @@ let test_value_mems_codec () =
     b = "hello"
     c = true
   |} in
-  let toml = Toml.parse input in
+  let toml = Tomlt_bytesrw.parse input in
   let v = Toml.find "value" toml in
   match decode value_mems v with
   | Ok pairs ->
@@ -1206,13 +1206,13 @@ let test_decode_string () =
     |> mem "name" string ~enc:Fun.id
     |> finish
   ) in
-  match decode_string codec toml_str with
+  match Tomlt_bytesrw.decode_string codec toml_str with
   | Ok name -> Alcotest.(check string) "name" "test" name
   | Error e -> Alcotest.failf "decode failed: %s" (Toml.Error.to_string e)
 
 let test_decode_string_exn () =
   let toml_str = {|value = 42|} in
-  let toml = Toml.parse toml_str in
+  let toml = Tomlt_bytesrw.parse toml_str in
   let v = Toml.find "value" toml in
   let result = decode_exn int v in
   Alcotest.(check int) "value" 42 result
@@ -1223,9 +1223,9 @@ let test_encode_string () =
     |> mem "name" string ~enc:Fun.id
     |> finish
   ) in
-  let s = encode_string codec "test" in
+  let s = Tomlt_bytesrw.encode_string codec "test" in
   (* Just verify it produces valid TOML *)
-  let _ = Toml.parse s in
+  let _ = Tomlt_bytesrw.parse s in
   ()
 
 (* ============================================================================

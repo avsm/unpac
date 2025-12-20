@@ -22,14 +22,17 @@
         |> mem "debug" bool ~enc:(fun c -> c.debug) ~dec_absent:false
         |> finish
       ))
+    v}
 
+    For I/O operations (parsing strings, reading files), use {!Tomlt_bytesrw}:
+    {v
     let () =
-      match Tomlt.decode_string config_codec {|
+      match Tomlt_bytesrw.decode_string config_codec {|
         host = "localhost"
         port = 8080
       |} with
       | Ok config -> Printf.printf "Host: %s\n" config.host
-      | Error e -> prerr_endline (Tomlt.Toml.Error.to_string e)
+      | Error e -> prerr_endline (Toml.Error.to_string e)
     v}
 
     {2 Codec Pattern}
@@ -1117,8 +1120,9 @@ val any :
 
 (** {1:codec_ops Encoding and Decoding}
 
-    Functions for converting between OCaml values and
-    {{:https://toml.io/en/v1.1.0}TOML 1.1} documents. *)
+    Functions for converting between OCaml values and TOML values.
+    For I/O operations (parsing strings, writing to files), see
+    {!Tomlt_bytesrw}. *)
 
 val decode : 'a t -> Toml.t -> ('a, Toml.Error.t) result
 (** [decode c v] decodes TOML value [v] using codec [c]. *)
@@ -1129,23 +1133,6 @@ val decode_exn : 'a t -> Toml.t -> 'a
 
 val encode : 'a t -> 'a -> Toml.t
 (** [encode c v] encodes OCaml value [v] to TOML using codec [c]. *)
-
-val decode_string : 'a t -> string -> ('a, Toml.Error.t) result
-(** [decode_string c s] parses TOML string [s] and decodes with [c]. *)
-
-val decode_string_exn : 'a t -> string -> 'a
-(** [decode_string_exn c s] is like [decode_string] but raises on error. *)
-
-val encode_string : 'a t -> 'a -> string
-(** [encode_string c v] encodes [v] to a TOML-formatted string. *)
-
-val decode_reader : ?file:string -> 'a t -> Bytesrw.Bytes.Reader.t ->
-  ('a, Toml.Error.t) result
-(** [decode_reader c r] parses TOML from reader [r] and decodes with [c].
-    @param file Optional filename for error messages. *)
-
-val encode_writer : 'a t -> 'a -> Bytesrw.Bytes.Writer.t -> unit
-(** [encode_writer c v w] encodes [v] and writes TOML to writer [w]. *)
 
 (** {1 Re-exported Modules} *)
 

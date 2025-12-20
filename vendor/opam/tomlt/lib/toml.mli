@@ -3,39 +3,29 @@
   SPDX-License-Identifier: ISC
  ---------------------------------------------------------------------------*)
 
-(** {{:https://toml.io/en/v1.1.0}TOML 1.1} codec.
+(** {{:https://toml.io/en/v1.1.0}TOML 1.1} value types.
 
-    Tomlt provides {{:https://toml.io/en/v1.1.0}TOML 1.1} parsing and encoding
-    with efficient streaming support via
-    {{:https://erratique.ch/software/bytesrw}Bytesrw}.
+    This module provides the core TOML value type and operations for
+    constructing, accessing, and manipulating TOML data. For parsing and
+    encoding, see {!Tomlt_bytesrw}.
 
     {2 Quick Start}
 
-    Parse a TOML string:
+    Create TOML values programmatically:
     {[
-      let config = Tomlt.of_string {|
-        [server]
-        host = "localhost"
-        port = 8080
-      |} in
-      match config with
-      | Ok t ->
-          let host = Tomlt.(t.%{"server"; "host"} |> to_string) in
-          let port = Tomlt.(t.%{"server"; "port"} |> to_int) in
-          Printf.printf "Server: %s:%Ld\n" host port
-      | Error e -> prerr_endline (Tomlt.Error.to_string e)
-    ]}
-
-    Create and encode TOML:
-    {[
-      let config = Tomlt.(table [
+      let config = Toml.(table [
         "title", string "My App";
         "database", table [
           "host", string "localhost";
           "ports", array [int 5432L; int 5433L]
         ]
-      ]) in
-      print_endline (Tomlt.to_string config)
+      ])
+    ]}
+
+    Access values:
+    {[
+      let host = Toml.(config.%{["database"; "host"]} |> to_string)
+      let port = Toml.(config.%{["database"; "ports"]} |> to_array |> List.hd |> to_int)
     ]}
 
     {2 Module Overview}
@@ -44,11 +34,9 @@
     - {!section:construct} - Value constructors
     - {!section:access} - Value accessors and type conversion
     - {!section:navigate} - Table navigation
-    - {!section:decode} - Parsing from strings and readers
-    - {!section:encode} - Encoding to strings and writers
+    - {!section:ptime} - Ptime datetime conversions
+    - {!section:pp} - Pretty printing
     - {!module:Error} - Structured error types *)
-
-open Bytesrw
 
 (** {1:types TOML Value Types} *)
 
@@ -138,116 +126,6 @@ val date_local : string -> t
 val time_local : string -> t
 (** [time_local s] creates a {{:https://toml.io/en/v1.1.0#local-time}local time}
     value. E.g. ["07:32:00"] or ["07:32:00.999"]. *)
-
-(** {2 Ptime Conversions}
-
-    Convert between {{:https://toml.io/en/v1.1.0#offset-date-time}TOML datetime}
-    values and {{:https://erratique.ch/software/ptime}Ptime} timestamps. Offset
-    datetimes can be converted to/from [Ptime.t] since they represent specific
-    instants on the UTC timeline. Local datetime types cannot be converted to
-    [Ptime.t] without assuming a timezone. *)
-
-val datetime_of_ptime : ?tz_offset_s:int -> ?frac_s:int -> Ptime.t -> t
-(** [datetime_of_ptime ?tz_offset_s ?frac_s ptime] creates an
-    {{:https://toml.io/en/v1.1.0#offset-date-time}offset datetime} from a ptime
-    timestamp.
-    @param tz_offset_s Timezone offset in seconds (default: 0 for UTC).
-      Use positive values for east of UTC (e.g., 3600 for +01:00),
-      negative for west (e.g., -18000 for -05:00).
-    @param frac_s Number of fractional second digits to include (default: 0).
-      Clipped to range \[0, 12\]. *)
-
-val to_ptime : t -> Ptime.t
-(** [to_ptime t] converts an {{:https://toml.io/en/v1.1.0#offset-date-time}offset
-    datetime} to a ptime timestamp.
-    @raise Invalid_argument if [t] is not a [Datetime] or if the datetime
-    string cannot be parsed. Local datetime types cannot be converted. *)
-
-val to_ptime_opt : t -> Ptime.t option
-(** [to_ptime_opt t] returns [Some ptime] if [t] is a [Datetime] that can be
-    parsed, [None] otherwise. *)
-
-val to_ptime_tz : t -> (Ptime.t * Ptime.tz_offset_s option) option
-(** [to_ptime_tz t] returns the ptime timestamp and timezone offset for an
-    offset datetime. The timezone is [Some 0] for [Z], [Some offset_s] for
-    explicit offsets like [+05:30], or [None] for the unknown local offset
-    convention ([-00:00]). Returns [None] if [t] is not a [Datetime]. *)
-
-val date_of_ptime : ?tz_offset_s:int -> Ptime.t -> t
-(** [date_of_ptime ?tz_offset_s ptime] creates a {{:https://toml.io/en/v1.1.0#local-date}local
-    date} from a ptime timestamp. The date is extracted in the given timezone
-    (default: UTC). *)
-
-val to_date : t -> Ptime.date
-(** [to_date t] converts a {{:https://toml.io/en/v1.1.0#local-date}local date}
-    to a ptime date tuple [(year, month, day)].
-    @raise Invalid_argument if [t] is not a [Date_local] or cannot be parsed. *)
-
-val to_date_opt : t -> Ptime.date option
-(** [to_date_opt t] returns [Some date] if [t] is a [Date_local], [None] otherwise. *)
-
-(** {2 Datetime}
-
-    Unifies all {{:https://toml.io/en/v1.1.0#offset-date-time}TOML datetime}
-    formats using {!Ptime} types, while preserving information about what was
-    originally specified in the TOML source.
-
-    For {{:https://toml.io/en/v1.1.0#local-date-time}local datetimes} without
-    timezone, pass [~tz_offset_s] to specify the timezone to use for
-    conversion. If not provided, UTC (0) is used as the default. *)
-
-type ptime_datetime = [
-  | `Datetime of Ptime.t * Ptime.tz_offset_s option
-      (** {{:https://toml.io/en/v1.1.0#offset-date-time}Offset datetime} with
-          full timezone info. The offset is [Some 0] for [Z], [Some n] for
-          explicit offsets, or [None] for the unknown local offset convention
-          ([-00:00]). *)
-  | `Datetime_local of Ptime.t
-      (** {{:https://toml.io/en/v1.1.0#local-date-time}Local datetime} converted
-          to [Ptime.t] using current system timezone. Preserves that the source
-          had no explicit timezone. *)
-  | `Date of Ptime.date
-      (** {{:https://toml.io/en/v1.1.0#local-date}Local date} as
-          [(year, month, day)]. *)
-  | `Time of int * int * int * int
-      (** {{:https://toml.io/en/v1.1.0#local-time}Local time} as
-          [(hour, minute, second, nanoseconds)]. Nanoseconds range from 0 to
-          999_999_999. *)
-]
-(** Datetime representation using {!Ptime}.
-
-    This variant indicates both the ptime value and the precision level
-    of datetime information present in the original TOML source. *)
-
-val to_ptime_datetime : ?tz_offset_s:int -> t -> ptime_datetime option
-(** [to_ptime_datetime ?tz_offset_s t] converts any TOML datetime value to
-    a unified ptime representation.
-
-    @param tz_offset_s Timezone offset for local datetimes. This is the offset
-      to assume when the TOML value is a local datetime without explicit
-      timezone. Defaults to 0 (UTC) if not provided.
-    @return [None] if [t] is not a datetime type, [Some pdt] otherwise.
-
-    Examples:
-    - [Datetime "1979-05-27T07:32:00Z"] →
-      [Some (`Datetime (ptime, Some 0))]
-    - [Datetime_local "1979-05-27T07:32:00"] →
-      [Some (`Datetime_local ptime)] (converted using current tz)
-    - [Date_local "1979-05-27"] →
-      [Some (`Date (1979, 5, 27))]
-    - [Time_local "07:32:00.123"] →
-      [Some (`Time (7, 32, 0, 123_000_000))] *)
-
-val ptime_datetime_to_toml : ptime_datetime -> t
-(** [ptime_datetime_to_toml pdt] converts a unified ptime datetime back to
-    a TOML value, preserving the appropriate datetime variant:
-    - [`Datetime (t, tz)] → [Datetime s] with timezone
-    - [`Datetime_local t] → [Datetime_local s]
-    - [`Date d] → [Date_local s]
-    - [`Time (h, m, s, ns)] → [Time_local s] *)
-
-val pp_ptime_datetime : Format.formatter -> ptime_datetime -> unit
-(** [pp_ptime_datetime fmt pdt] pretty-prints the unified datetime. *)
 
 (** {1:access Value Accessors}
 
@@ -374,55 +252,125 @@ val ( .%{}<- ) : t -> string list -> t -> t
     @raise Invalid_argument if [t] is not a table or if an intermediate
     value exists but is not a table. *)
 
-(** {1:decode Decoding (Parsing)}
+(** {1:ptime Ptime Conversions}
 
-    Parse TOML from various sources. *)
+    Convert between {{:https://toml.io/en/v1.1.0#offset-date-time}TOML datetime}
+    values and {{:https://erratique.ch/software/ptime}Ptime} timestamps. Offset
+    datetimes can be converted to/from [Ptime.t] since they represent specific
+    instants on the UTC timeline. Local datetime types cannot be converted to
+    [Ptime.t] without assuming a timezone. *)
 
-val of_string : string -> (t, Toml_error.t) result
-(** [of_string s] parses [s] as a TOML document. *)
+val datetime_of_ptime : ?tz_offset_s:int -> ?frac_s:int -> Ptime.t -> t
+(** [datetime_of_ptime ?tz_offset_s ?frac_s ptime] creates an
+    {{:https://toml.io/en/v1.1.0#offset-date-time}offset datetime} from a ptime
+    timestamp.
+    @param tz_offset_s Timezone offset in seconds (default: 0 for UTC).
+      Use positive values for east of UTC (e.g., 3600 for +01:00),
+      negative for west (e.g., -18000 for -05:00).
+    @param frac_s Number of fractional second digits to include (default: 0).
+      Clipped to range \[0, 12\]. *)
 
-val of_reader : ?file:string -> Bytes.Reader.t -> (t, Toml_error.t) result
-(** [of_reader r] parses a TOML document from reader [r].
-    @param file Optional filename for error messages. *)
+val to_ptime : t -> Ptime.t
+(** [to_ptime t] converts an {{:https://toml.io/en/v1.1.0#offset-date-time}offset
+    datetime} to a ptime timestamp.
+    @raise Invalid_argument if [t] is not a [Datetime] or if the datetime
+    string cannot be parsed. Local datetime types cannot be converted. *)
 
-val parse : string -> t
-(** [parse s] parses [s] as a TOML document.
-    @raise Error.Error on parse errors. *)
+val to_ptime_opt : t -> Ptime.t option
+(** [to_ptime_opt t] returns [Some ptime] if [t] is a [Datetime] that can be
+    parsed, [None] otherwise. *)
 
-val parse_reader : ?file:string -> Bytes.Reader.t -> t
-(** [parse_reader r] parses a TOML document from reader [r].
-    @param file Optional filename for error messages.
-    @raise Error.Error on parse errors. *)
+val to_ptime_tz : t -> (Ptime.t * Ptime.tz_offset_s option) option
+(** [to_ptime_tz t] returns the ptime timestamp and timezone offset for an
+    offset datetime. The timezone is [Some 0] for [Z], [Some offset_s] for
+    explicit offsets like [+05:30], or [None] for the unknown local offset
+    convention ([-00:00]). Returns [None] if [t] is not a [Datetime]. *)
 
-(** {1:encode Encoding}
+val date_of_ptime : ?tz_offset_s:int -> Ptime.t -> t
+(** [date_of_ptime ?tz_offset_s ptime] creates a {{:https://toml.io/en/v1.1.0#local-date}local
+    date} from a ptime timestamp. The date is extracted in the given timezone
+    (default: UTC). *)
 
-    Encode TOML values using {{:https://erratique.ch/software/bytesrw}Bytesrw}
-    writers. *)
+val to_date : t -> Ptime.date
+(** [to_date t] converts a {{:https://toml.io/en/v1.1.0#local-date}local date}
+    to a ptime date tuple [(year, month, day)].
+    @raise Invalid_argument if [t] is not a [Date_local] or cannot be parsed. *)
 
-val to_writer : Bytes.Writer.t -> t -> unit
-(** [to_writer w t] writes [t] as TOML to writer [w].
+val to_date_opt : t -> Ptime.date option
+(** [to_date_opt t] returns [Some date] if [t] is a [Date_local], [None] otherwise. *)
 
-    Use with {!Bytesrw.Bytes.Writer} to write to various destinations:
-    {[
-      (* To string *)
-      let buf = Buffer.create 256 in
-      Toml.to_writer (Bytes.Writer.of_buffer buf) value;
-      Buffer.contents buf
+(** {2:ptime_unified Unified Ptime Datetime}
 
-      (* To channel *)
-      Toml.to_writer (Bytes.Writer.of_out_channel oc) value
-    ]}
+    Unifies all {{:https://toml.io/en/v1.1.0#offset-date-time}TOML datetime}
+    formats using {!Ptime} types, while preserving information about what was
+    originally specified in the TOML source.
 
-    @raise Invalid_argument if [t] is not a [Table]. *)
+    For {{:https://toml.io/en/v1.1.0#local-date-time}local datetimes} without
+    timezone, pass [~tz_offset_s] to specify the timezone to use for
+    conversion. If not provided, UTC (0) is used as the default. *)
+
+type ptime_datetime = [
+  | `Datetime of Ptime.t * Ptime.tz_offset_s option
+      (** {{:https://toml.io/en/v1.1.0#offset-date-time}Offset datetime} with
+          full timezone info. The offset is [Some 0] for [Z], [Some n] for
+          explicit offsets, or [None] for the unknown local offset convention
+          ([-00:00]). *)
+  | `Datetime_local of Ptime.t
+      (** {{:https://toml.io/en/v1.1.0#local-date-time}Local datetime} converted
+          to [Ptime.t] using current system timezone. Preserves that the source
+          had no explicit timezone. *)
+  | `Date of Ptime.date
+      (** {{:https://toml.io/en/v1.1.0#local-date}Local date} as
+          [(year, month, day)]. *)
+  | `Time of int * int * int * int
+      (** {{:https://toml.io/en/v1.1.0#local-time}Local time} as
+          [(hour, minute, second, nanoseconds)]. Nanoseconds range from 0 to
+          999_999_999. *)
+]
+(** Datetime representation using {!Ptime}.
+
+    This variant indicates both the ptime value and the precision level
+    of datetime information present in the original TOML source. *)
+
+val to_ptime_datetime : ?tz_offset_s:int -> t -> ptime_datetime option
+(** [to_ptime_datetime ?tz_offset_s t] converts any TOML datetime value to
+    a unified ptime representation.
+
+    @param tz_offset_s Timezone offset for local datetimes. This is the offset
+      to assume when the TOML value is a local datetime without explicit
+      timezone. Defaults to 0 (UTC) if not provided.
+    @return [None] if [t] is not a datetime type, [Some pdt] otherwise.
+
+    Examples:
+    - [Datetime "1979-05-27T07:32:00Z"] →
+      [Some (`Datetime (ptime, Some 0))]
+    - [Datetime_local "1979-05-27T07:32:00"] →
+      [Some (`Datetime_local ptime)] (converted using current tz)
+    - [Date_local "1979-05-27"] →
+      [Some (`Date (1979, 5, 27))]
+    - [Time_local "07:32:00.123"] →
+      [Some (`Time (7, 32, 0, 123_000_000))] *)
+
+val ptime_datetime_to_toml : ptime_datetime -> t
+(** [ptime_datetime_to_toml pdt] converts a unified ptime datetime back to
+    a TOML value, preserving the appropriate datetime variant:
+    - [`Datetime (t, tz)] → [Datetime s] with timezone
+    - [`Datetime_local t] → [Datetime_local s]
+    - [`Date d] → [Date_local s]
+    - [`Time (h, m, s, ns)] → [Time_local s] *)
+
+val pp_ptime_datetime : Format.formatter -> ptime_datetime -> unit
+(** [pp_ptime_datetime fmt pdt] pretty-prints the unified datetime. *)
 
 (** {1:pp Pretty Printing} *)
 
 val pp : Format.formatter -> t -> unit
-(** [pp fmt t] pretty-prints [t] in TOML format. *)
+(** [pp fmt t] pretty-prints [t] in TOML inline format.
+    Tables are printed as inline tables. *)
 
 val pp_value : Format.formatter -> t -> unit
-(** [pp_value fmt t] pretty-prints a single TOML value (not a full document).
-    Useful for debugging. Tables are printed as inline tables. *)
+(** [pp_value fmt t] pretty-prints a single TOML value.
+    Same as {!pp}. *)
 
 val equal : t -> t -> bool
 (** [equal a b] is structural equality on TOML values.
@@ -437,31 +385,3 @@ module Error = Toml_error
 (** Structured error types for TOML parsing and encoding.
 
     See {!Toml_error} for detailed documentation. *)
-
-(** {1:tagged_json Tagged JSON}
-
-    Functions for interoperating with the
-    {{:https://github.com/toml-lang/toml-test}toml-test} suite's tagged JSON
-    format. These functions are primarily for testing and validation. *)
-
-module Tagged_json : sig
-  val encode : t -> string
-  (** [encode t] converts TOML value [t] to tagged JSON format.
-
-      The tagged JSON format wraps each value with type information:
-      - Strings: [{"type": "string", "value": "..."}]
-      - Integers: [{"type": "integer", "value": "..."}]
-      - Floats: [{"type": "float", "value": "..."}]
-      - Booleans: [{"type": "bool", "value": "true"|"false"}]
-      - Datetimes: [{"type": "datetime", "value": "..."}]
-      - Arrays: [[...]]
-      - Tables: [{...}] *)
-
-  val decode : string -> t
-  (** [decode s] parses tagged JSON string [s] into a TOML value.
-      @raise Failure if the JSON is malformed or has invalid types. *)
-
-  val decode_and_encode_toml : string -> (string, string) result
-  (** [decode_and_encode_toml json] decodes tagged JSON and encodes as TOML.
-      Used by the toml-test encoder harness. *)
-end

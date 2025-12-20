@@ -1,11 +1,11 @@
 (test
  (name test_tomlt)
- (libraries tomlt bytesrw alcotest))
+ (libraries tomlt tomlt.bytesrw alcotest))
 
 (test
  (name test_codec)
- (libraries tomlt bytesrw alcotest))
+ (libraries tomlt tomlt.bytesrw alcotest))
 
 (executable
  (name test_debug)
- (libraries tomlt bytesrw))
+ (libraries tomlt tomlt.bytesrw))

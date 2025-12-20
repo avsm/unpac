@@ -1,4 +1,4 @@
 (library
  (name tomlt_unix)
  (public_name tomlt.unix)
- (libraries tomlt bytesrw ptime.clock.os))
+ (libraries tomlt tomlt.bytesrw bytesrw ptime.clock.os))

@@ -2,4 +2,4 @@
  (name tomlt_jsont)
  (public_name tomlt.jsont)
  (optional)
- (libraries tomlt jsont jsont.bytesrw))
+ (libraries tomlt tomlt.bytesrw jsont jsont.bytesrw))

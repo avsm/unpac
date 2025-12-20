@@ -2,9 +2,9 @@
 
 let () =
   let input = In_channel.input_all In_channel.stdin in
-  match Tomlt.Toml.of_string input with
+  match Tomlt_bytesrw.of_string input with
   | Ok toml ->
-      let json = Tomlt.Toml.Tagged_json.encode toml in
+      let json = Tomlt_bytesrw.Tagged_json.encode toml in
       print_string json;
       print_newline ()
   | Error e ->

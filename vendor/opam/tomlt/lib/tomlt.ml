@@ -1325,24 +1325,6 @@ let decode_exn c v =
 
 let encode c v = c.enc v
 
-let decode_string c s = Result.bind (Toml.of_string s) (decode c)
-
-let decode_string_exn c s =
-  let toml = Toml.parse s in
-  decode_exn c toml
-
-let encode_string c v =
-  let toml = encode c v in
-  let buf = Buffer.create 256 in
-  Toml.to_writer (Bytesrw.Bytes.Writer.of_buffer buf) toml;
-  Buffer.contents buf
-
-let decode_reader ?file c r = Result.bind (Toml.of_reader ?file r) (decode c)
-
-let encode_writer c v w =
-  let toml = encode c v in
-  Toml.to_writer w toml
-
 (* Re-export the Toml module for accessing raw TOML values *)
 module Toml = Toml
 module Error = Toml.Error
