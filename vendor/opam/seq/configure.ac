@@ -2349,6 +2349,8 @@ AC_CHECK_FUNC(
     AC_DEFINE([HAS_WAIT4], [1])
   ])
 
+AC_CHECK_FUNCS_ONCE([getlogin_r getgrnam_r getgrgid_r getpwnam_r getpwuid_r])
+
 ## getgroups
 AC_CHECK_FUNC([getgroups], [AC_DEFINE([HAS_GETGROUPS], [1])])
 
@@ -2396,6 +2398,7 @@ AC_CHECK_FUNC([gettimeofday],
 ## mktime
 
 AC_CHECK_FUNC([mktime], [AC_DEFINE([HAS_MKTIME], [1])])
+AC_CHECK_FUNCS_ONCE([gmtime_r localtime_r])
 
 ## setsid
 
