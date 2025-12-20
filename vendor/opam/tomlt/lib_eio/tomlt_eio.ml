@@ -43,5 +43,59 @@ let of_path ~fs path =
   |> parse ~file
 
 let to_flow flow value =
-  let output = Tomlt.Toml.to_toml_string value in
-  Eio.Flow.copy_string output flow
+  let buf = Buffer.create 256 in
+  Tomlt.Toml.to_writer (Bytesrw.Bytes.Writer.of_buffer buf) value;
+  Eio.Flow.copy_string (Buffer.contents buf) flow
+
+let to_path ~fs path value =
+  Eio.Path.save ~create:(`Or_truncate 0o644) (Eio.Path.(/) fs path)
+    (let buf = Buffer.create 256 in
+     Tomlt.Toml.to_writer (Bytesrw.Bytes.Writer.of_buffer buf) value;
+     Buffer.contents buf)
+
+(* Codec-based operations *)
+let decode_flow ?file codec flow =
+  let toml = of_flow ?file flow in
+  Tomlt.decode codec toml
+
+let decode_flow_exn ?file codec flow =
+  let toml = of_flow ?file flow in
+  wrap_error (fun () -> Tomlt.decode_exn codec toml)
+
+let decode_path codec ~fs path =
+  let toml = of_path ~fs path in
+  Tomlt.decode codec toml
+
+let decode_path_exn codec ~fs path =
+  let toml = of_path ~fs path in
+  wrap_error (fun () -> Tomlt.decode_exn codec toml)
+
+let encode_flow codec value flow =
+  let toml = Tomlt.encode codec value in
+  to_flow flow toml
+
+let encode_path codec value ~fs path =
+  let toml = Tomlt.encode codec value in
+  to_path ~fs path toml
+
+(* Time utilities *)
+let current_tz_offset_s = Ptime_clock.current_tz_offset_s
+
+let now = Ptime_clock.now
+
+let today_date ?tz_offset_s () =
+  let tz_offset_s = match tz_offset_s with
+    | Some tz -> tz
+    | None ->
+        match current_tz_offset_s () with
+        | Some tz -> tz
+        | None -> 0
+  in
+  Ptime.to_date ~tz_offset_s (now ())
+
+(* Pre-configured ptime codecs with system timezone *)
+let ptime ?frac_s () =
+  Tomlt.ptime ?frac_s ~get_tz:current_tz_offset_s ~now ()
+
+let ptime_full () =
+  Tomlt.ptime_full ~get_tz:current_tz_offset_s ()

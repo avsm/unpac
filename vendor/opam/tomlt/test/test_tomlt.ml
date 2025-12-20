@@ -2,6 +2,12 @@
 
 open Tomlt.Toml
 
+(* Helper to encode TOML to string via writer *)
+let to_toml_string value =
+  let buf = Buffer.create 256 in
+  to_writer (Bytesrw.Bytes.Writer.of_buffer buf) value;
+  Buffer.contents buf
+
 (* Helper to parse and extract value *)
 let parse s =
   match of_string s with
@@ -995,6 +1001,152 @@ let ptime_tests = [
 ]
 
 (* ============================================
+   Unified Ptime Datetime
+   ============================================ *)
+
+let ptime_datetime_testable =
+  Alcotest.testable pp_ptime_datetime (fun a b ->
+    match a, b with
+    | `Datetime (t1, tz1), `Datetime (t2, tz2) ->
+        Ptime.equal t1 t2 && tz1 = tz2
+    | `Datetime_local t1, `Datetime_local t2 ->
+        Ptime.equal t1 t2
+    | `Date d1, `Date d2 -> d1 = d2
+    | `Time t1, `Time t2 -> t1 = t2
+    | _ -> false)
+
+let test_unified_offset_datetime () =
+  let v = Datetime "1979-05-27T07:32:00Z" in
+  match to_ptime_datetime v with
+  | Some (`Datetime (ptime, Some 0)) ->
+      let expected = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
+        | Some t -> t | None -> Alcotest.fail "invalid expected datetime" in
+      Alcotest.(check ptime_testable) "ptime value" expected ptime
+  | Some (`Datetime (_, tz)) ->
+      Alcotest.failf "expected tz=Some 0, got %s"
+        (match tz with Some n -> string_of_int n | None -> "None")
+  | Some other ->
+      Alcotest.failf "expected `Datetime, got %a" pp_ptime_datetime other
+  | None ->
+      Alcotest.fail "expected Some, got None"
+
+let test_unified_offset_datetime_with_tz () =
+  let v = Datetime "1979-05-27T00:32:00-07:00" in
+  match to_ptime_datetime v with
+  | Some (`Datetime (ptime, Some tz)) ->
+      (* UTC time should be 1979-05-27T07:32:00Z *)
+      let expected = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
+        | Some t -> t | None -> Alcotest.fail "invalid expected datetime" in
+      Alcotest.(check ptime_testable) "ptime value" expected ptime;
+      Alcotest.(check int) "timezone" (-25200) tz
+  | _ -> Alcotest.fail "expected `Datetime with tz"
+
+let test_unified_local_datetime () =
+  let v = Datetime_local "1979-05-27T07:32:00" in
+  (* Use explicit UTC for testing *)
+  match to_ptime_datetime ~tz_offset_s:0 v with
+  | Some (`Datetime_local ptime) ->
+      let expected = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
+        | Some t -> t | None -> Alcotest.fail "invalid expected datetime" in
+      Alcotest.(check ptime_testable) "ptime value" expected ptime
+  | Some other ->
+      Alcotest.failf "expected `Datetime_local, got %a" pp_ptime_datetime other
+  | None ->
+      Alcotest.fail "expected Some, got None"
+
+let test_unified_local_date () =
+  let v = Date_local "1979-05-27" in
+  match to_ptime_datetime v with
+  | Some (`Date (year, month, day)) ->
+      Alcotest.(check int) "year" 1979 year;
+      Alcotest.(check int) "month" 5 month;
+      Alcotest.(check int) "day" 27 day
+  | Some other ->
+      Alcotest.failf "expected `Date, got %a" pp_ptime_datetime other
+  | None ->
+      Alcotest.fail "expected Some, got None"
+
+let test_unified_local_time () =
+  let v = Time_local "07:32:00" in
+  match to_ptime_datetime v with
+  | Some (`Time (hour, minute, second, ns)) ->
+      Alcotest.(check int) "hour" 7 hour;
+      Alcotest.(check int) "minute" 32 minute;
+      Alcotest.(check int) "second" 0 second;
+      Alcotest.(check int) "nanoseconds" 0 ns
+  | Some other ->
+      Alcotest.failf "expected `Time, got %a" pp_ptime_datetime other
+  | None ->
+      Alcotest.fail "expected Some, got None"
+
+let test_unified_local_time_frac () =
+  let v = Time_local "07:32:00.123456789" in
+  match to_ptime_datetime v with
+  | Some (`Time (hour, minute, second, ns)) ->
+      Alcotest.(check int) "hour" 7 hour;
+      Alcotest.(check int) "minute" 32 minute;
+      Alcotest.(check int) "second" 0 second;
+      Alcotest.(check int) "nanoseconds" 123456789 ns
+  | Some other ->
+      Alcotest.failf "expected `Time, got %a" pp_ptime_datetime other
+  | None ->
+      Alcotest.fail "expected Some, got None"
+
+let test_unified_roundtrip_offset () =
+  let original = `Datetime (
+    (match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
+     | Some t -> t | None -> Alcotest.fail "invalid datetime"),
+    Some (-25200)
+  ) in
+  let toml = ptime_datetime_to_toml original in
+  match to_ptime_datetime toml with
+  | Some result -> Alcotest.(check ptime_datetime_testable) "roundtrip" original result
+  | None -> Alcotest.fail "roundtrip failed"
+
+let test_unified_roundtrip_local () =
+  let original = `Datetime_local (
+    match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
+    | Some t -> t | None -> Alcotest.fail "invalid datetime"
+  ) in
+  let toml = ptime_datetime_to_toml original in
+  match to_ptime_datetime ~tz_offset_s:0 toml with
+  | Some result -> Alcotest.(check ptime_datetime_testable) "roundtrip" original result
+  | None -> Alcotest.fail "roundtrip failed"
+
+let test_unified_roundtrip_date () =
+  let original = `Date (1979, 5, 27) in
+  let toml = ptime_datetime_to_toml original in
+  match to_ptime_datetime toml with
+  | Some result -> Alcotest.(check ptime_datetime_testable) "roundtrip" original result
+  | None -> Alcotest.fail "roundtrip failed"
+
+let test_unified_roundtrip_time () =
+  let original = `Time (7, 32, 45, 123000000) in
+  let toml = ptime_datetime_to_toml original in
+  match to_ptime_datetime toml with
+  | Some result -> Alcotest.(check ptime_datetime_testable) "roundtrip" original result
+  | None -> Alcotest.fail "roundtrip failed"
+
+let test_unified_not_datetime () =
+  let v = String "not a datetime" in
+  Alcotest.(check (option ptime_datetime_testable)) "non-datetime"
+    None (to_ptime_datetime v)
+
+let unified_datetime_tests = [
+  "offset datetime", `Quick, test_unified_offset_datetime;
+  "offset datetime with tz", `Quick, test_unified_offset_datetime_with_tz;
+  "local datetime", `Quick, test_unified_local_datetime;
+  "local date", `Quick, test_unified_local_date;
+  "local time", `Quick, test_unified_local_time;
+  "local time frac", `Quick, test_unified_local_time_frac;
+  "roundtrip offset", `Quick, test_unified_roundtrip_offset;
+  "roundtrip local", `Quick, test_unified_roundtrip_local;
+  "roundtrip date", `Quick, test_unified_roundtrip_date;
+  "roundtrip time", `Quick, test_unified_roundtrip_time;
+  "not datetime", `Quick, test_unified_not_datetime;
+]
+
+(* ============================================
    Main
    ============================================ *)
 
@@ -1014,4 +1166,5 @@ let () =
     "encoding", encode_tests;
     "edge_cases", edge_case_tests;
     "ptime", ptime_tests;
+    "unified_datetime", unified_datetime_tests;
   ]

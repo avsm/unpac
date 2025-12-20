@@ -2381,6 +2381,136 @@ let to_date t =
       | Date_local _ -> invalid_arg "Toml.to_date: cannot parse date"
       | _ -> invalid_arg "Toml.to_date: not a date_local"
 
+(* Unified ptime datetime type *)
+
+type ptime_datetime = [
+  | `Datetime of Ptime.t * Ptime.tz_offset_s option
+  | `Datetime_local of Ptime.t
+  | `Date of Ptime.date
+  | `Time of int * int * int * int  (* hour, minute, second, nanoseconds *)
+]
+
+(* Parse local datetime string to ptime using given timezone offset *)
+let parse_local_datetime_with_tz tz_offset_s s =
+  let normalized = normalize_datetime_for_ptime s in
+  (* Append timezone to make it parseable by ptime *)
+  let tz_str =
+    if tz_offset_s = 0 then "Z"
+    else
+      let sign = if tz_offset_s >= 0 then '+' else '-' in
+      let abs_offset = abs tz_offset_s in
+      let hours = abs_offset / 3600 in
+      let minutes = (abs_offset mod 3600) / 60 in
+      Printf.sprintf "%c%02d:%02d" sign hours minutes
+  in
+  let with_tz = normalized ^ tz_str in
+  match Ptime.of_rfc3339 ~strict:false with_tz with
+  | Ok (t, _, _) -> Some t
+  | Error _ -> None
+
+(* Parse local time string to (hour, minute, second, nanoseconds) *)
+let parse_local_time s =
+  let len = String.length s in
+  if len < 5 then None
+  else
+    try
+      let hour = int_of_string (String.sub s 0 2) in
+      let minute = int_of_string (String.sub s 3 2) in
+      let second, frac =
+        if len >= 8 then
+          let sec = int_of_string (String.sub s 6 2) in
+          let frac =
+            if len > 9 && s.[8] = '.' then
+              let frac_str = String.sub s 9 (len - 9) in
+              (* Pad or truncate to 9 digits for nanoseconds *)
+              let padded =
+                if String.length frac_str >= 9 then String.sub frac_str 0 9
+                else frac_str ^ String.make (9 - String.length frac_str) '0'
+              in
+              int_of_string padded
+            else 0
+          in
+          (sec, frac)
+        else
+          (* TOML 1.1: optional seconds *)
+          (0, 0)
+      in
+      if hour >= 0 && hour <= 23 &&
+         minute >= 0 && minute <= 59 &&
+         second >= 0 && second <= 60 then  (* 60 for leap second *)
+        Some (hour, minute, second, frac)
+      else
+        None
+    with _ -> None
+
+let to_ptime_datetime ?tz_offset_s t =
+  let get_tz () =
+    match tz_offset_s with
+    | Some tz -> tz
+    | None -> 0  (* Default to UTC when no timezone provided *)
+  in
+  match t with
+  | Datetime s ->
+      let normalized = normalize_datetime_for_ptime s in
+      (match Ptime.of_rfc3339 ~strict:false normalized with
+       | Ok (ptime, tz, _) -> Some (`Datetime (ptime, tz))
+       | Error _ -> None)
+  | Datetime_local s ->
+      let tz = get_tz () in
+      (match parse_local_datetime_with_tz tz s with
+       | Some ptime -> Some (`Datetime_local ptime)
+       | None -> None)
+  | Date_local _ ->
+      (match to_date_opt t with
+       | Some date -> Some (`Date date)
+       | None -> None)
+  | Time_local s ->
+      (match parse_local_time s with
+       | Some time -> Some (`Time time)
+       | None -> None)
+  | _ -> None
+
+let ptime_datetime_to_toml = function
+  | `Datetime (ptime, tz) ->
+      let tz_offset_s = Option.value ~default:0 tz in
+      Datetime (Ptime.to_rfc3339 ~tz_offset_s ptime)
+  | `Datetime_local ptime ->
+      (* Convert to local time string without timezone *)
+      let ((year, month, day), ((hour, minute, second), _)) =
+        Ptime.to_date_time ptime
+      in
+      Datetime_local (Printf.sprintf "%04d-%02d-%02dT%02d:%02d:%02d"
+        year month day hour minute second)
+  | `Date (year, month, day) ->
+      Date_local (Printf.sprintf "%04d-%02d-%02d" year month day)
+  | `Time (hour, minute, second, ns) ->
+      if ns = 0 then
+        Time_local (Printf.sprintf "%02d:%02d:%02d" hour minute second)
+      else
+        (* Format nanoseconds, trimming trailing zeros *)
+        let ns_str = Printf.sprintf "%09d" ns in
+        let rec trim_end i =
+          if i <= 0 then 1
+          else if ns_str.[i] <> '0' then i + 1
+          else trim_end (i - 1)
+        in
+        let ns_trimmed = String.sub ns_str 0 (trim_end 8) in
+        Time_local (Printf.sprintf "%02d:%02d:%02d.%s" hour minute second ns_trimmed)
+
+let pp_ptime_datetime fmt = function
+  | `Datetime (ptime, tz) ->
+      let tz_offset_s = Option.value ~default:0 tz in
+      Format.fprintf fmt "`Datetime %s" (Ptime.to_rfc3339 ~tz_offset_s ptime)
+  | `Datetime_local ptime ->
+      Format.fprintf fmt "`Datetime_local %s" (Ptime.to_rfc3339 ~tz_offset_s:0 ptime)
+  | `Date (year, month, day) ->
+      Format.fprintf fmt "`Date %04d-%02d-%02d" year month day
+  | `Time (hour, minute, second, ns) ->
+      if ns = 0 then
+        Format.fprintf fmt "`Time %02d:%02d:%02d" hour minute second
+      else
+        Format.fprintf fmt "`Time %02d:%02d:%02d.%09d" hour minute second ns
+
 (* ============================================
    Public Interface - Accessors
    ============================================ *)

@@ -1,5 +1,11 @@
 open Tomlt
 
+(* Helper to encode TOML to string via writer *)
+let toml_to_string value =
+  let buf = Buffer.create 256 in
+  Toml.to_writer (Bytesrw.Bytes.Writer.of_buffer buf) value;
+  Buffer.contents buf
+
 type config = { name : string; timeout : int option }
 
 let config_codec =
@@ -14,7 +20,7 @@ let () =
   (* Test encoding *)
   let c = { name = "app"; timeout = None } in
   let toml = encode config_codec c in
-  Printf.printf "Encoded TOML:\n%s\n" (Toml.to_toml_string toml);
+  Printf.printf "Encoded TOML:\n%s\n" (toml_to_string toml);
 
   (* Show raw structure *)
   Printf.printf "\nRaw structure: %s\n" (match toml with

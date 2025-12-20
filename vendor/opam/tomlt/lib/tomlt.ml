@@ -5,6 +5,57 @@
 
 (** Declarative TOML codecs *)
 
+(* ---- Preliminaries ---- *)
+
+type 'a fmt = Format.formatter -> 'a -> unit
+
+module Sort = struct
+  type t =
+    | String
+    | Int
+    | Float
+    | Bool
+    | Datetime
+    | Datetime_local
+    | Date
+    | Time
+    | Array
+    | Table
+
+  let to_string = function
+    | String -> "string"
+    | Int -> "integer"
+    | Float -> "float"
+    | Bool -> "boolean"
+    | Datetime -> "datetime"
+    | Datetime_local -> "datetime-local"
+    | Date -> "date-local"
+    | Time -> "time-local"
+    | Array -> "array"
+    | Table -> "table"
+
+  let pp fmt t = Format.pp_print_string fmt (to_string t)
+
+  let of_toml = function
+    | Toml.String _ -> String
+    | Toml.Int _ -> Int
+    | Toml.Float _ -> Float
+    | Toml.Bool _ -> Bool
+    | Toml.Datetime _ -> Datetime
+    | Toml.Datetime_local _ -> Datetime_local
+    | Toml.Date_local _ -> Date
+    | Toml.Time_local _ -> Time
+    | Toml.Array _ -> Array
+    | Toml.Table _ -> Table
+
+  let or_kind ~kind sort =
+    if kind = "" then to_string sort else kind
+
+  let kinded ~kind sort =
+    if kind = "" then to_string sort
+    else kind ^ " " ^ to_string sort
+end
+
 (* ---- Helpers ---- *)
 
 (* Chain comparisons: return first non-zero, or final comparison *)
@@ -352,9 +403,34 @@ let string = {
   enc = (fun s -> Toml.String s);
 }
 
-(* ---- Datetime codecs ---- *)
+let int_as_string = {
+  kind = "integer (as string)";
+  doc = "";
+  dec = (function
+    | Toml.String s ->
+        (match int_of_string_opt s with
+        | Some i -> Ok i
+        | None -> Error (Value_error ("cannot parse integer: " ^ s)))
+    | v -> Error (Type_mismatch { expected = "string"; got = type_name v }));
+  enc = (fun i -> Toml.String (Int.to_string i));
+}
 
-let datetime = {
+let int64_as_string = {
+  kind = "int64 (as string)";
+  doc = "";
+  dec = (function
+    | Toml.String s ->
+        (match Int64.of_string_opt s with
+        | Some i -> Ok i
+        | None -> Error (Value_error ("cannot parse int64: " ^ s)))
+    | v -> Error (Type_mismatch { expected = "string"; got = type_name v }));
+  enc = (fun i -> Toml.String (Int64.to_string i));
+}
+
+(* ---- Internal datetime codecs (for structured datetime types) ---- *)
+(* These are used internally but not exposed in the mli - only ptime codecs are public *)
+
+let datetime_ = {
   kind = "datetime";
   doc = "";
   dec = (function
@@ -366,7 +442,7 @@ let datetime = {
   enc = (fun dt -> Toml.Datetime (Datetime.to_string dt));
 }
 
-let datetime_local = {
+let datetime_local_ = {
   kind = "datetime-local";
   doc = "";
   dec = (function
@@ -378,7 +454,7 @@ let datetime_local = {
   enc = (fun dt -> Toml.Datetime_local (Datetime_local.to_string dt));
 }
 
-let date_local = {
+let date_local_ = {
   kind = "date-local";
   doc = "";
   dec = (function
@@ -390,7 +466,7 @@ let date_local = {
   enc = (fun d -> Toml.Date_local (Date.to_string d));
 }
 
-let time_local = {
+let time_local_ = {
   kind = "time-local";
   doc = "";
   dec = (function
@@ -402,20 +478,88 @@ let time_local = {
   enc = (fun t -> Toml.Time_local (Time.to_string t));
 }
 
-let datetime_string = {
-  kind = "datetime";
-  doc = "";
-  dec = (function
-    | Toml.Datetime s | Toml.Datetime_local s
-    | Toml.Date_local s | Toml.Time_local s -> Ok s
-    | v -> Error (Type_mismatch { expected = "datetime"; got = type_name v }));
-  enc = (fun s -> Toml.Datetime s);  (* Default to offset datetime *)
-}
+(* Silence unused warnings for internal codecs *)
+let _ = datetime_
+let _ = datetime_local_
+let _ = date_local_
+let _ = time_local_
 
 (* ---- Ptime codecs ---- *)
 
-let ptime = {
-  kind = "datetime (ptime)";
+(* Helper to get current timezone offset from explicit value or function *)
+let get_tz_offset ?tz_offset_s ?get_tz () =
+  match tz_offset_s with
+  | Some tz -> tz
+  | None ->
+      match get_tz with
+      | Some f ->
+          (match f () with
+          | Some tz -> tz
+          | None -> 0)
+      | None -> 0  (* Default to UTC when no timezone source provided *)
+
+(* Helper to get today's date in the given timezone *)
+let today_date ?now tz_offset_s =
+  let t = match now with
+    | Some f -> f ()
+    | None -> Ptime.epoch  (* Default to epoch when no clock provided *)
+  in
+  Ptime.to_date ~tz_offset_s t
+
+(* Helper to create a ptime from date at midnight *)
+let ptime_of_date ?(tz_offset_s = 0) (year, month, day) =
+  match Ptime.of_date_time ((year, month, day), ((0, 0, 0), tz_offset_s)) with
+  | Some t -> t
+  | None ->
+      (* Fallback to epoch if date is invalid *)
+      Ptime.epoch
+
+(* Helper to create a ptime from time on today's date *)
+let ptime_of_time ?now ~tz_offset_s ~hour ~minute ~second ~ns () =
+  let frac = Float.of_int ns /. 1_000_000_000.0 in
+  let date = today_date ?now tz_offset_s in
+  let time = ((hour, minute, second), tz_offset_s) in
+  match Ptime.of_date_time (date, time) with
+  | Some t ->
+      (* Add fractional seconds *)
+      (match Ptime.Span.of_float_s frac with
+      | Some span -> Option.value ~default:t (Ptime.add_span t span)
+      | None -> t)
+  | None -> Ptime.epoch
+
+(* Unified ptime codec - accepts any TOML datetime, fills in defaults *)
+let ptime ?tz_offset_s ?get_tz ?now ?(frac_s = 0) () =
+  let tz () = get_tz_offset ?tz_offset_s ?get_tz () in
+  {
+    kind = "datetime (ptime)";
+    doc = "";
+    dec = (fun v ->
+      let tz_s = tz () in
+      match v with
+      | Toml.Datetime _ ->
+          (match Toml.to_ptime_opt v with
+          | Some t -> Ok t
+          | None -> Error (Value_error "cannot parse offset datetime"))
+      | Toml.Datetime_local _ ->
+          (match Toml.to_ptime_datetime ~tz_offset_s:tz_s v with
+          | Some (`Datetime_local t) -> Ok t
+          | _ -> Error (Value_error "cannot parse local datetime"))
+      | Toml.Date_local _ ->
+          (match Toml.to_date_opt v with
+          | Some date -> Ok (ptime_of_date ~tz_offset_s:tz_s date)
+          | None -> Error (Value_error "cannot parse local date"))
+      | Toml.Time_local _ ->
+          (match Toml.to_ptime_datetime ~tz_offset_s:tz_s v with
+          | Some (`Time (h, m, s, ns)) ->
+              Ok (ptime_of_time ?now ~tz_offset_s:tz_s ~hour:h ~minute:m ~second:s ~ns ())
+          | _ -> Error (Value_error "cannot parse local time"))
+      | _ -> Error (Type_mismatch { expected = "datetime"; got = type_name v }));
+    enc = (fun t -> Toml.datetime_of_ptime ~tz_offset_s:(tz ()) ~frac_s t);
+  }
+
+(* Strict ptime codec - only accepts offset datetimes *)
+let ptime_opt ?(tz_offset_s = 0) ?(frac_s = 0) () = {
+  kind = "datetime (ptime offset only)";
   doc = "";
   dec = (function
     | Toml.Datetime _ as v ->
@@ -423,25 +567,47 @@ let ptime = {
         | Some t -> Ok t
         | None -> Error (Value_error "cannot parse offset datetime"))
     | Toml.Datetime_local _ ->
-        Error (Value_error "local datetime has no timezone, cannot convert to ptime")
+        Error (Value_error "local datetime requires timezone; use ptime() instead")
+    | Toml.Date_local _ ->
+        Error (Value_error "local date requires timezone; use ptime() instead")
+    | Toml.Time_local _ ->
+        Error (Value_error "local time requires timezone; use ptime() instead")
     | v -> Error (Type_mismatch { expected = "datetime"; got = type_name v }));
-  enc = (fun t -> Toml.datetime_of_ptime t);
+  enc = (fun t -> Toml.datetime_of_ptime ~tz_offset_s ~frac_s t);
 }
 
-let ptime_tz ?(tz_offset_s = 0) ?(frac_s = 0) () = {
-  kind = "datetime (ptime with tz)";
+(* Ptime span codec for local times (duration from midnight) *)
+let ptime_span = {
+  kind = "time-local (ptime span)";
   doc = "";
   dec = (function
-    | Toml.Datetime _ as v ->
-        (match Toml.to_ptime_tz v with
-        | Some (t, tz) -> Ok (t, tz)
-        | None -> Error (Value_error "cannot parse offset datetime"))
-    | Toml.Datetime_local _ ->
-        Error (Value_error "local datetime has no timezone")
-    | v -> Error (Type_mismatch { expected = "datetime"; got = type_name v }));
-  enc = (fun (t, _) -> Toml.datetime_of_ptime ~tz_offset_s ~frac_s t);
+    | Toml.Time_local _ as v ->
+        (match Toml.to_ptime_datetime v with
+        | Some (`Time (h, m, s, ns)) ->
+            let total_secs = (h * 3600) + (m * 60) + s in
+            let frac = Float.of_int ns /. 1_000_000_000.0 in
+            (match Ptime.Span.of_float_s (Float.of_int total_secs +. frac) with
+            | Some span -> Ok span
+            | None -> Error (Value_error "cannot create span from time"))
+        | _ -> Error (Value_error "cannot parse local time"))
+    | v -> Error (Type_mismatch { expected = "time-local"; got = type_name v }));
+  enc = (fun span ->
+    let secs = Ptime.Span.to_float_s span in
+    (* Clamp to 0-24 hours *)
+    let secs = Float.max 0.0 (Float.min secs 86399.999999999) in
+    let total_secs = Float.to_int secs in
+    let frac = secs -. Float.of_int total_secs in
+    let h = total_secs / 3600 in
+    let m = (total_secs mod 3600) / 60 in
+    let s = total_secs mod 60 in
+    if frac > 0.0 then
+      Toml.Time_local (Printf.sprintf "%02d:%02d:%02d%s" h m s
+        (String.sub (Printf.sprintf "%.9f" frac) 1 10))
+    else
+      Toml.Time_local (Printf.sprintf "%02d:%02d:%02d" h m s));
 }
 
+(* Ptime date codec *)
 let ptime_date = {
   kind = "date-local (ptime)";
   doc = "";
@@ -454,6 +620,30 @@ let ptime_date = {
   enc = (fun (year, month, day) ->
     Toml.Date_local (Printf.sprintf "%04d-%02d-%02d" year month day));
 }
+
+(* Full ptime datetime codec - preserves variant information *)
+let ptime_full ?tz_offset_s ?get_tz () =
+  let tz_offset_s = match tz_offset_s with
+    | Some tz -> Some tz
+    | None ->
+        match get_tz with
+        | Some f -> f ()
+        | None -> None
+  in
+  {
+    kind = "datetime (unified ptime)";
+    doc = "";
+    dec = (fun v ->
+      match Toml.to_ptime_datetime ?tz_offset_s v with
+      | Some pdt -> Ok pdt
+      | None ->
+          match v with
+          | Toml.Datetime _ | Toml.Datetime_local _
+          | Toml.Date_local _ | Toml.Time_local _ ->
+              Error (Value_error "cannot parse datetime")
+          | _ -> Error (Type_mismatch { expected = "datetime"; got = type_name v }));
+    enc = Toml.ptime_datetime_to_toml;
+  }
 
 (* ---- Combinators ---- *)
 
@@ -527,6 +717,133 @@ let rec' lazy_c =
     doc = "";
     dec = (fun v -> (Lazy.force lazy_c).dec v);
     enc = (fun v -> (Lazy.force lazy_c).enc v);
+  }
+
+let iter ?kind ?doc ?dec ?enc c =
+  let kind = Option.value ~default:c.kind kind in
+  let doc = Option.value ~default:c.doc doc in
+  {
+    kind;
+    doc;
+    dec = (fun v ->
+      match c.dec v with
+      | Ok x ->
+          (match dec with Some f -> f x | None -> ());
+          Ok x
+      | Error e -> Error e);
+    enc = (fun x ->
+      (match enc with Some f -> f x | None -> ());
+      c.enc x);
+  }
+
+let recode ~dec:dec_codec f ~enc:enc_codec =
+  {
+    kind = dec_codec.kind;
+    doc = dec_codec.doc;
+    dec = (fun v ->
+      match dec_codec.dec v with
+      | Ok x -> Ok (f x)
+      | Error e -> Error e);
+    enc = enc_codec.enc;
+  }
+
+(* ---- Query combinators ---- *)
+
+let nth ?absent n elt_codec =
+  {
+    kind = elt_codec.kind;
+    doc = "";
+    dec = (function
+      | Toml.Array arr ->
+          if n >= 0 && n < List.length arr then
+            elt_codec.dec (List.nth arr n)
+          else
+            (match absent with
+            | Some v -> Ok v
+            | None -> Error (Value_error (Printf.sprintf "array index %d out of bounds" n)))
+      | v -> Error (Type_mismatch { expected = "array"; got = type_name v }));
+    enc = (fun x -> Toml.Array [elt_codec.enc x]);
+  }
+
+let mem ?absent name value_codec =
+  {
+    kind = value_codec.kind;
+    doc = "";
+    dec = (function
+      | Toml.Table pairs ->
+          (match List.assoc_opt name pairs with
+          | Some v -> value_codec.dec v
+          | None ->
+              match absent with
+              | Some v -> Ok v
+              | None -> Error (Value_error (Printf.sprintf "missing member %S" name)))
+      | v -> Error (Type_mismatch { expected = "table"; got = type_name v }));
+    enc = (fun x -> Toml.Table [(name, value_codec.enc x)]);
+  }
+
+let fold_array elt_codec f init =
+  {
+    kind = "array";
+    doc = "";
+    dec = (function
+      | Toml.Array arr ->
+          let rec loop acc i = function
+            | [] -> Ok acc
+            | x :: xs ->
+                match elt_codec.dec x with
+                | Ok v -> loop (f i v acc) (i + 1) xs
+                | Error e -> Error e
+          in
+          loop init 0 arr
+      | v -> Error (Type_mismatch { expected = "array"; got = type_name v }));
+    enc = (fun _ -> Toml.Array []);  (* Encoding not supported for folds *)
+  }
+
+let fold_table value_codec f init =
+  {
+    kind = "table";
+    doc = "";
+    dec = (function
+      | Toml.Table pairs ->
+          let rec loop acc = function
+            | [] -> Ok acc
+            | (k, v) :: rest ->
+                match value_codec.dec v with
+                | Ok x -> loop (f k x acc) rest
+                | Error e -> Error e
+          in
+          loop init pairs
+      | v -> Error (Type_mismatch { expected = "table"; got = type_name v }));
+    enc = (fun _ -> Toml.Table []);  (* Encoding not supported for folds *)
+  }
+
+(* ---- Ignoring and placeholders ---- *)
+
+let ignore = {
+  kind = "ignored";
+  doc = "";
+  dec = (fun _ -> Ok ());
+  enc = (fun () -> failwith "cannot encode ignored value");
+}
+
+let zero = {
+  kind = "zero";
+  doc = "";
+  dec = (fun _ -> Ok ());
+  enc = (fun () -> Toml.Table []);
+}
+
+let todo ?kind ?doc ?dec_stub () =
+  let kind = Option.value ~default:"todo" kind in
+  let doc = Option.value ~default:"" doc in
+  {
+    kind;
+    doc;
+    dec = (fun _ ->
+      match dec_stub with
+      | Some v -> Ok v
+      | None -> Error (Value_error "TODO: codec not implemented"));
+    enc = (fun _ -> failwith "TODO: codec not implemented");
   }
 
 (* ---- Array codecs ---- *)
@@ -1016,7 +1333,9 @@ let decode_string_exn c s =
 
 let encode_string c v =
   let toml = encode c v in
-  Toml.to_toml_string toml
+  let buf = Buffer.create 256 in
+  Toml.to_writer (Bytesrw.Bytes.Writer.of_buffer buf) toml;
+  Buffer.contents buf
 
 let decode_reader ?file c r = Result.bind (Toml.of_reader ?file r) (decode c)
 
