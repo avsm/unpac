@@ -19,6 +19,7 @@
   (bytesrw (>= 0.1.0))
   (uutf (>= 1.0.0))
   (ptime (>= 1.0.0))
+  (ptime-clock (>= 1.0.0))
   (alcotest :with-test))
  (depopts
   eio
