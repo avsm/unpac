@@ -487,6 +487,105 @@ let test_datetime_string_codec () =
   check_decode_ok "date" datetime_string "value = 2024-06-15" "2024-06-15";
   check_decode_ok "time" datetime_string "value = 14:30:00" "14:30:00"
 
+(* ---- Ptime codecs ---- *)
+
+let ptime_testable =
+  let pp fmt t = Format.fprintf fmt "%s" (Ptime.to_rfc3339 ~tz_offset_s:0 t) in
+  Alcotest.testable pp Ptime.equal
+
+let ptime_date_testable =
+  let pp fmt (y, m, d) = Format.fprintf fmt "%04d-%02d-%02d" y m d in
+  let eq (y1, m1, d1) (y2, m2, d2) = y1 = y2 && m1 = m2 && d1 = d2 in
+  Alcotest.testable pp eq
+
+let test_ptime_codec () =
+  let input = "value = 2024-06-15T14:30:00Z" in
+  let expected = match Ptime.of_date_time ((2024, 6, 15), ((14, 30, 0), 0)) with
+    | Some t -> t | None -> failwith "invalid test datetime" in
+  let toml = Toml.parse input in
+  let value = Toml.find "value" toml in
+  match decode ptime value with
+  | Ok v -> Alcotest.(check ptime_testable) "ptime" expected v
+  | Error e -> Alcotest.fail (Toml.Error.to_string e)
+
+let test_ptime_codec_offset () =
+  (* Test parsing datetime with offset and verify UTC conversion *)
+  let input = "value = 1979-05-27T00:32:00-07:00" in
+  (* UTC time should be 1979-05-27T07:32:00Z *)
+  let expected = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
+    | Some t -> t | None -> failwith "invalid test datetime" in
+  let toml = Toml.parse input in
+  let value = Toml.find "value" toml in
+  match decode ptime value with
+  | Ok v -> Alcotest.(check ptime_testable) "ptime with offset" expected v
+  | Error e -> Alcotest.fail (Toml.Error.to_string e)
+
+let test_ptime_codec_roundtrip () =
+  let original = match Ptime.of_date_time ((2024, 12, 19), ((15, 30, 45), 0)) with
+    | Some t -> t | None -> failwith "invalid test datetime" in
+  let toml = encode ptime original in
+  match decode ptime toml with
+  | Ok v -> Alcotest.(check ptime_testable) "roundtrip" original v
+  | Error e -> Alcotest.fail (Toml.Error.to_string e)
+
+let test_ptime_codec_optional_seconds () =
+  (* TOML 1.1 allows optional seconds *)
+  let input = "value = 1979-05-27T07:32Z" in
+  let expected = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
+    | Some t -> t | None -> failwith "invalid test datetime" in
+  let toml = Toml.parse input in
+  let value = Toml.find "value" toml in
+  match decode ptime value with
+  | Ok v -> Alcotest.(check ptime_testable) "optional seconds" expected v
+  | Error e -> Alcotest.fail (Toml.Error.to_string e)
+
+let test_ptime_tz_codec () =
+  let input = "value = 1979-05-27T00:32:00-07:00" in
+  let expected_ptime = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
+    | Some t -> t | None -> failwith "invalid test datetime" in
+  let toml = Toml.parse input in
+  let value = Toml.find "value" toml in
+  match decode (ptime_tz ()) value with
+  | Ok (t, tz) ->
+      Alcotest.(check ptime_testable) "ptime" expected_ptime t;
+      Alcotest.(check (option int)) "timezone" (Some (-25200)) tz
+  | Error e -> Alcotest.fail (Toml.Error.to_string e)
+
+let test_ptime_tz_utc () =
+  let input = "value = 1979-05-27T07:32:00Z" in
+  let expected_ptime = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
+    | Some t -> t | None -> failwith "invalid test datetime" in
+  let toml = Toml.parse input in
+  let value = Toml.find "value" toml in
+  match decode (ptime_tz ()) value with
+  | Ok (t, tz) ->
+      Alcotest.(check ptime_testable) "ptime" expected_ptime t;
+      Alcotest.(check (option int)) "timezone UTC" (Some 0) tz
+  | Error e -> Alcotest.fail (Toml.Error.to_string e)
+
+let test_ptime_date_codec () =
+  let input = "value = 1979-05-27" in
+  let toml = Toml.parse input in
+  let value = Toml.find "value" toml in
+  match decode ptime_date value with
+  | Ok date -> Alcotest.(check ptime_date_testable) "date" (1979, 5, 27) date
+  | Error e -> Alcotest.fail (Toml.Error.to_string e)
+
+let test_ptime_date_roundtrip () =
+  let original = (2024, 12, 19) in
+  let toml = encode ptime_date original in
+  match decode ptime_date toml with
+  | Ok v -> Alcotest.(check ptime_date_testable) "roundtrip" original v
+  | Error e -> Alcotest.fail (Toml.Error.to_string e)
+
+let test_ptime_local_datetime_error () =
+  let input = "value = 1979-05-27T07:32:00" in
+  let toml = Toml.parse input in
+  let value = Toml.find "value" toml in
+  match decode ptime value with
+  | Ok _ -> Alcotest.fail "expected error for local datetime"
+  | Error _ -> ()  (* Expected *)
+
 (* ============================================================================
    Combinator Tests
    ============================================================================ *)
@@ -1229,6 +1328,18 @@ let datetime_codec_tests = [
   "datetime string", `Quick, test_datetime_string_codec;
 ]
 
+let ptime_codec_tests = [
+  "ptime", `Quick, test_ptime_codec;
+  "ptime with offset", `Quick, test_ptime_codec_offset;
+  "ptime roundtrip", `Quick, test_ptime_codec_roundtrip;
+  "ptime optional seconds", `Quick, test_ptime_codec_optional_seconds;
+  "ptime_tz", `Quick, test_ptime_tz_codec;
+  "ptime_tz utc", `Quick, test_ptime_tz_utc;
+  "ptime_date", `Quick, test_ptime_date_codec;
+  "ptime_date roundtrip", `Quick, test_ptime_date_roundtrip;
+  "ptime local datetime error", `Quick, test_ptime_local_datetime_error;
+]
+
 let combinator_tests = [
   "map", `Quick, test_map_combinator;
   "map roundtrip", `Quick, test_map_roundtrip;
@@ -1317,6 +1428,7 @@ let () =
     "number", number_tests;
     "string", string_tests;
     "datetime_codecs", datetime_codec_tests;
+    "ptime_codecs", ptime_codec_tests;
     "combinators", combinator_tests;
     "arrays", array_tests;
     "tables", table_tests;
