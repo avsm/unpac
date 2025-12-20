@@ -9,3 +9,7 @@
 (executable
  (name test_debug)
  (libraries tomlt tomlt.bytesrw))
+
+(executable
+ (name cookbook)
+ (libraries tomlt tomlt.bytesrw))

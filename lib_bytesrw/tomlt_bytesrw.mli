@@ -20,8 +20,9 @@
       |} in
       match config with
       | Ok t ->
-          let host = Tomlt.Toml.(t.%{["server"; "host"]} |> to_string) in
-          let port = Tomlt.Toml.(t.%{["server"; "port"]} |> to_int) in
+          let server = Tomlt.Toml.find "server" t in
+          let host = Tomlt.Toml.to_string (Tomlt.Toml.find "host" server) in
+          let port = Tomlt.Toml.to_int (Tomlt.Toml.find "port" server) in
           Printf.printf "Server: %s:%Ld\n" host port
       | Error e -> prerr_endline (Tomlt.Toml.Error.to_string e)
     ]}

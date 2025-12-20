@@ -7,7 +7,8 @@
 
     This module provides the core TOML value type and operations for
     constructing, accessing, and manipulating TOML data. For parsing and
-    encoding, see {!Tomlt_bytesrw}.
+    encoding, see {!Tomlt_bytesrw}. For codec-based bidirectional encoding,
+    see {!Tomlt}.
 
     {2 Quick Start}
 
@@ -24,9 +25,12 @@
 
     Access values:
     {[
-      let host = Toml.(config.%{["database"; "host"]} |> to_string)
-      let port = Toml.(config.%{["database"; "ports"]} |> to_array |> List.hd |> to_int)
+      let host = Toml.to_string (Toml.find "host" (Toml.find "database" config))
+      let ports = Toml.to_array (Toml.find "ports" (Toml.find "database" config))
+      let port = Toml.to_int (List.hd ports)
     ]}
+
+    See the {{!page-cookbook}cookbook} for common patterns and recipes.
 
     {2 Module Overview}
 
@@ -370,7 +374,7 @@ val pp : Format.formatter -> t -> unit
 
 val pp_value : Format.formatter -> t -> unit
 (** [pp_value fmt t] pretty-prints a single TOML value.
-    Same as {!pp}. *)
+    Same as {!val:pp}. *)
 
 val equal : t -> t -> bool
 (** [equal a b] is structural equality on TOML values.
@@ -382,6 +386,4 @@ val compare : t -> t -> int
 (** {1:errors Error Handling} *)
 
 module Error = Toml_error
-(** Structured error types for TOML parsing and encoding.
-
-    See {!Toml_error} for detailed documentation. *)
+(** Structured error types for TOML parsing and encoding. *)
