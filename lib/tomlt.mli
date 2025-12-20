@@ -5,9 +5,8 @@
 
 (** Declarative TOML 1.1 codecs.
 
-    Tomlt provides a type-safe, bidirectional codec system for TOML files,
-    inspired by {{:https://erratique.ch/software/jsont}Jsont}'s approach
-    to JSON codecs.
+    Tomlt provides a bidirectional codec system for TOML files, inspired by
+    {{:https://erratique.ch/software/jsont}Jsont}'s approach to JSON codecs.
 
     {2 Quick Start}
 
@@ -241,6 +240,39 @@ val time_local : Time.t t
 val datetime_string : string t
 (** Codec for any datetime type as a raw string.
     Decodes any datetime variant; encodes as offset datetime. *)
+
+(** {2 Ptime Codecs}
+
+    Codecs that work with {{:https://erratique.ch/software/ptime}Ptime}
+    timestamps directly. These provide convenient interop between TOML
+    datetime values and ptime's precise timestamp representation. *)
+
+val ptime : Ptime.t t
+(** Codec for offset datetimes as [Ptime.t].
+    Decodes TOML offset datetime (e.g., [1979-05-27T07:32:00Z]) to a ptime
+    timestamp. Encodes as UTC (with [Z] suffix).
+
+    Supports TOML 1.1 optional seconds (e.g., [1979-05-27T07:32Z]).
+
+    @raise Value_error if the datetime cannot be parsed or is not an
+    offset datetime. Local datetimes without timezone cannot be converted. *)
+
+val ptime_tz : ?tz_offset_s:int -> ?frac_s:int -> unit -> (Ptime.t * Ptime.tz_offset_s option) t
+(** Codec for offset datetimes with timezone information.
+    Decodes to [(ptime, tz_offset)] where [tz_offset] is:
+    - [Some 0] for [Z] (UTC)
+    - [Some offset_s] for explicit offsets like [+05:30] (19800 seconds)
+    - [None] for the unknown local offset convention ([-00:00])
+
+    @param tz_offset_s Timezone offset for encoding (default: 0 for UTC).
+    @param frac_s Fractional second digits for encoding (default: 0). *)
+
+val ptime_date : Ptime.date t
+(** Codec for local dates as [Ptime.date] (i.e., [(year, month, day)]).
+    Decodes TOML local date (e.g., [1979-05-27]) to a ptime date tuple.
+
+    Uses ptime for validation, ensuring the date is valid in the
+    proleptic Gregorian calendar. *)
 
 (** {1:combinators Codec Combinators} *)
 

@@ -122,6 +122,48 @@ val time_local : string -> t
 (** [time_local s] creates a local time value.
     E.g. ["07:32:00"] or ["07:32:00.999"]. *)
 
+(** {2 Ptime Conversions}
+
+    Convert between TOML datetime values and {{:https://erratique.ch/software/ptime}Ptime}
+    timestamps. Offset datetimes can be converted to/from [Ptime.t] since they
+    represent specific instants on the UTC timeline. Local datetime types cannot
+    be converted to [Ptime.t] without assuming a timezone. *)
+
+val datetime_of_ptime : ?tz_offset_s:int -> ?frac_s:int -> Ptime.t -> t
+(** [datetime_of_ptime ?tz_offset_s ?frac_s ptime] creates an offset datetime
+    from a ptime timestamp.
+    @param tz_offset_s Timezone offset in seconds (default: 0 for UTC).
+      Use positive values for east of UTC (e.g., 3600 for +01:00),
+      negative for west (e.g., -18000 for -05:00).
+    @param frac_s Number of fractional second digits to include (default: 0).
+      Clipped to range \[0, 12\]. *)
+
+val to_ptime : t -> Ptime.t
+(** [to_ptime t] converts an offset datetime to a ptime timestamp.
+    @raise Invalid_argument if [t] is not a [Datetime] or if the datetime
+    string cannot be parsed. Local datetime types cannot be converted. *)
+
+val to_ptime_opt : t -> Ptime.t option
+(** [to_ptime_opt t] returns [Some ptime] if [t] is a [Datetime] that can be
+    parsed, [None] otherwise. *)
+
+val to_ptime_tz : t -> (Ptime.t * Ptime.tz_offset_s option) option
+(** [to_ptime_tz t] returns the ptime timestamp and timezone offset for an
+    offset datetime. The timezone is [Some 0] for [Z], [Some offset_s] for
+    explicit offsets like [+05:30], or [None] for the unknown local offset
+    convention ([-00:00]). Returns [None] if [t] is not a [Datetime]. *)
+
+val date_of_ptime : ?tz_offset_s:int -> Ptime.t -> t
+(** [date_of_ptime ?tz_offset_s ptime] creates a local date from a ptime
+    timestamp. The date is extracted in the given timezone (default: UTC). *)
+
+val to_date : t -> Ptime.date
+(** [to_date t] converts a local date to a ptime date tuple [(year, month, day)].
+    @raise Invalid_argument if [t] is not a [Date_local] or cannot be parsed. *)
+
+val to_date_opt : t -> Ptime.date option
+(** [to_date_opt t] returns [Some date] if [t] is a [Date_local], [None] otherwise. *)
+
 (** {1:access Value Accessors}
 
     These functions extract OCaml values from TOML values.

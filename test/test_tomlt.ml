@@ -876,6 +876,125 @@ let edge_case_tests = [
 ]
 
 (* ============================================
+   Ptime Conversions
+   ============================================ *)
+
+let ptime_testable =
+  let pp fmt t = Format.fprintf fmt "%s" (Ptime.to_rfc3339 ~tz_offset_s:0 t) in
+  Alcotest.testable pp Ptime.equal
+
+let date_testable =
+  let pp fmt (y, m, d) = Format.fprintf fmt "%04d-%02d-%02d" y m d in
+  let eq (y1, m1, d1) (y2, m2, d2) = y1 = y2 && m1 = m2 && d1 = d2 in
+  Alcotest.testable pp eq
+
+let test_datetime_of_ptime () =
+  let ptime = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
+    | Some t -> t | None -> Alcotest.fail "invalid test datetime"
+  in
+  let v = datetime_of_ptime ptime in
+  Alcotest.(check value_testable) "datetime_of_ptime UTC"
+    (Datetime "1979-05-27T07:32:00Z") v
+
+let test_datetime_of_ptime_with_tz () =
+  let ptime = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
+    | Some t -> t | None -> Alcotest.fail "invalid test datetime"
+  in
+  let v = datetime_of_ptime ~tz_offset_s:(-25200) ptime in  (* -07:00 = -25200s *)
+  Alcotest.(check value_testable) "datetime_of_ptime with tz"
+    (Datetime "1979-05-27T00:32:00-07:00") v
+
+let test_datetime_of_ptime_with_frac () =
+  let ptime = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
+    | Some t -> t | None -> Alcotest.fail "invalid test datetime"
+  in
+  let v = datetime_of_ptime ~frac_s:3 ptime in
+  Alcotest.(check value_testable) "datetime_of_ptime with frac"
+    (Datetime "1979-05-27T07:32:00.000Z") v
+
+let test_to_ptime () =
+  let v = Datetime "1979-05-27T07:32:00Z" in
+  let ptime = to_ptime v in
+  let expected = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
+    | Some t -> t | None -> Alcotest.fail "invalid expected datetime"
+  in
+  Alcotest.(check ptime_testable) "to_ptime" expected ptime
+
+let test_to_ptime_with_offset () =
+  let v = Datetime "1979-05-27T00:32:00-07:00" in
+  let ptime = to_ptime v in
+  (* UTC time should be 1979-05-27T07:32:00Z *)
+  let expected = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
+    | Some t -> t | None -> Alcotest.fail "invalid expected datetime"
+  in
+  Alcotest.(check ptime_testable) "to_ptime with offset" expected ptime
+
+let test_to_ptime_tz () =
+  let v = Datetime "1979-05-27T00:32:00-07:00" in
+  match to_ptime_tz v with
+  | Some (_, Some tz) ->
+      Alcotest.(check int) "timezone offset" (-25200) tz
+  | Some (_, None) ->
+      Alcotest.fail "expected timezone offset"
+  | None ->
+      Alcotest.fail "expected ptime result"
+
+let test_to_ptime_opt_local () =
+  let v = Datetime_local "1979-05-27T07:32:00" in
+  Alcotest.(check (option ptime_testable)) "local datetime returns None"
+    None (to_ptime_opt v)
+
+let test_to_ptime_optional_seconds () =
+  (* TOML 1.1 allows optional seconds *)
+  let v = Datetime "1979-05-27T07:32Z" in
+  let ptime = to_ptime v in
+  let expected = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
+    | Some t -> t | None -> Alcotest.fail "invalid expected datetime"
+  in
+  Alcotest.(check ptime_testable) "to_ptime optional seconds" expected ptime
+
+let test_date_of_ptime () =
+  let ptime = match Ptime.of_date_time ((1979, 5, 27), ((7, 32, 0), 0)) with
+    | Some t -> t | None -> Alcotest.fail "invalid test datetime"
+  in
+  let v = date_of_ptime ptime in
+  Alcotest.(check value_testable) "date_of_ptime"
+    (Date_local "1979-05-27") v
+
+let test_to_date () =
+  let v = Date_local "1979-05-27" in
+  let date = to_date v in
+  Alcotest.(check date_testable) "to_date" (1979, 5, 27) date
+
+let test_to_date_opt_invalid () =
+  let v = Date_local "1979-02-30" in  (* Invalid date *)
+  Alcotest.(check (option date_testable)) "invalid date returns None"
+    None (to_date_opt v)
+
+let test_ptime_roundtrip () =
+  let original = match Ptime.of_date_time ((2024, 12, 19), ((15, 30, 45), 0)) with
+    | Some t -> t | None -> Alcotest.fail "invalid test datetime"
+  in
+  let v = datetime_of_ptime original in
+  let roundtrip = to_ptime v in
+  Alcotest.(check ptime_testable) "ptime roundtrip" original roundtrip
+
+let ptime_tests = [
+  "datetime_of_ptime", `Quick, test_datetime_of_ptime;
+  "datetime_of_ptime with tz", `Quick, test_datetime_of_ptime_with_tz;
+  "datetime_of_ptime with frac", `Quick, test_datetime_of_ptime_with_frac;
+  "to_ptime", `Quick, test_to_ptime;
+  "to_ptime with offset", `Quick, test_to_ptime_with_offset;
+  "to_ptime_tz", `Quick, test_to_ptime_tz;
+  "to_ptime_opt local", `Quick, test_to_ptime_opt_local;
+  "to_ptime optional seconds", `Quick, test_to_ptime_optional_seconds;
+  "date_of_ptime", `Quick, test_date_of_ptime;
+  "to_date", `Quick, test_to_date;
+  "to_date_opt invalid", `Quick, test_to_date_opt_invalid;
+  "ptime roundtrip", `Quick, test_ptime_roundtrip;
+]
+
+(* ============================================
    Main
    ============================================ *)
 
@@ -894,4 +1013,5 @@ let () =
     "array_of_tables", array_of_tables_tests;
     "encoding", encode_tests;
     "edge_cases", edge_case_tests;
+    "ptime", ptime_tests;
   ]

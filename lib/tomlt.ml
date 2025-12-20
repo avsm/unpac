@@ -412,6 +412,49 @@ let datetime_string = {
   enc = (fun s -> Toml.Datetime s);  (* Default to offset datetime *)
 }
 
+(* ---- Ptime codecs ---- *)
+
+let ptime = {
+  kind = "datetime (ptime)";
+  doc = "";
+  dec = (function
+    | Toml.Datetime _ as v ->
+        (match Toml.to_ptime_opt v with
+        | Some t -> Ok t
+        | None -> Error (Value_error "cannot parse offset datetime"))
+    | Toml.Datetime_local _ ->
+        Error (Value_error "local datetime has no timezone, cannot convert to ptime")
+    | v -> Error (Type_mismatch { expected = "datetime"; got = type_name v }));
+  enc = (fun t -> Toml.datetime_of_ptime t);
+}
+
+let ptime_tz ?(tz_offset_s = 0) ?(frac_s = 0) () = {
+  kind = "datetime (ptime with tz)";
+  doc = "";
+  dec = (function
+    | Toml.Datetime _ as v ->
+        (match Toml.to_ptime_tz v with
+        | Some (t, tz) -> Ok (t, tz)
+        | None -> Error (Value_error "cannot parse offset datetime"))
+    | Toml.Datetime_local _ ->
+        Error (Value_error "local datetime has no timezone")
+    | v -> Error (Type_mismatch { expected = "datetime"; got = type_name v }));
+  enc = (fun (t, _) -> Toml.datetime_of_ptime ~tz_offset_s ~frac_s t);
+}
+
+let ptime_date = {
+  kind = "date-local (ptime)";
+  doc = "";
+  dec = (function
+    | Toml.Date_local _ as v ->
+        (match Toml.to_date_opt v with
+        | Some d -> Ok d
+        | None -> Error (Value_error "cannot parse local date"))
+    | v -> Error (Type_mismatch { expected = "date-local"; got = type_name v }));
+  enc = (fun (year, month, day) ->
+    Toml.Date_local (Printf.sprintf "%04d-%02d-%02d" year month day));
+}
+
 (* ---- Combinators ---- *)
 
 let map ?kind:k ?doc:d ?dec ?enc c =

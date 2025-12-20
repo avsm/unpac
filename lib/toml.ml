@@ -2298,6 +2298,89 @@ let datetime_local s = Datetime_local s
 let date_local s = Date_local s
 let time_local s = Time_local s
 
+(* Ptime conversions *)
+
+let datetime_of_ptime ?(tz_offset_s = 0) ?(frac_s = 0) ptime =
+  Datetime (Ptime.to_rfc3339 ~tz_offset_s ~frac_s ptime)
+
+let date_of_ptime ?(tz_offset_s = 0) ptime =
+  let (year, month, day) = Ptime.to_date ~tz_offset_s ptime in
+  Date_local (Printf.sprintf "%04d-%02d-%02d" year month day)
+
+(* Helper to normalize TOML datetime for ptime parsing.
+   TOML 1.1 allows optional seconds (e.g., "1979-05-27T07:32Z"),
+   but ptime requires seconds. We add ":00" when missing. *)
+let normalize_datetime_for_ptime s =
+  let len = String.length s in
+  if len < 16 then s (* Too short, let ptime handle the error *)
+  else
+    (* Check if we have HH:MM followed by timezone or end without seconds *)
+    (* Format: YYYY-MM-DDTHH:MM... position 16 would be after HH:MM *)
+    let has_t = len > 10 && (s.[10] = 'T' || s.[10] = 't' || s.[10] = ' ') in
+    if not has_t then s
+    else if len >= 17 && s.[16] = ':' then s (* Already has seconds *)
+    else if len = 16 then
+      (* YYYY-MM-DDTHH:MM - local datetime without seconds, add :00 *)
+      s ^ ":00"
+    else
+      let c16 = s.[16] in
+      if c16 = 'Z' || c16 = 'z' || c16 = '+' || c16 = '-' then
+        (* YYYY-MM-DDTHH:MMZ or YYYY-MM-DDTHH:MM+... - insert :00 before tz *)
+        String.sub s 0 16 ^ ":00" ^ String.sub s 16 (len - 16)
+      else if c16 = '.' then
+        (* YYYY-MM-DDTHH:MM.fraction - unusual but handle it *)
+        s
+      else
+        s
+
+let to_ptime_tz = function
+  | Datetime s ->
+      let normalized = normalize_datetime_for_ptime s in
+      (match Ptime.of_rfc3339 ~strict:false normalized with
+       | Ok (t, tz, _) -> Some (t, tz)
+       | Error _ -> None)
+  | _ -> None
+
+let to_ptime_opt = function
+  | Datetime s ->
+      let normalized = normalize_datetime_for_ptime s in
+      (match Ptime.of_rfc3339 ~strict:false normalized with
+       | Ok (t, _, _) -> Some t
+       | Error _ -> None)
+  | _ -> None
+
+let to_ptime t =
+  match to_ptime_opt t with
+  | Some ptime -> ptime
+  | None ->
+      match t with
+      | Datetime _ -> invalid_arg "Toml.to_ptime: cannot parse datetime"
+      | Datetime_local _ -> invalid_arg "Toml.to_ptime: local datetime has no timezone"
+      | Date_local _ -> invalid_arg "Toml.to_ptime: date_local is not a datetime"
+      | Time_local _ -> invalid_arg "Toml.to_ptime: time_local is not a datetime"
+      | _ -> invalid_arg "Toml.to_ptime: not a datetime"
+
+let to_date_opt = function
+  | Date_local s when String.length s >= 10 ->
+      (try
+        let year = int_of_string (String.sub s 0 4) in
+        let month = int_of_string (String.sub s 5 2) in
+        let day = int_of_string (String.sub s 8 2) in
+        (* Validate using Ptime.of_date *)
+        match Ptime.of_date (year, month, day) with
+        | Some _ -> Some (year, month, day)
+        | None -> None
+      with _ -> None)
+  | _ -> None
+
+let to_date t =
+  match to_date_opt t with
+  | Some date -> date
+  | None ->
+      match t with
+      | Date_local _ -> invalid_arg "Toml.to_date: cannot parse date"
+      | _ -> invalid_arg "Toml.to_date: not a date_local"
+
 (* ============================================
    Public Interface - Accessors
    ============================================ *)
