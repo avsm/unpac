@@ -44,30 +44,17 @@
     Codecs compose through combinators to build complex types from
     simple primitives.
 
-    {2 Datetime Handling}
+    {2 Cookbook}
 
-    Tomlt uses {{:https://erratique.ch/software/ptime}Ptime} for all datetime
-    operations, providing a unified approach to TOML's four datetime formats:
+    See the {{!page-cookbook}cookbook} for patterns and recipes:
 
-    {v
-    (* Accept any TOML datetime format, normalize to Ptime.t *)
-    type event = { name : string; when_ : Ptime.t }
-
-    let event_codec = Tomlt.(Table.(
-      obj (fun name when_ -> { name; when_ })
-      |> mem "name" string ~enc:(fun e -> e.name)
-      |> mem "when" (ptime ()) ~enc:(fun e -> e.when_)
-      |> finish
-    ))
-
-    (* All of these work: *)
-    (* when = 2024-01-15T10:30:00Z      -> offset datetime *)
-    (* when = 2024-01-15T10:30:00       -> local datetime (uses system tz) *)
-    (* when = 2024-01-15                -> date only (assumes midnight) *)
-    (* when = 10:30:00                  -> time only (uses today's date) *)
-    v}
-
-    See {!section:ptime_codecs} for the complete datetime codec API.
+    - {{!page-cookbook.config_files}Parsing configuration files}
+    - {{!page-cookbook.optional_values}Optional and absent values}
+    - {{!page-cookbook.datetimes}Working with datetimes}
+    - {{!page-cookbook.arrays}Working with arrays}
+    - {{!page-cookbook.tables}Nested tables and objects}
+    - {{!page-cookbook.unknown_members}Unknown member handling}
+    - {{!page-cookbook.validation}Validation and constraints}
 
     {2 Module Overview}
 
@@ -340,150 +327,20 @@ val int64_as_string : int64 t
 
 (** {1:ptime_codecs Ptime Datetime Codecs}
 
-    Tomlt provides a unified datetime handling system built on
-    {{:https://erratique.ch/software/ptime}Ptime}. All
-    {{:https://toml.io/en/v1.1.0#offset-date-time}TOML datetime formats}
-    can be decoded to [Ptime.t] timestamps with sensible defaults for
-    incomplete information.
+    Tomlt provides unified datetime handling using
+    {{:https://erratique.ch/software/ptime}Ptime}. All TOML datetime formats
+    can be decoded to [Ptime.t] timestamps.
 
-    {2 TOML Datetime Formats}
-
-    {{:https://toml.io/en/v1.1.0}TOML 1.1} supports four datetime formats
-    with varying levels of precision:
-
-    {v
-    # Offset datetime - full timestamp with timezone (unambiguous)
-    # See: https://toml.io/en/v1.1.0#offset-date-time
-    published = 2024-01-15T10:30:00Z
-    published = 2024-01-15T10:30:00-05:00
-
-    # Local datetime - no timezone (wall clock time)
-    # See: https://toml.io/en/v1.1.0#local-date-time
-    meeting = 2024-01-15T10:30:00
-
-    # Local date - date only
-    # See: https://toml.io/en/v1.1.0#local-date
-    birthday = 1979-05-27
-
-    # Local time - time only
-    # See: https://toml.io/en/v1.1.0#local-time
-    alarm = 07:30:00
-    v}
+    See the {{!page-cookbook.datetimes}cookbook} for detailed patterns
+    and examples.
 
     {2 Choosing a Codec}
 
-    - {!val:ptime} - {b Recommended for most cases.} Accepts any datetime format
-      and normalizes to [Ptime.t] by filling in sensible defaults.
-
-    - {!val:ptime_opt} - {b For strict validation.} Only accepts offset datetimes
-      with explicit timezone. Rejects ambiguous local formats.
-
-    - {!val:ptime_date} - For fields that should only contain dates.
-
-    - {!val:ptime_span} - For fields that should only contain times (as duration).
-
-    - {!val:ptime_full} - {b For roundtripping.} Preserves the exact datetime
-      variant from the source, allowing faithful re-encoding.
-
-    {2 Timezone Handling}
-
-    For local datetimes without explicit timezone, Tomlt uses
-    [Ptime_clock.current_tz_offset_s ()] to get the system timezone.
-    You can override this by passing [~tz_offset_s]:
-
-    {v
-    (* Force UTC interpretation for local datetimes *)
-    let codec = ptime ~tz_offset_s:0 ()
-
-    (* Force Eastern Time (-05:00 = -18000 seconds) *)
-    let codec = ptime ~tz_offset_s:(-18000) ()
-    v}
-
-    {2 Examples}
-
-    {3 Basic Event Tracking}
-    {v
-    type event = { name : string; timestamp : Ptime.t }
-
-    let event_codec = Tomlt.(Table.(
-      obj (fun name timestamp -> { name; timestamp })
-      |> mem "name" string ~enc:(fun e -> e.name)
-      |> mem "when" (ptime ()) ~enc:(fun e -> e.timestamp)
-      |> finish
-    ))
-
-    (* All of these decode successfully: *)
-    (* when = 2024-01-15T10:30:00Z       *)
-    (* when = 2024-01-15T10:30:00        *)
-    (* when = 2024-01-15                 *)
-    (* when = 10:30:00                   *)
-    v}
-
-    {3 Strict Timestamp Validation}
-    {v
-    type log_entry = { message : string; timestamp : Ptime.t }
-
-    let log_codec = Tomlt.(Table.(
-      obj (fun message timestamp -> { message; timestamp })
-      |> mem "message" string ~enc:(fun e -> e.message)
-      |> mem "timestamp" (ptime_opt ()) ~enc:(fun e -> e.timestamp)
-      |> finish
-    ))
-
-    (* Only accepts: timestamp = 2024-01-15T10:30:00Z *)
-    (* Rejects:      timestamp = 2024-01-15T10:30:00  *)
-    v}
-
-    {3 Birthday (Date Only)}
-    {v
-    type person = { name : string; birthday : Ptime.date }
-
-    let person_codec = Tomlt.(Table.(
-      obj (fun name birthday -> { name; birthday })
-      |> mem "name" string ~enc:(fun p -> p.name)
-      |> mem "birthday" ptime_date ~enc:(fun p -> p.birthday)
-      |> finish
-    ))
-
-    (* birthday = 1979-05-27 -> (1979, 5, 27) *)
-    v}
-
-    {3 Daily Alarm (Time Only)}
-    {v
-    type alarm = { label : string; time : Ptime.Span.t }
-
-    let alarm_codec = Tomlt.(Table.(
-      obj (fun label time -> { label; time })
-      |> mem "label" string ~enc:(fun a -> a.label)
-      |> mem "time" ptime_span ~enc:(fun a -> a.time)
-      |> finish
-    ))
-
-    (* time = 07:30:00 -> 27000 seconds (7.5 hours from midnight) *)
-    v}
-
-    {3 Preserving Datetime Format}
-    {v
-    type flexible_event = {
-      name : string;
-      when_ : Toml.ptime_datetime;
-    }
-
-    let flexible_codec = Tomlt.(Table.(
-      obj (fun name when_ -> { name; when_ })
-      |> mem "name" string ~enc:(fun e -> e.name)
-      |> mem "when" (ptime_full ()) ~enc:(fun e -> e.when_)
-      |> finish
-    ))
-
-    (* Decoding preserves the variant:
-       when = 2024-01-15T10:30:00Z -> `Datetime (ptime, Some 0)
-       when = 2024-01-15T10:30:00  -> `Datetime_local ptime
-       when = 2024-01-15           -> `Date (2024, 1, 15)
-       when = 10:30:00             -> `Time (10, 30, 0, 0)
-
-       Encoding reproduces the original format. *)
-    v} *)
+    - {!val:ptime} - Accepts any datetime format, normalizes to [Ptime.t]
+    - {!val:ptime_opt} - Strict: only accepts offset datetimes with timezone
+    - {!val:ptime_date} - For date-only fields
+    - {!val:ptime_span} - For time-only fields (as duration from midnight)
+    - {!val:ptime_full} - Preserves exact variant for roundtripping *)
 
 val ptime :
   ?tz_offset_s:int ->
@@ -493,158 +350,45 @@ val ptime :
   unit -> Ptime.t t
 (** Datetime codec that converts any TOML datetime to {!Ptime.t}.
 
-    This is the recommended codec for most datetime use cases. It handles
-    all TOML datetime variants by filling in sensible defaults:
+    Handles all TOML datetime variants by filling in sensible defaults.
+    Encoding produces RFC 3339 offset datetime strings.
 
-    - {b Offset datetime} ([2024-01-15T10:30:00Z]): Parsed directly to [Ptime.t]
-    - {b Local datetime} ([2024-01-15T10:30:00]): Converted using the timezone
-    - {b Local date} ([2024-01-15]): Assumed to be midnight (00:00:00) in the
-      given timezone
-    - {b Local time} ([10:30:00]): Combined with today's date using [now]
+    See {{!page-cookbook.datetimes}Working with datetimes} for examples.
 
-    Encoding always produces an RFC 3339 offset datetime string.
-
-    {4 Parameters}
-
-    @param tz_offset_s Explicit timezone offset in seconds, used for:
-      - Converting local datetimes to [Ptime.t]
-      - Converting local dates to [Ptime.t] (at midnight)
-      - Converting local times to [Ptime.t] (on today's date)
-      - Formatting the timezone when encoding
-
-      Common values:
-      - [0] = UTC
-      - [3600] = +01:00 (Central European Time)
-      - [-18000] = -05:00 (Eastern Standard Time)
-      - [-28800] = -08:00 (Pacific Standard Time)
-
-      If not provided, [get_tz] is called. If neither is provided, defaults
-      to UTC (0).
-
-    @param get_tz Function to get the current timezone offset. Called when
-      [tz_offset_s] is not provided. Pass [Tomlt_unix.current_tz_offset_s]
-      for OS-specific timezone support:
-      {[let codec = ptime ~get_tz:Tomlt_unix.current_tz_offset_s ()]}
-
-    @param now Function to get the current time. Used when decoding local
-      times (e.g., [10:30:00]) to combine with today's date. Pass
-      [Tomlt_unix.now] for OS-specific time support. If not provided,
-      defaults to [Ptime.epoch] (1970-01-01).
-
-    @param frac_s Number of fractional second digits to include when encoding.
-      Range: 0-12. Default: 0 (whole seconds only). For example, [~frac_s:3]
-      produces [2024-01-15T10:30:00.123Z].
-
-    {4 Example}
-    {[
-      type event = { name : string; timestamp : Ptime.t }
-
-      let event_codec = Tomlt.(Table.(
-        obj (fun name timestamp -> { name; timestamp })
-        |> mem "name" string ~enc:(fun e -> e.name)
-        |> mem "when" (ptime ()) ~enc:(fun e -> e.timestamp)
-        |> finish
-      ))
-
-      (* All of these decode to a Ptime.t: *)
-      let e1 = decode_string_exn event_codec {|name="a" when=2024-01-15T10:30:00Z|}
-      let e2 = decode_string_exn event_codec {|name="b" when=2024-01-15T10:30:00|}
-      let e3 = decode_string_exn event_codec {|name="c" when=2024-01-15|}
-      let e4 = decode_string_exn event_codec {|name="d" when=10:30:00|}
-    ]} *)
+    @param tz_offset_s Timezone offset in seconds for local datetimes.
+      Common: [0] (UTC), [3600] (+01:00), [-18000] (-05:00).
+    @param get_tz Function to get timezone offset when [tz_offset_s]
+      not provided. Use [Tomlt_unix.current_tz_offset_s] for system timezone.
+    @param now Function for current time, used for time-only values.
+      Use [Tomlt_unix.now] for system time.
+    @param frac_s Fractional second digits (0-12) for encoding. *)
 
 val ptime_opt : ?tz_offset_s:int -> ?frac_s:int -> unit -> Ptime.t t
 (** Strict datetime codec that only accepts offset datetimes.
 
-    Unlike {!ptime} which accepts any datetime format, this codec requires
-    an explicit timezone and rejects local datetime variants. Use this when
-    you need unambiguous timestamps and want to reject values that would
-    require timezone assumptions.
+    Requires explicit timezone; rejects local datetimes, dates, and times.
+    Use when you need unambiguous timestamps.
 
-    {4 Accepted}
-    - [2024-01-15T10:30:00Z] (UTC)
-    - [2024-01-15T10:30:00+05:30] (explicit offset)
-    - [2024-01-15T10:30:00-08:00] (explicit offset)
-
-    {4 Rejected}
-
-    These raise [Value_error]:
-
-    - [2024-01-15T10:30:00] (local datetime - no timezone)
-    - [2024-01-15] (local date)
-    - [10:30:00] (local time)
+    See {{!page-cookbook.datetimes}Working with datetimes} for examples.
 
     @param tz_offset_s Timezone offset for encoding. Default: 0 (UTC).
-    @param frac_s Fractional second digits for encoding. Default: 0.
-
-    {4 Example}
-    {[
-      type audit_log = { action : string; timestamp : Ptime.t }
-
-      let audit_codec = Tomlt.(Table.(
-        obj (fun action timestamp -> { action; timestamp })
-        |> mem "action" string ~enc:(fun a -> a.action)
-        |> mem "timestamp" (ptime_opt ()) ~enc:(fun a -> a.timestamp)
-        |> finish
-      ))
-
-      (* Valid: timestamp = 2024-01-15T10:30:00Z *)
-      (* Error: timestamp = 2024-01-15T10:30:00 (no timezone) *)
-    ]} *)
+    @param frac_s Fractional second digits for encoding. Default: 0. *)
 
 val ptime_span : Ptime.Span.t t
 (** Codec for TOML local times as [Ptime.Span.t] (duration from midnight).
 
-    Decodes a local time like [07:32:00] or [14:30:45.123] to a [Ptime.Span.t]
-    representing the time elapsed since midnight (00:00:00).
+    Decodes [07:32:00] to a span representing time since midnight.
+    Values are clamped to [00:00:00] to [23:59:59.999999999].
 
-    When encoding, the span is formatted as a local time string. Values are
-    clamped to the range [00:00:00] to [23:59:59.999999999].
-
-    {4 Decoding}
-    - [07:32:00] -> 27120 seconds (7 hours, 32 minutes)
-    - [14:30:45.5] -> 52245.5 seconds
-    - [00:00:00] -> 0 seconds
-
-    {4 Encoding}
-    - 27120 seconds -> [07:32:00]
-    - 52245.5 seconds -> [14:30:45.5]
-
-    {4 Example}
-    {[
-      type daily_schedule = { name : string; start_time : Ptime.Span.t }
-
-      let schedule_codec = Tomlt.(Table.(
-        obj (fun name start_time -> { name; start_time })
-        |> mem "name" string ~enc:(fun s -> s.name)
-        |> mem "start_time" ptime_span ~enc:(fun s -> s.start_time)
-        |> finish
-      ))
-
-      (* start_time = 09:00:00 -> 32400 seconds *)
-    ]} *)
+    See {{!page-cookbook.datetimes}Working with datetimes} for examples. *)
 
 val ptime_date : Ptime.date t
-(** Codec for TOML local dates as [Ptime.date] (a [(year, month, day)] tuple).
+(** Codec for TOML local dates as [Ptime.date] ([(year, month, day)] tuple).
 
-    Decodes a local date like [1979-05-27] to an [(int * int * int)] tuple.
-    Only accepts [Date_local] TOML values; rejects datetimes and times.
+    Decodes [1979-05-27] to [(1979, 5, 27)]. Only accepts local dates.
+    To work with dates as [Ptime.t] (at midnight), use {!ptime} instead.
 
-    {4 Example}
-    {[
-      type person = { name : string; birthday : Ptime.date }
-
-      let person_codec = Tomlt.(Table.(
-        obj (fun name birthday -> { name; birthday })
-        |> mem "name" string ~enc:(fun p -> p.name)
-        |> mem "birthday" ptime_date ~enc:(fun p -> p.birthday)
-        |> finish
-      ))
-
-      (* birthday = 1979-05-27 -> (1979, 5, 27) *)
-    ]}
-
-    To work with dates as [Ptime.t] (at midnight), use {!ptime} instead. *)
+    See {{!page-cookbook.datetimes}Working with datetimes} for examples. *)
 
 val ptime_full :
   ?tz_offset_s:int ->
@@ -652,71 +396,15 @@ val ptime_full :
   unit -> Toml.ptime_datetime t
 (** Codec that preserves full datetime variant information.
 
-    Unlike {!ptime} which normalizes all datetime formats to [Ptime.t],
-    this codec returns a polymorphic variant that indicates exactly what
-    was present in the TOML source. This is essential for:
+    Returns a {!Toml.ptime_datetime} variant indicating exactly what was
+    present in the TOML source. Essential for roundtripping TOML files
+    while preserving the original format.
 
-    - Distinguishing between datetime formats during decoding
-    - Roundtripping TOML files while preserving the original format
-    - Applications that treat different datetime formats differently
+    See {{!page-cookbook.datetimes}Working with datetimes} and
+    {{!page-cookbook.roundtripping}Roundtripping TOML} for examples.
 
-    {4 Decoded Variants}
-
-    The [Toml.ptime_datetime] type is:
-    {[
-      type ptime_datetime = [
-        | `Datetime of Ptime.t * Ptime.tz_offset_s option
-        | `Datetime_local of Ptime.t
-        | `Date of Ptime.date
-        | `Time of int * int * int * int  (* hour, minute, second, nanoseconds *)
-      ]
-    ]}
-
-    {4 Mapping from TOML}
-
-    - [2024-01-15T10:30:00Z] -> [`Datetime (ptime, Some 0)]
-    - [2024-01-15T10:30:00-05:00] -> [`Datetime (ptime, Some (-18000))]
-    - [2024-01-15T10:30:00] -> [`Datetime_local ptime]
-    - [2024-01-15] -> [`Date (2024, 1, 15)]
-    - [10:30:45.123] -> [`Time (10, 30, 45, 123_000_000)]
-
-    {4 Encoding}
-
-    When encoding, the variant determines the output format:
-    - [`Datetime] -> offset datetime with timezone
-    - [`Datetime_local] -> local datetime (no timezone)
-    - [`Date] -> local date
-    - [`Time] -> local time
-
-    @param tz_offset_s Explicit timezone offset for converting
-      [`Datetime_local] to [Ptime.t].
-
-    @param get_tz Function to get the current timezone offset. Called when
-      [tz_offset_s] is not provided. Pass [Tomlt_unix.current_tz_offset_s]
-      for OS-specific timezone support. If neither is provided, defaults to
-      UTC (0).
-
-    {4 Example}
-    {[
-      type schedule_item = {
-        description : string;
-        when_ : Toml.ptime_datetime;
-      }
-
-      let item_codec = Tomlt.(Table.(
-        obj (fun description when_ -> { description; when_ })
-        |> mem "description" string ~enc:(fun i -> i.description)
-        |> mem "when" (ptime_full ()) ~enc:(fun i -> i.when_)
-        |> finish
-      ))
-
-      (* Can distinguish between:
-         - when = 2024-01-15T10:00:00Z  (specific instant)
-         - when = 2024-01-15T10:00:00   (wall clock time)
-         - when = 2024-01-15            (all day)
-         - when = 10:00:00              (daily recurring)
-      *)
-    ]} *)
+    @param tz_offset_s Timezone offset for converting [`Datetime_local].
+    @param get_tz Function for timezone when [tz_offset_s] not provided. *)
 
 (** {1:combinators Codec Combinators} *)
 
@@ -904,7 +592,9 @@ val todo : ?kind:string -> ?doc:string -> ?dec_stub:'a -> unit -> 'a t
 
 (** {1:arrays Array Codecs}
 
-    Build codecs for {{:https://toml.io/en/v1.1.0#array}TOML arrays}. *)
+    Build codecs for {{:https://toml.io/en/v1.1.0#array}TOML arrays}.
+
+    See {{!page-cookbook.arrays}Working with arrays} for patterns. *)
 
 module Array : sig
   type 'a codec = 'a t
@@ -947,25 +637,11 @@ val array : ?kind:string -> ?doc:string -> 'a t -> 'a array t
 (** {1:tables Table Codecs}
 
     Build codecs for {{:https://toml.io/en/v1.1.0#table}TOML tables}
-    (key-value mappings). The applicative-style builder pattern allows
-    defining bidirectional codecs declaratively.
+    using an applicative-style builder pattern.
 
-    Tables can be defined using standard headers or as
-    {{:https://toml.io/en/v1.1.0#inline-table}inline tables}.
-    {{:https://toml.io/en/v1.1.0#keys}Keys} can be bare, quoted, or dotted.
-
-    {2 Basic Usage}
-
-    {v
-    type person = { name : string; age : int }
-
-    let person_codec = Tomlt.Table.(
-      obj (fun name age -> { name; age })
-      |> mem "name" Tomlt.string ~enc:(fun p -> p.name)
-      |> mem "age" Tomlt.int ~enc:(fun p -> p.age)
-      |> finish
-    )
-    v} *)
+    See the {{!page-cookbook.config_files}cookbook} for configuration patterns,
+    {{!page-cookbook.optional_values}optional values}, and
+    {{!page-cookbook.unknown_members}unknown member handling}. *)
 
 module Table : sig
   type 'a codec = 'a t
