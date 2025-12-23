@@ -65,7 +65,14 @@
     - {!section:combinators} - Codec transformers
     - {!section:arrays} - Array codec builders
     - {!section:tables} - Table/object codec builders
-    - {!section:codec_ops} - Encoding and decoding operations *)
+    - {!section:codec_ops} - Encoding and decoding operations
+
+    {2 Related Libraries}
+
+    {ul
+    {- [Tomlt_bytesrw] - Byte-level I/O for string and channel operations}
+    {- [Tomlt_eio] - Eio integration with system timezone support}
+    {- [Toml] - Low-level TOML value type and error handling}} *)
 
 (** {1:preliminaries Preliminaries} *)
 
