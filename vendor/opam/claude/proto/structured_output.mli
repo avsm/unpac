@@ -23,7 +23,7 @@ type t
 val of_json_schema : Jsont.json -> t
 (** [of_json_schema schema] creates an output format from a JSON Schema.
 
-    The schema should be a valid JSON Schema Draft 7 as a {!Jsont.json} value.
+    The schema should be a valid JSON Schema Draft 7 as a {!type:Jsont.json} value.
 
     Example:
     {[

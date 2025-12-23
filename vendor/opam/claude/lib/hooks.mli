@@ -115,7 +115,7 @@ module PostToolUse : sig
     tool_response : Jsont.json;  (* Response varies by tool *)
   }
   (** Input provided to PostToolUse hooks.
-      Note: [tool_response] remains as {!Jsont.json} since response schemas
+      Note: [tool_response] remains as {!type:Jsont.json} since response schemas
       vary by tool. *)
 
   (** {2 Output} *)
