@@ -42,7 +42,7 @@
 
 val of_file : string -> Tomlt.Toml.t
 (** [of_file path] reads and parses a TOML file.
-    @raise Toml.Error.Error on parse errors.
+    @raise Tomlt.Error.Error on parse errors.
     @raise Sys_error on file errors. *)
 
 val to_file : string -> Tomlt.Toml.t -> unit
