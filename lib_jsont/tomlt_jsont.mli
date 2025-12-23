@@ -92,7 +92,7 @@ val decode_jsont' : string -> (Toml.t, Jsont.Error.t) result
 
 val decode_jsont_exn : string -> Toml.t
 (** [decode_jsont_exn s] is like [decode_jsont'] but raises on error.
-    @raise Jsont.Error on decode failure. *)
+    @raise Jsont.Error.Error on decode failure. *)
 
 (** {1:internal Internal Types}
 
