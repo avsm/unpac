@@ -2,14 +2,17 @@
  (name toml_test_decoder)
  (public_name toml-test-decoder)
  (package tomlt)
+ (optional)
  (libraries tomlt tomlt.bytesrw))
 
 (executable
  (name toml_test_encoder)
  (public_name toml-test-encoder)
  (package tomlt)
+ (optional)
  (libraries tomlt tomlt.bytesrw))
 
 (executable
  (name run_tests)
+ (optional)
  (libraries tomlt tomlt.bytesrw))
