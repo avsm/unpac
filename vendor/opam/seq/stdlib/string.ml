@@ -304,6 +304,7 @@ type t = string
 
 let compare (x: t) (y: t) = Stdlib.compare x y
 external equal : string -> string -> bool = "caml_string_equal" [@@noalloc]
+let is_empty s = Int.equal (length s) 0
 
 (** {1 Iterators} *)
 

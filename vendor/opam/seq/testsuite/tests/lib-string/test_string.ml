@@ -258,3 +258,9 @@ let () =
   assert (String.of_char 'a' = "a");
   assert (String.of_char '\x00' = "\x00");
   ()
+
+let () =
+  (* Test String.is_empty *)
+  assert (String.is_empty "life" = false);
+  assert (String.is_empty "" = true);
+  ()
