@@ -133,6 +133,9 @@ Working version
 
 ### Standard library:
 
+- #14438: Add String.is_empty
+  (Daniel Bünzli, review by Nicolás Ojeda Bär and Gabriel Scherer)
+
 - #14440: Add String.of_char
   (Daniel Bünzli, review by Nicolás Ojeda Bär and Gabriel Scherer)
 
