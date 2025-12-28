@@ -159,6 +159,11 @@ val compare : t -> t -> int
 (** [compare s0 s1] sorts [s0] and [s1] in lexicographical order. [compare]
     behaves like {!Stdlib.compare} on strings but may be more efficient. *)
 
+val is_empty : string -> bool
+(** [is_empty s] is [true] if and only if [s] is an empty string.
+
+    @since 5.5 *)
+
 val starts_with :
   prefix (* comment thwarts tools/sync_stdlib_docs *) :string -> string -> bool
 (** [starts_with ][~prefix s] is [true] if and only if [s] starts with
