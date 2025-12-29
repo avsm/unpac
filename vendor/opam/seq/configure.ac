@@ -2854,13 +2854,13 @@ AS_IF([$build_ocamltest],
     [ocaml_cv_prog_diff_flags],
     [flags=""
     for flag in ${flags_to_test}; do
-      "$DIFF" $flag /dev/zero /dev/zero >/dev/null 2>&1 && \
+      "$DIFF" $flag /dev/null /dev/null >/dev/null 2>&1 && \
         flags="${flags:+$flags }$flag"
     done
     ocaml_cv_prog_diff_flags="$flags"])
   AC_CACHE_CHECK([whether $DIFF supports --color={auto,always,never}],
     [ocaml_cv_prog_diff_supports_color],
-    [AS_IF([$DIFF --color=auto $0 $0 > /dev/null 2>&1],
+    [AS_IF([$DIFF --color=auto /dev/null /dev/null > /dev/null 2>&1],
       [ocaml_cv_prog_diff_supports_color=true])])])
 AC_SUBST([DIFF_FLAGS], [$ocaml_cv_prog_diff_flags])
 # Always assign a valid default OCaml value

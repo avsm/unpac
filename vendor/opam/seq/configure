@@ -23961,7 +23961,7 @@ then :
 else $as_nop
   flags=""
     for flag in ${flags_to_test}; do
-      "$DIFF" $flag /dev/zero /dev/zero >/dev/null 2>&1 && \
+      "$DIFF" $flag /dev/null /dev/null >/dev/null 2>&1 && \
         flags="${flags:+$flags }$flag"
     done
     ocaml_cv_prog_diff_flags="$flags"
@@ -23974,7 +23974,7 @@ if test ${ocaml_cv_prog_diff_supports_color+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
-  if $DIFF --color=auto $0 $0 > /dev/null 2>&1
+  if $DIFF --color=auto /dev/null /dev/null > /dev/null 2>&1
 then :
   ocaml_cv_prog_diff_supports_color=true
 fi
