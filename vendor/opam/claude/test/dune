@@ -3,6 +3,12 @@
  (modules test_json_utils)
  (libraries jsont jsont.bytesrw))
 
+; Consolidated unit test suite using alcotest
+(test
+ (name test_claude)
+ (modules test_claude)
+ (libraries claude alcotest jsont.bytesrw))
+
 (executable
  (public_name camel_jokes)
  (name camel_jokes)

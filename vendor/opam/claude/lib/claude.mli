@@ -210,6 +210,42 @@ module Server_info = Server_info
 module Model = Model
 (** Claude AI model identifiers. *)
 
+(** {1 Custom Tools (MCP)}
+
+    These modules enable custom tool definitions that run in-process via MCP
+    (Model Context Protocol). Unlike built-in tools which Claude CLI handles
+    internally, custom tools are executed by your application.
+
+    {2 Example}
+
+    {[
+      let greet = Claude.Tool.create
+        ~name:"greet"
+        ~description:"Greet a user"
+        ~input_schema:(Claude.Tool.schema_object
+          ["name", Claude.Tool.schema_string]
+          ~required:["name"])
+        ~handler:(fun args ->
+          match Claude.Tool_input.get_string args "name" with
+          | Some name -> Ok (Claude.Tool.text_result ("Hello, " ^ name ^ "!"))
+          | None -> Error "Missing name")
+
+      let server = Claude.Mcp_server.create
+        ~name:"my-tools"
+        ~tools:[greet]
+        ()
+
+      let options = Claude.Options.default
+        |> Claude.Options.with_mcp_server ~name:"tools" server
+        |> Claude.Options.with_allowed_tools ["mcp__tools__greet"]
+    ]} *)
+
+module Tool = Tool
+(** Custom tool definitions for MCP servers. *)
+
+module Mcp_server = Mcp_server
+(** In-process MCP servers for custom tools. *)
+
 (** {1 Infrastructure} *)
 
 module Transport = Transport

@@ -17,3 +17,7 @@ module Server_info = Server_info
 module Transport = Transport
 module Model = Model
 module Proto = Proto
+
+(* New MCP-based custom tool support *)
+module Tool = Tool
+module Mcp_server = Mcp_server

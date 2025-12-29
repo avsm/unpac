@@ -33,6 +33,7 @@ type t = {
   max_buffer_size : int option;
   user : string option;
   output_format : Proto.Structured_output.t option;
+  mcp_servers : (string * Mcp_server.t) list;
 }
 
 let default =
@@ -62,6 +63,7 @@ let default =
     max_buffer_size = None;
     user = None;
     output_format = None;
+    mcp_servers = [];
   }
 
 (* Accessors *)
@@ -90,6 +92,7 @@ let setting_sources t = t.setting_sources
 let max_buffer_size t = t.max_buffer_size
 let user t = t.user
 let output_format t = t.output_format
+let mcp_servers t = t.mcp_servers
 
 (* Builders *)
 let with_allowed_tools tools t = { t with allowed_tools = tools }
@@ -131,6 +134,9 @@ let with_no_settings t = { t with setting_sources = Some [] }
 let with_max_buffer_size size t = { t with max_buffer_size = Some size }
 let with_user user t = { t with user = Some user }
 let with_output_format format t = { t with output_format = Some format }
+
+let with_mcp_server ~name server t =
+  { t with mcp_servers = (name, server) :: t.mcp_servers }
 
 let log_options t =
   Log.debug (fun m ->

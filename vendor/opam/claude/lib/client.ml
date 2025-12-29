@@ -60,6 +60,10 @@ type t = {
   control_mutex : Eio.Mutex.t;
   control_condition : Eio.Condition.t;
   clock : float Eio.Time.clock_ty Eio.Resource.t;
+  (* Track tool_use_ids we've already responded to, preventing duplicates *)
+  responded_tool_ids : (string, unit) Hashtbl.t;
+  (* In-process MCP servers for custom tools *)
+  mcp_servers : (string, Mcp_server.t) Hashtbl.t;
 }
 
 let session_id t = t.session_id
@@ -152,6 +156,35 @@ let handle_control_request t (ctrl_req : Sdk_control.control_request) =
           Log.err (fun m -> m "%s" error_msg);
           Transport.send t.transport
             (Control_response.error ~request_id ~code:`Internal_error ~message:error_msg ()))
+  | Sdk_control.Request.Mcp_message req -> (
+      (* Handle MCP request for in-process SDK servers *)
+      let module J = Jsont.Json in
+      let server_name = req.server_name in
+      let message = req.message in
+      Log.info (fun m -> m "MCP request for server '%s'" server_name);
+
+      match Hashtbl.find_opt t.mcp_servers server_name with
+      | None ->
+          let error_msg = Printf.sprintf "MCP server '%s' not found" server_name in
+          Log.err (fun m -> m "%s" error_msg);
+          (* Return JSONRPC error in mcp_response format *)
+          let mcp_error = J.object' [
+            J.mem (J.name "jsonrpc") (J.string "2.0");
+            J.mem (J.name "id") (J.null ());
+            J.mem (J.name "error") (J.object' [
+              J.mem (J.name "code") (J.number (-32601.0));
+              J.mem (J.name "message") (J.string error_msg)
+            ])
+          ] in
+          let response_data = J.object' [J.mem (J.name "mcp_response") mcp_error] in
+          let response = Control_response.success ~request_id ~response:(Some response_data) in
+          Transport.send t.transport response
+      | Some server ->
+          let mcp_response = Mcp_server.handle_json_message server message in
+          Log.debug (fun m -> m "MCP response: %s" (json_to_string mcp_response));
+          let response_data = J.object' [J.mem (J.name "mcp_response") mcp_response] in
+          let response = Control_response.success ~request_id ~response:(Some response_data) in
+          Transport.send t.transport response)
   | _ ->
       (* Other request types not handled here *)
       let error_msg = "Unsupported control request type" in
@@ -253,6 +286,13 @@ let create ?(options = Options.default) ~sw ~process_mgr ~clock () =
   let hook_callbacks = Hashtbl.create 16 in
   let next_callback_id = ref 0 in
 
+  (* Setup MCP servers from options *)
+  let mcp_servers_ht = Hashtbl.create 16 in
+  List.iter (fun (name, server) ->
+    Log.info (fun m -> m "Registering MCP server: %s" name);
+    Hashtbl.add mcp_servers_ht name server
+  ) (Options.mcp_servers options);
+
   let t =
     {
       transport;
@@ -264,6 +304,8 @@ let create ?(options = Options.default) ~sw ~process_mgr ~clock () =
       control_mutex = Eio.Mutex.create ();
       control_condition = Eio.Condition.create ();
       clock;
+      responded_tool_ids = Hashtbl.create 16;
+      mcp_servers = mcp_servers_ht;
     }
   in
 
@@ -329,21 +371,42 @@ let query t prompt =
   send_message t msg
 
 let respond_to_tool t ~tool_use_id ~content ?(is_error = false) () =
-  let user_msg = Message.User.with_tool_result ~tool_use_id ~content ~is_error () in
-  let msg = Message.User user_msg in
-  send_message t msg
+  (* Check for duplicate response - prevents API errors from multiple responses *)
+  if Hashtbl.mem t.responded_tool_ids tool_use_id then begin
+    Log.warn (fun m -> m "Skipping duplicate tool response for tool_use_id: %s" tool_use_id)
+  end else begin
+    Hashtbl.add t.responded_tool_ids tool_use_id ();
+    let user_msg = Message.User.with_tool_result ~tool_use_id ~content ~is_error () in
+    let msg = Message.User user_msg in
+    send_message t msg
+  end
 
 let respond_to_tools t responses =
-  let tool_results =
-    List.map
-      (fun (tool_use_id, content, is_error_opt) ->
-        let is_error = Option.value is_error_opt ~default:false in
-        Content_block.tool_result ~tool_use_id ~content ~is_error ())
-      responses
-  in
-  let user_msg = Message.User.of_blocks tool_results in
-  let msg = Message.User user_msg in
-  send_message t msg
+  (* Filter out duplicates *)
+  let new_responses = List.filter (fun (tool_use_id, _, _) ->
+    if Hashtbl.mem t.responded_tool_ids tool_use_id then begin
+      Log.warn (fun m -> m "Skipping duplicate tool response for tool_use_id: %s" tool_use_id);
+      false
+    end else begin
+      Hashtbl.add t.responded_tool_ids tool_use_id ();
+      true
+    end
+  ) responses in
+  if new_responses <> [] then begin
+    let tool_results =
+      List.map
+        (fun (tool_use_id, content, is_error_opt) ->
+          let is_error = Option.value is_error_opt ~default:false in
+          Content_block.tool_result ~tool_use_id ~content ~is_error ())
+        new_responses
+    in
+    let user_msg = Message.User.of_blocks tool_results in
+    let msg = Message.User user_msg in
+    send_message t msg
+  end
+
+let clear_tool_response_tracking t =
+  Hashtbl.clear t.responded_tool_ids
 
 let receive t = fun () -> handle_messages t
 
