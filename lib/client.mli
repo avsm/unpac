@@ -85,6 +85,10 @@ val respond_to_tool :
 (** [respond_to_tool t ~tool_use_id ~content ?is_error ()] responds to a tool
     use request.
 
+    {b Duplicate protection:} If the same [tool_use_id] has already been
+    responded to, this call is silently skipped with a warning log. This
+    prevents API errors from duplicate tool responses.
+
     @param tool_use_id The ID from the {!Response.Tool_use.t} event
     @param content The result content (can be a string or array of content blocks)
     @param is_error Whether this is an error response (default: false) *)
@@ -92,6 +96,9 @@ val respond_to_tool :
 val respond_to_tools : t -> (string * Jsont.json * bool option) list -> unit
 (** [respond_to_tools t responses] responds to multiple tool use requests at
     once.
+
+    {b Duplicate protection:} Any [tool_use_id] that has already been
+    responded to is filtered out with a warning log.
 
     Each tuple is [(tool_use_id, content, is_error option)] where content
     can be a string or array of content blocks.
@@ -104,6 +111,14 @@ val respond_to_tools : t -> (string * Jsont.json * bool option) list -> unit
           ("tool_use_456", Jsont.string "Error occurred", Some true);
         ]
     ]} *)
+
+val clear_tool_response_tracking : t -> unit
+(** [clear_tool_response_tracking t] clears the internal tracking of which
+    tool_use_ids have been responded to.
+
+    This is useful when starting a new conversation or turn where you want
+    to allow responses to previously-seen tool IDs. Normally this is not
+    needed as tool IDs are unique per conversation turn. *)
 
 (** {1 Response Handling} *)
 

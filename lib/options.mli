@@ -181,6 +181,12 @@ val with_output_format : Proto.Structured_output.t -> t -> t
 val with_extra_args : (string * string option) list -> t -> t
 (** [with_extra_args args t] sets the additional CLI flags. *)
 
+val with_mcp_server : name:string -> Mcp_server.t -> t -> t
+(** [with_mcp_server ~name server t] adds an in-process MCP server.
+
+    Multiple servers can be added. Tools from server "foo" are accessed as
+    [mcp__foo__<tool_name>]. *)
+
 (** {1 Accessors} *)
 
 val allowed_tools : t -> string list
@@ -259,6 +265,9 @@ val output_format : t -> Proto.Structured_output.t option
 
 val extra_args : t -> (string * string option) list
 (** [extra_args t] returns the additional CLI flags. *)
+
+val mcp_servers : t -> (string * Mcp_server.t) list
+(** [mcp_servers t] returns the list of in-process MCP servers. *)
 
 (** {1 Logging} *)
 
