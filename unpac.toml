@@ -3,3 +3,7 @@
 [[opam.repositories]]
 name = "default"
 path = "/workspace/opam-repository"
+
+[[opam.repositories]]
+name = "aoah"
+path = "/workspace/opam"
