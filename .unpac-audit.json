@@ -2,6 +2,21 @@
   "version": "1.0",
   "entries": [
     {
+      "id": "b207da29-dfbf-8307-4014-dc092cc6f11f",
+      "timestamp": 1767080445.9502971,
+      "operation": "opam.add",
+      "args": [
+        "opam-0install",
+        "--solve"
+      ],
+      "cwd": "/workspace/unpac-unpac/main",
+      "duration_ms": 117867,
+      "status": {
+        "status": "success"
+      },
+      "git_operations": []
+    },
+    {
       "id": "b775881b-982c-a2c4-0286-2ee2d0e62cb7",
       "timestamp": 1767080435.2070611,
       "operation": "opam.add",
