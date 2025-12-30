@@ -1,0 +1,47 @@
+name: Cross-platform tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - 'master'
+
+jobs:
+  test-with-setup-ocaml:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
+        ocaml-compiler:
+          - '4.13.x'
+    runs-on: ${{ matrix.os }}
+    name: test-ocaml / ${{ matrix.os }}-${{ matrix.ocaml-compiler }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Hack Git CRLF for ocaml/setup-ocaml issue #529
+        if: ${{ startsWith(matrix.os, 'windows-') }}
+        run: |
+          & "C:\Program Files\Git\bin\git.exe" config --system core.autocrlf input
+
+      - name: OCaml ${{ matrix.ocaml-compiler }} with Dune cache
+        uses: ocaml/setup-ocaml@v3
+        if: ${{ !startsWith(matrix.os, 'windows-') }}
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          dune-cache: true
+      - name: OCaml ${{ matrix.ocaml-compiler }} without Dune cache
+        uses: ocaml/setup-ocaml@v3
+        if: ${{ startsWith(matrix.os, 'windows-') }}
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          dune-cache: false
+      - name: Install/build/test
+        run: |
+          opam install . --deps-only --with-test
+          opam exec -- dune build --display=short
+          opam exec -- dune runtest --display=short
