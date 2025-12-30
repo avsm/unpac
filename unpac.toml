@@ -168,3 +168,7 @@ url = "https://github.com/mirage/digestif.git"
 [[opam.vendored]]
 name = "eqaf"
 url = "https://github.com/mirage/eqaf.git"
+
+[[opam.vendored]]
+name = "base64"
+url = "https://github.com/mirage/ocaml-base64.git"
