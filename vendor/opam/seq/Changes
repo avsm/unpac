@@ -496,7 +496,7 @@ Working version
 
 ### Build system:
 
-- #13705: Cache test results of custom Autoconf tests from aclocal.m4.
+- #13705, #14444: Cache test results of custom Autoconf tests from aclocal.m4.
   (Antonin Décimo, review by David Allsopp and Miod Vallat)
 
 - #13810: Support build of cross compilers to native freestanding targets
