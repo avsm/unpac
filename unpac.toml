@@ -7,7 +7,7 @@ path = "/workspace/opam-repository"
 
 [[opam.repositories]]
 name = "aoah"
-path = "/workspace/opam"
+path = "/workspace/opam/aoah-opam-repo"
 
 [[opam.vendored]]
 name = "bigstringaf"
