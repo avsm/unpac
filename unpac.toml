@@ -176,3 +176,7 @@ url = "https://github.com/mirage/ocaml-base64.git"
 [[opam.vendored]]
 name = "astring"
 url = "http://erratique.ch/repos/astring.git"
+
+[[opam.vendored]]
+name = "fpath"
+url = "https://erratique.ch/repos/fpath.git"
