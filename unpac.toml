@@ -1,9 +1,5 @@
 [opam]
-repositories = []
-# compiler = "5.4.0"
 
-# Vendor cache location (default: XDG cache directory)
-# vendor_cache = "/path/to/cache"
-
-[projects]
-# Projects will be added here
+[[opam.repositories]]
+name = "default"
+path = "/workspace/opam-repository"
