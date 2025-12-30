@@ -1,0 +1,13 @@
+(library
+ (name unpac)
+ (public_name unpac)
+ (libraries
+  eio
+  logs
+  logs.fmt
+  fmt
+  fmt.tty
+  tomlt
+  tomlt.bytesrw
+  jsont
+  jsont.bytesrw))

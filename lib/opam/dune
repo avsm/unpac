@@ -1,0 +1,10 @@
+(library
+ (name unpac_opam)
+ (public_name unpac-opam)
+ (libraries
+  unpac
+  cmdliner
+  opam-format
+  opam-core
+  opam-state
+  opam-0install))

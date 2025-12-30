@@ -1,0 +1,4 @@
+(library
+ (name unpac_claude)
+ (public_name unpac-claude)
+ (libraries unpac claude eio eio_main logs fmt jsont digestif base64))

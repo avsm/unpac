@@ -1,0 +1,5 @@
+(executable
+ (name main)
+ (public_name unpac)
+ (package unpac)
+ (libraries unpac unpac_opam cmdliner eio_main logs logs.fmt fmt.tty jsont jsont.bytesrw str))
