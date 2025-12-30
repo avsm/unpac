@@ -84,3 +84,7 @@ url = "https://erratique.ch/repos/topkg.git"
 [[opam.vendored]]
 name = "uring"
 url = "https://github.com/ocaml-multicore/ocaml-uring.git"
+
+[[opam.vendored]]
+name = "logs"
+url = "https://erratique.ch/repos/logs.git"
