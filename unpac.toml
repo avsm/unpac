@@ -8,4 +8,79 @@ path = "/workspace/opam-repository"
 [[opam.repositories]]
 name = "aoah"
 path = "/workspace/opam"
-unpac = {}
+
+[[opam.vendored]]
+name = "bigstringaf"
+url = "https://github.com/inhabitedtype/bigstringaf.git"
+
+[[opam.vendored]]
+name = "csexp"
+url = "https://github.com/ocaml-dune/csexp.git"
+
+[[opam.vendored]]
+name = "cstruct"
+url = "https://github.com/mirage/ocaml-cstruct.git"
+
+[[opam.vendored]]
+name = "domain-local-await"
+url = "https://github.com/ocaml-multicore/domain-local-await.git"
+
+[[opam.vendored]]
+name = "dune"
+url = "https://github.com/ocaml/dune.git"
+
+[[opam.vendored]]
+name = "eio"
+url = "https://github.com/ocaml-multicore/eio.git"
+
+[[opam.vendored]]
+name = "fmt"
+url = "https://erratique.ch/repos/fmt.git"
+
+[[opam.vendored]]
+name = "hmap"
+url = "http://erratique.ch/repos/hmap.git"
+
+[[opam.vendored]]
+name = "iomux"
+url = "https://github.com/ocaml-multicore/ocaml-iomux.git"
+
+[[opam.vendored]]
+name = "lwt-dllist"
+url = "https://github.com/mirage/lwt-dllist.git"
+
+[[opam.vendored]]
+name = "mtime"
+url = "https://erratique.ch/repos/mtime.git"
+
+[[opam.vendored]]
+name = "ocamlbuild"
+url = "https://github.com/ocaml/ocamlbuild.git"
+
+[[opam.vendored]]
+name = "ocamlfind"
+url = "https://github.com/ocaml/ocamlfind.git"
+
+[[opam.vendored]]
+name = "optint"
+url = "https://github.com/mirage/optint.git"
+
+[[opam.vendored]]
+name = "psq"
+url = "https://github.com/pqwy/psq.git"
+
+[[opam.vendored]]
+name = "seq"
+url = "https://github.com/ocaml/ocaml.git"
+
+[[opam.vendored]]
+name = "thread-table"
+url = "https://github.com/ocaml-multicore/thread-table.git"
+
+[[opam.vendored]]
+name = "topkg"
+url = "https://erratique.ch/repos/topkg.git"
+
+[[opam.vendored]]
+name = "uring"
+url = "https://github.com/ocaml-multicore/ocaml-uring.git"
