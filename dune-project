@@ -1,4 +1,4 @@
-(lang dune 3.20)
+(lang dune 3.18)
 (name unpac)
 (generate_opam_files true)
 
@@ -14,7 +14,7 @@
   (logs (>= 0.7.0))
   (fmt (>= 0.9.0))
   tomlt
-  (jsont (>= 0.1.0))))
+  (jsont (>= 0.2.0))))
 
 (package
  (name unpac-opam)
