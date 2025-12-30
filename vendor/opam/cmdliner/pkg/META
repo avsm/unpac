@@ -1,0 +1,8 @@
+description = "Declarative definition of command line interfaces for OCaml"
+version = "%%VERSION_NUM%%"
+requires = ""
+archive(byte) = "cmdliner.cma"
+archive(native) = "cmdliner.cmxa"
+plugin(byte) = "cmdliner.cma"
+plugin(native) = "cmdliner.cmxs"
+exists_if = "cmdliner.cma cmdliner.cmxa"
