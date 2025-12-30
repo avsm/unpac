@@ -156,3 +156,7 @@ url = "https://github.com/ocamlpro/swhid_core.git"
 [[opam.vendored]]
 name = "uutf"
 url = "https://erratique.ch/repos/uutf.git"
+
+[[opam.vendored]]
+name = "claude"
+url = "https://tangled.org/@anil.recoil.org/ocaml-claudeio.git"
