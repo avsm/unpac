@@ -1,0 +1,19 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "id": "66e2a947-f11f-89c9-40a8-ec8e7f4f8250",
+      "timestamp": 1767080119.9858041,
+      "operation": "project.new",
+      "args": [
+        "unpac"
+      ],
+      "cwd": "/workspace/unpac-unpac/main",
+      "duration_ms": 126,
+      "status": {
+        "status": "success"
+      },
+      "git_operations": []
+    }
+  ]
+}
