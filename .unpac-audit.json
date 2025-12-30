@@ -2,6 +2,21 @@
   "version": "1.0",
   "entries": [
     {
+      "id": "162a5e3d-ed20-114d-673c-ade1343ed560",
+      "timestamp": 1767080681.7424791,
+      "operation": "opam.merge",
+      "args": [
+        "jsonm",
+        "unpac"
+      ],
+      "cwd": "/workspace/unpac-unpac/main",
+      "duration_ms": 170,
+      "status": {
+        "status": "success"
+      },
+      "git_operations": []
+    },
+    {
       "id": "7ddeae69-6898-a711-66af-db2a9dfd012e",
       "timestamp": 1767080681.4911079,
       "operation": "opam.merge",
