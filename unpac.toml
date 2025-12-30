@@ -92,3 +92,11 @@ url = "https://erratique.ch/repos/logs.git"
 [[opam.vendored]]
 name = "jsont"
 url = "https://erratique.ch/repos/jsont.git"
+
+[[opam.vendored]]
+name = "ptime"
+url = "https://erratique.ch/repos/ptime.git"
+
+[[opam.vendored]]
+name = "tomlt"
+url = "https://tangled.org/@anil.recoil.org/ocaml-tomlt.git"
