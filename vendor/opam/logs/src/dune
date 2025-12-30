@@ -1,0 +1,5 @@
+(library
+ (name logs)
+ (public_name logs)
+ (modules logs)
+ (flags (:standard -w -27)))

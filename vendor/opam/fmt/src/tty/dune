@@ -1,0 +1,5 @@
+(library
+ (name fmt_tty)
+ (public_name fmt.tty)
+ (libraries unix fmt)
+ (modules fmt_tty))

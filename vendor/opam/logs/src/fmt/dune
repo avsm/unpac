@@ -1,0 +1,13 @@
+(library
+ (name logs_fmt)
+ (public_name logs.fmt)
+ (modules logs_fmt)
+ (libraries logs fmt)
+ (flags (:standard -w -27))
+ (optional))
+
+(install
+ (section lib)
+ (package logs)
+ (files
+  (logs_fmt_top_init.ml as fmt/logs_fmt_top_init.ml)))

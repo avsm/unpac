@@ -34,9 +34,7 @@ doc: "https://erratique.ch/software/logs/doc"
 bug-reports: "https://github.com/dbuenzli/logs/issues"
 depends: [
   "ocaml" {>= "4.14.0"}
-  "ocamlfind" {build}
-  "ocamlbuild" {build}
-  "topkg" {build & >= "1.1.0"}
+  "dune" {>= "3.0"}
   "mtime" {with-test}
 ]
 depopts: ["cmdliner" "js_of_ocaml-compiler" "fmt" "lwt" "base-threads"]
@@ -46,21 +44,8 @@ conflicts: [
   "fmt" {< "0.9.0"}
 ]
 build: [
-  "ocaml"
-  "pkg/pkg.ml"
-  "build"
-  "--dev-pkg"
-  "%{dev}%"
-  "--with-js_of_ocaml-compiler"
-  "%{js_of_ocaml-compiler:installed}%"
-  "--with-fmt"
-  "%{fmt:installed}%"
-  "--with-cmdliner"
-  "%{cmdliner:installed}%"
-  "--with-lwt"
-  "%{lwt:installed}%"
-  "--with-base-threads"
-  "%{base-threads:installed}%"
+  ["dune" "subst"] {dev}
+  ["dune" "build" "-p" name "-j" jobs]
 ]
 dev-repo: "git+https://erratique.ch/repos/logs.git"
 x-maintenance-intent: ["(latest)"]

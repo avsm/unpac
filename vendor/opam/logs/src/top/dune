@@ -1,0 +1,13 @@
+(library
+ (name logs_top)
+ (public_name logs.top)
+ (modules logs_top)
+ (libraries logs compiler-libs.toplevel)
+ (optional))
+
+(install
+ (section lib)
+ (package logs)
+ (files
+  (logs_top_init.ml as top/logs_top_init.ml)
+  (logs_top_init.ml as top/logs_top_init_ml)))

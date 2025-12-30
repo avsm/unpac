@@ -1,0 +1,6 @@
+(library
+ (name logs_threaded)
+ (public_name logs.threaded)
+ (modules logs_threaded)
+ (libraries logs threads.posix)
+ (optional))

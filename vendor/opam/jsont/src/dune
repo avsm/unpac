@@ -1,0 +1,5 @@
+(library
+ (name jsont)
+ (public_name jsont)
+ (modules Jsont_base Jsont)
+ (flags (:standard -w -27-30-32-34-35)))

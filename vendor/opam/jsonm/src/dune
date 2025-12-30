@@ -1,0 +1,4 @@
+(library
+ (name jsonm)
+ (public_name jsonm)
+ (libraries uutf))

@@ -1,0 +1,5 @@
+(library
+ (name ptime)
+ (public_name ptime)
+ (modules Ptime)
+ (flags (:standard -w -27)))

@@ -1,0 +1,9 @@
+(library
+ (name mtime)
+ (public_name mtime)
+ (modules Mtime))
+
+(install
+ (section lib)
+ (package mtime)
+ (files mtime_top_init.ml))

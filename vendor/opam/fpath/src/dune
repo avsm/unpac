@@ -1,0 +1,6 @@
+(library
+ (name fpath)
+ (public_name fpath)
+ (libraries astring)
+ (flags (:standard -w -27-32-39))
+ (modules Fpath))

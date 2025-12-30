@@ -1,0 +1,11 @@
+(library
+ (name astring)
+ (public_name astring)
+ (flags (:standard -w -27))
+ (modules Astring_unsafe Astring_base Astring_escape Astring_char Astring_sub Astring_string Astring))
+
+(library
+ (name astring_top)
+ (public_name astring.top)
+ (libraries compiler-libs.toplevel astring)
+ (modules Astring_top))

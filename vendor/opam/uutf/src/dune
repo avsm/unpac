@@ -1,0 +1,6 @@
+(library
+ (name uutf)
+ (public_name uutf)
+ (wrapped false)
+ (flags (:standard -w -27-32))
+ (modules Uutf))
