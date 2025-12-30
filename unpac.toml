@@ -1,4 +1,5 @@
 [opam]
+compiler = "5.4.0"
 
 [[opam.repositories]]
 name = "default"
