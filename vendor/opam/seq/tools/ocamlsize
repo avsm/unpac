@@ -1,0 +1,101 @@
+#!/usr/bin/perl
+
+#**************************************************************************
+#*                                                                        *
+#*                                 OCaml                                  *
+#*                                                                        *
+#*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *
+#*                                                                        *
+#*   Copyright 2002 Institut National de Recherche en Informatique et     *
+#*     en Automatique.                                                    *
+#*                                                                        *
+#*   All rights reserved.  This file is distributed under the terms of    *
+#*   the GNU Lesser General Public License version 2.1, with the          *
+#*   special exception on linking described in the file LICENSE.          *
+#*                                                                        *
+#**************************************************************************
+
+foreach $f (@ARGV) {
+    open(FILE, $f) || die("Cannot open $f");
+    read(FILE, $header, 2);
+    if ($header eq '#!') {
+      chomp($path = <FILE>);
+      if ($path =~ m/\/sh$/) {
+        # shell-script form of the shebang header
+        chomp($path = <FILE>);
+        # exec form - used for -runtime-search absolute when the path to the
+        # runtime isn't valid as a #! line.
+        if ($path =~ s/^exec '(.*)' "\$0" "\$@\"$/$1/ > 0) {
+          $path =~ s/'\\''/'/g;
+        # Both -runtime-search fallback and -runtime-search enable define a
+        # variable r with the name of the runtime (see bytecomp/bytelink.ml)
+        } elsif ($path =~ s/^r='(.*)'$/$1/ > 0) {
+          $path =~ s/'\\''/'/g;
+          chomp($dir = <FILE>);
+          # In -runtime-search fallback, there will also be a path to the
+          # runtime defined the variable c.
+          if ($dir =~ s/^c='(.*)'"\$r"$/$1/ > 0) {
+            $dir =~ s/'\\''/'/g;
+            $path = "[$dir]$path";
+          }
+        } else {
+          undef $path;
+        }
+      }
+    };
+    seek(FILE, -16, 2);
+    $num_sections = &read_int();
+    read(FILE, $magic, 12);
+    seek(FILE, -16 - 8 * $num_sections, 2);
+    @secname = ();
+    @seclength = ();
+    %length = ();
+    for ($i = 0; $i < $num_sections; $i++) {
+        read(FILE, $sec, 4);
+        $secname[$i] = $sec;
+        $seclength[$i] = &read_int();
+        $length{$sec} = $seclength[$i];
+    }
+    print $f, ":\n" if ($#ARGV > 0);
+    if (not defined $path) {
+      if ($length{'RNTM'} > 0) {
+        $path = &read_section('RNTM');
+        # RNTM is "\0ocamlrun" for -runtime-search enable
+        if ($path !~ s/^\0//) {
+          # RNTM is "/path/to/ocamlrun" for -runtime-search disable and
+          # "/path/to\0ocamlrun" for -runtime-search fallback. Transform the
+          # embedded "\0" into a directory separator and display the directory
+          # in square brackets (as above for the sh-case)
+          $path =~ s/^([^\/\\]*)([\\\/])([^\0]*)\0(.*)$/[$1$2$3$2]$4/
+        }
+      } else {
+        $path = '(custom runtime)';
+      }
+    };
+    printf ("\tcode: %-7d data: %-7d symbols: %-7d debug: %-7d\n",
+            $length{'CODE'}, $length{'DATA'},
+            $length{'SYMB'}, $length{'DBUG'});
+    printf ("\tmagic number: %s  runtime system: %s\n",
+            $magic, $path);
+    close(FILE);
+}
+
+sub read_int {
+    read(FILE, $buff, 4) == 4 || die("Truncated bytecode file $f");
+    @int = unpack("C4", $buff);
+    return ($int[0] << 24) + ($int[1] << 16) + ($int[2] << 8) + $int[3];
+}
+
+sub read_section {
+    local ($sec) = @_;
+    local ($i, $ofs, $data);
+    for ($i = $num_sections - 1; $i >= 0; $i--) {
+        $ofs += $seclength[$i];
+        if ($secname[$i] eq $sec) {
+            seek(FILE, -16 - 8 * $num_sections - $ofs, 2);
+            read(FILE, $data, $seclength[$i]);
+            return $data;
+        }
+    }
+    return '';
+}

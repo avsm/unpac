@@ -1,0 +1,208 @@
+#**************************************************************************
+#*                                                                        *
+#*                                 OCaml                                  *
+#*                                                                        *
+#*            Xavier Leroy, projet Cristal, INRIA Rocquencourt            *
+#*                                                                        *
+#*   Copyright 1999 Institut National de Recherche en Informatique et     *
+#*     en Automatique.                                                    *
+#*                                                                        *
+#*   All rights reserved.  This file is distributed under the terms of    *
+#*   the GNU Lesser General Public License version 2.1, with the          *
+#*   special exception on linking described in the file LICENSE.          *
+#*                                                                        *
+#**************************************************************************
+
+# Common Makefile for otherlibs
+
+ROOTDIR=../..
+SUBDIR_NAME=otherlibs/$(LIBNAME)
+include $(ROOTDIR)/Makefile.common
+include $(ROOTDIR)/Makefile.best_binaries
+
+CAMLC := $(BEST_OCAMLC) $(STDLIBFLAGS)
+CAMLOPT := $(BEST_OCAMLOPT) $(STDLIBFLAGS)
+
+ifneq "$(CCOMPTYPE)" "msvc"
+OC_CFLAGS += -g
+endif
+
+OC_CFLAGS += $(SHAREDLIB_CFLAGS)
+
+# Compilation options
+COMPFLAGS=-absname -w +a-4-9-41-42-44-45-48 -warn-error +A -bin-annot -g \
+          -strict-sequence -strict-formats $(EXTRACAMLFLAGS)
+ifeq "$(FLAMBDA)" "true"
+OPTCOMPFLAGS += -O3
+endif
+MKLIB=$(OCAMLRUN) $(ROOTDIR)/tools/ocamlmklib$(EXE)
+ifeq "$(SUFFIXING)" "true"
+MKLIB += -suffixed
+endif
+
+# Variables that must be defined by individual libraries:
+# LIBNAME
+# CAMLOBJS
+
+# Variables that can be defined by individual libraries,
+# but have sensible default values:
+C_SOURCES ?=
+EXTRACAMLFLAGS ?=
+LINKOPTS ?=
+LDOPTS ?=
+HEADERS ?=
+CMIFILES ?= $(CAMLOBJS:.cmo=.cmi)
+CAMLOBJS_NAT ?= $(CAMLOBJS:.cmo=.cmx)
+CLIBNAME ?= $(LIBNAME)
+
+ifeq "$(C_SOURCES)" ""
+
+STUBSLIB_BYTECODE=
+STUBSLIB_NATIVE=
+STUBSDLL=
+
+else
+
+COBJS_BYTECODE = $(C_SOURCES:.c=.b.$(O))
+COBJS_NATIVE = $(C_SOURCES:.c=.n.$(O))
+COBJS = $(COBJS_BYTECODE) $(COBJS_NATIVE)
+
+CLIBNAME_BYTECODE=$(CLIBNAME)byt
+CLIBNAME_NATIVE=$(CLIBNAME)nat
+STUBSLIB_BYTECODE=lib$(CLIBNAME_BYTECODE).$(A)
+STUBSLIB_NATIVE=lib$(CLIBNAME_NATIVE).$(A)
+
+ifeq "$(SUFFIXING)" "true"
+STUBSDLL=dll$(CLIBNAME_BYTECODE)-$(TARGET)-$(BYTECODE_RUNTIME_ID)$(EXT_DLL)
+else
+STUBSDLL=dll$(CLIBNAME_BYTECODE)$(EXT_DLL)
+endif
+endif
+
+.PHONY: all allopt opt.opt # allopt and opt.opt are synonyms
+all: $(STUBSLIB_BYTECODE) $(LIBNAME).cma $(CMIFILES)
+
+allopt: $(STUBSLIB_NATIVE) $(LIBNAME).cmxa $(LIBNAME).$(CMXS) $(CMIFILES)
+opt.opt: allopt
+
+$(LIBNAME).cma: $(CAMLOBJS)
+ifeq "$(COBJS)" ""
+	$(V_LINKC)$(CAMLC) -o $@ -a -linkall $(CAMLOBJS) $(LINKOPTS)
+else
+	$(V_OCAMLMKLIB)$(MKLIB) -o $(LIBNAME) -oc $(CLIBNAME_BYTECODE) -ocamlc '$(CAMLC)' \
+                -linkall $(CAMLOBJS) $(LINKOPTS)
+endif
+
+$(LIBNAME).cmxa: $(CAMLOBJS_NAT)
+ifeq "$(COBJS)" ""
+	$(V_OCAMLOPT)$(CAMLOPT) -o $@ -a -linkall $(CAMLOBJS_NAT) $(LINKOPTS)
+else
+	$(V_OCAMLMKLIB)$(MKLIB) -o $(LIBNAME) -oc $(CLIBNAME_NATIVE) -ocamlopt '$(CAMLOPT)' \
+                -linkall $(CAMLOBJS_NAT) $(LINKOPTS)
+endif
+
+$(LIBNAME).cmxs: $(LIBNAME).cmxa $(STUBSLIB_NATIVE)
+	$(V_OCAMLOPT)$(CAMLOPT) -shared -o $(LIBNAME).cmxs -I . $(LIBNAME).cmxa
+
+lib$(CLIBNAME_BYTECODE).$(A): $(COBJS)
+	$(V_OCAMLMKLIB)$(MKLIB) -oc $(CLIBNAME_BYTECODE) $(COBJS_BYTECODE) $(LDOPTS)
+
+lib$(CLIBNAME_NATIVE).$(A): $(COBJS)
+	$(V_OCAMLMKLIB)$(MKLIB) -oc $(CLIBNAME_NATIVE) $(COBJS_NATIVE) $(LDOPTS)
+
+install::
+ifneq "$(STUBSLIB_BYTECODE)" ""
+ifeq "$(SUPPORTS_SHARED_LIBRARIES)" "true"
+	$(call INSTALL_ITEMS, $(STUBSDLL), stublibs)
+endif
+	$(call INSTALL_ITEMS, $(STUBSLIB_BYTECODE), lib)
+endif
+# If installing over a previous OCaml version, ensure the library is removed
+# from the previous installation.
+	$(call INSTALL_RM, \
+	  $(addprefix "$(INSTALL_LIBDIR)"/, \
+	  $(LIBNAME).cma $(CMIFILES) \
+	  $(CMIFILES:.cmi=.mli) $(CMIFILES:.cmi=.cmti) \
+	  $(CAMLOBJS_NAT) $(LIBNAME).cmxa $(LIBNAME).cmxs $(LIBNAME).$(A)))
+	$(call INSTALL_ITEMS, $(LIBNAME).cma $(CMIFILES) META, lib, $(LIBNAME))
+ifeq "$(INSTALL_SOURCE_ARTIFACTS)" "true"
+	$(call INSTALL_ITEMS, $(CMIFILES:.cmi=.mli) $(CMIFILES:.cmi=.cmti), \
+	  lib, $(LIBNAME))
+endif
+ifneq "$(HEADERS)" ""
+	$(call INSTALL_ITEMS, $(HEADERS), lib, $(INSTALL_LIBDIR_CAML))
+endif
+
+installopt:
+	$(call INSTALL_ITEMS, \
+	   $(CAMLOBJS_NAT) $(LIBNAME).cmxa $(LIBNAME).$(A), lib, $(LIBNAME))
+ifeq "$(SUPPORTS_SHARED_LIBRARIES)" "true"
+	$(call INSTALL_ITEMS, $(LIBNAME).cmxs, libexec, $(LIBNAME))
+ifeq "$(SUFFIXING)" "false"
+	$(call INSTALL_ITEMS, dll$(CLIBNAME_NATIVE)$(EXT_DLL), stublibs)
+endif
+endif
+ifneq "$(STUBSLIB_NATIVE)" ""
+	$(call INSTALL_ITEMS, $(STUBSLIB_NATIVE), lib)
+endif
+
+partialclean:
+	rm -f *.cm*
+
+clean:: partialclean
+	rm -f *.dll *.so *.a *.lib *.o *.obj
+	rm -rf $(DEPDIR)
+
+.PHONY: distclean
+distclean:: clean
+	rm -f META
+
+%.cmi: %.mli
+	$(V_OCAMLC)$(CAMLC) -c $(COMPFLAGS) $<
+
+%.cmo: %.ml
+	$(V_OCAMLC)$(CAMLC) -c $(COMPFLAGS) $<
+
+%.cmx: %.ml
+	$(V_OCAMLOPT)$(CAMLOPT) -c $(COMPFLAGS) $(OPTCOMPFLAGS) $<
+
+ifeq "$(COMPUTE_DEPS)" "true"
+%.b.$(O): %.c $(REQUIRED_HEADERS) | $(DEPDIR)
+	$(V_CC)$(CC) $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) \
+	  $(OUTPUTOBJ)$@ $(call DEP_FLAGS,$@,$(DEPDIR)/$(@:.$(O)=.$(D))) -c $<
+# MSVC doesn't emit usable dependency information, but if GCC is available
+# then it can instead be called in order to generate the .d file.
+ifneq "$(CC)" "$(DEP_CC)"
+	$(V_CCDEPS)$(DEP_CC) $(DEP_CPPFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) $< \
+   -MM -MT $@ -MF $(DEPDIR)/$(@:.$(O)=.$(D))
+endif # ifneq "$(CC)" "$(DEP_CC)"
+
+%.n.$(O): %.c $(REQUIRED_HEADERS) | $(DEPDIR)
+	$(V_CC)$(CC) $(OC_CFLAGS) $(CFLAGS) \
+	  $(OC_CPPFLAGS) $(CPPFLAGS) $(OUTPUTOBJ)$@ \
+	  $(call DEP_FLAGS,$@,$(DEPDIR)/$(@:.$(O)=.$(D))) -c $<
+# MSVC doesn't emit usable dependency information, but if GCC is available
+# then it can instead be called in order to generate the .d file.
+ifneq "$(CC)" "$(DEP_CC)"
+	$(V_CCDEPS)$(DEP_CC) $(OC_CPPFLAGS) $(CPPFLAGS) $< -MM -MT $@ \
+   -MF $(DEPDIR)/$(@:.$(O)=.$(D))
+endif # ifneq "$(CC)" "$(DEP_CC)"
+else
+%.b.$(O): %.c $(REQUIRED_HEADERS)
+	$(V_CC)$(CC) $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) \
+	  $(OUTPUTOBJ)$@ -c $<
+
+%.n.$(O): %.c $(REQUIRED_HEADERS)
+	$(V_CC)$(CC) $(OC_CFLAGS) $(CFLAGS) \
+	  $(OC_CPPFLAGS) $(CPPFLAGS) $(OUTPUTOBJ)$@ -c $<
+endif # ifeq "$(COMPUTE_DEPS)" "true"
+
+%.n.$(O): OC_CFLAGS += $(OC_NATIVE_CFLAGS)
+
+ifeq "$(COMPUTE_DEPS)" "true"
+ifneq "$(COBJS_BYTECODE)" ""
+GENERATED_DEPEND_FILES := $(wildcard $(DEPDIR)/*.$(D))
+.PHONY: $(GENERATED_DEPEND_FILES)
+include $(GENERATED_DEPEND_FILES)
+endif
+endif
