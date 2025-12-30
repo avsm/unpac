@@ -104,3 +104,55 @@ url = "https://tangled.org/@anil.recoil.org/ocaml-tomlt.git"
 [[opam.vendored]]
 name = "cmdliner"
 url = "https://erratique.ch/repos/cmdliner.git"
+
+[[opam.vendored]]
+name = "0install-solver"
+url = "https://github.com/0install/0install.git"
+
+[[opam.vendored]]
+name = "jsonm"
+url = "https://erratique.ch/repos/jsonm.git"
+
+[[opam.vendored]]
+name = "ocamlgraph"
+url = "https://github.com/backtracking/ocamlgraph.git"
+
+[[opam.vendored]]
+name = "opam-0install"
+url = "https://github.com/ocaml-opam/opam-0install-solver.git"
+
+[[opam.vendored]]
+name = "opam-core"
+url = "https://github.com/ocaml/opam.git"
+
+[[opam.vendored]]
+name = "opam-file-format"
+url = "https://github.com/ocaml/opam-file-format"
+
+[[opam.vendored]]
+name = "patch"
+url = "https://github.com/hannesm/patch.git"
+
+[[opam.vendored]]
+name = "re"
+url = "https://github.com/ocaml/ocaml-re.git"
+
+[[opam.vendored]]
+name = "sha"
+url = "https://github.com/djs55/ocaml-sha.git"
+
+[[opam.vendored]]
+name = "spdx_licenses"
+url = "https://github.com/kit-ty-kate/spdx_licenses.git"
+
+[[opam.vendored]]
+name = "stdlib-shims"
+url = "https://github.com/ocaml/stdlib-shims.git"
+
+[[opam.vendored]]
+name = "swhid_core"
+url = "https://github.com/ocamlpro/swhid_core.git"
+
+[[opam.vendored]]
+name = "uutf"
+url = "https://erratique.ch/repos/uutf.git"
