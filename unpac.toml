@@ -100,3 +100,7 @@ url = "https://erratique.ch/repos/ptime.git"
 [[opam.vendored]]
 name = "tomlt"
 url = "https://tangled.org/@anil.recoil.org/ocaml-tomlt.git"
+
+[[opam.vendored]]
+name = "cmdliner"
+url = "https://erratique.ch/repos/cmdliner.git"
