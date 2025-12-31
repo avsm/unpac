@@ -2,6 +2,22 @@
   "version": "1.0",
   "entries": [
     {
+      "id": "b71bd64a-b743-8fdc-16f3-6c805c5d673b",
+      "timestamp": 1767199138.506453,
+      "operation": "opam.add",
+      "args": [
+        "https://github.com/LexiFi/menhir.git",
+        "--name",
+        "menhir"
+      ],
+      "cwd": "/workspace/unpac-unpac/main",
+      "duration_ms": 10952,
+      "status": {
+        "status": "success"
+      },
+      "git_operations": []
+    },
+    {
       "id": "84e26c8a-bef6-ae65-24a4-52b4a79643e7",
       "timestamp": 1767198218.6752441,
       "operation": "opam.merge",
