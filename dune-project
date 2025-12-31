@@ -5,7 +5,7 @@
 (package
  (name unpac)
  (synopsis "Monorepo management tool")
- (description "A tool for managing OCaml monorepos with opam repository integration")
+ (description "A tool for managing OCaml monorepos with opam and git repository integration")
  (authors "Anil Madhavapeddy")
  (license ISC)
  (depends
