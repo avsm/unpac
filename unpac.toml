@@ -184,3 +184,7 @@ url = "https://erratique.ch/repos/fpath.git"
 [[opam.vendored]]
 name = "bytesrw"
 url = "https://erratique.ch/repos/bytesrw.git"
+
+[[opam.vendored]]
+name = "menhir"
+url = "https://github.com/LexiFi/menhir.git"
