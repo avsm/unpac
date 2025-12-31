@@ -180,3 +180,7 @@ url = "http://erratique.ch/repos/astring.git"
 [[opam.vendored]]
 name = "fpath"
 url = "https://erratique.ch/repos/fpath.git"
+
+[[opam.vendored]]
+name = "bytesrw"
+url = "https://erratique.ch/repos/bytesrw.git"
