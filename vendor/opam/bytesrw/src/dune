@@ -1,0 +1,6 @@
+(library
+ (name bytesrw)
+ (public_name bytesrw)
+ (wrapped false)
+ (modules Bytesrw_fmt Bytesrw Bytesrw_utf Bytesrw_hex)
+ (flags (:standard -w -27-32-33-34-37)))
